@@ -1,0 +1,48 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #1a1a1a;
+}
+
+#game-container {
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+#game-canvas {
+  display: block;
+  background: #111;
+  /* Fixed pixel size - prevents 4K from scaling canvas and tanking performance */
+  width: 1200px;
+  height: 900px;
+}
+
+#game-ui {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  gap: 15px;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
+
+#game-ui a {
+  color: #6af;
+  text-decoration: none;
+}
+
+#game-ui a:hover {
+  text-decoration: underline;
+}
+
+#game-ui span {
+  color: #666;
+}

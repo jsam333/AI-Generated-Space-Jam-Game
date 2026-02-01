@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Level Editor</title>
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+  <div id="toolbar">
+    <h2>Level Editor</h2>
+    <div class="tool-group">
+      <label>Level Width: <input type="number" id="level-width" value="5000" min="1000" max="20000" step="500"></label>
+      <label>Level Height: <input type="number" id="level-height" value="5000" min="1000" max="20000" step="500"></label>
+      <button id="apply-size">Apply Size</button>
+    </div>
+    <div class="tool-group">
+      <label>Asteroid Size: <input type="range" id="asteroid-size" min="10" max="150" value="40"></label>
+      <span id="size-display">40</span>
+    </div>
+    <div class="tool-group">
+      <button id="clear-all">Clear All</button>
+      <button id="export-level">Export Level</button>
+      <button id="import-level">Import Level</button>
+      <input type="file" id="import-file" accept=".json" style="display:none">
+    </div>
+    <div class="tool-group">
+      <a href="index.html">Back to Game</a>
+    </div>
+    <div id="instructions">
+      <p>Left-click: Place asteroid</p>
+      <p>Right-click: Remove asteroid</p>
+      <p>Scroll: Zoom in/out</p>
+      <p>Middle-click drag: Pan view</p>
+    </div>
+  </div>
+  <div id="editor-container">
+    <canvas id="editor-canvas" tabindex="1"></canvas>
+  </div>
+  <script src="js/editor.js"></script>
+</body>
+</html>
