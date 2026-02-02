@@ -299,15 +299,17 @@ function update(dt) {
       const overlap = minDist - dist;
       ship.x += nx * overlap;
       ship.y += ny * overlap;
-      // Perpendicular impact speed (into asteroid)
+      // Perpendicular impact speed (into asteroid is negative)
       const normalSpeed = ship.vx * nx + ship.vy * ny;
-      if (normalSpeed > 0) {
-        // Bounce: reflect normal component with restitution
-        const bounce = normalSpeed * (1 + BOUNCE_RESTITUTION);
-        ship.vx -= nx * bounce;
-        ship.vy -= ny * bounce;
+      if (normalSpeed < 0) {
+        // Ship is moving into asteroid
+        const impactSpeed = -normalSpeed; // positive value
+        // Bounce: cancel inward velocity and add small outward push
+        const bounce = impactSpeed * (1 + BOUNCE_RESTITUTION);
+        ship.vx += nx * bounce;
+        ship.vy += ny * bounce;
         // Damage from impact speed, max 20
-        const damage = Math.min(MAX_COLLISION_DAMAGE, normalSpeed * DAMAGE_PER_SPEED);
+        const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
       }
     }
