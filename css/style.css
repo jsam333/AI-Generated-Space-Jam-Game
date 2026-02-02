@@ -46,3 +46,107 @@ body {
 #game-ui span {
   color: #666;
 }
+
+#warp-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+#warp-menu {
+  background: #2a2a2a;
+  padding: 24px;
+  border-radius: 8px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #555;
+}
+
+#warp-menu p {
+  margin: 0;
+  color: #eee;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+#warp-menu button {
+  padding: 8px 16px;
+  margin: 0 4px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #444;
+  color: #fff;
+}
+
+#warp-menu button:hover:not(:disabled) {
+  background: #555;
+}
+
+#warp-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#shop-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+#shop-menu {
+  background: #2a2a2a;
+  padding: 24px;
+  border-radius: 8px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #555;
+}
+
+#shop-menu p {
+  margin: 0;
+  color: #eee;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+#shop-menu button {
+  padding: 8px 16px;
+  margin: 0 4px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #444;
+  color: #fff;
+}
+
+#shop-menu button:hover:not(:disabled) {
+  background: #555;
+}
+
+#shop-menu button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

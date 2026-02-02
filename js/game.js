@@ -61,6 +61,10 @@ let rightMouseDown = false;
 let leftMouseDown = false;
 let ctrlBrake = false;
 
+let gamePaused = false;
+let warpMenuOpen = false;
+let shopMenuOpen = false;
+
 // Bullets
 const bullets = [];
 let fireCooldown = 0;
@@ -205,7 +209,7 @@ function laserHitAsteroid(ox, oy, dx, dy, maxLen) {
 }
 
 const SHIP_SIZE = 10;
-const SHIP_COLLISION_RADIUS = 14;
+const SHIP_COLLISION_RADIUS = 8;
 
 const SHOT_SPREAD = 8;
 
@@ -309,6 +313,32 @@ function update(dt) {
         ship.vx += nx * bounce;
         ship.vy += ny * bounce;
         // Damage from impact speed, max 20
+        const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
+        player.health = Math.max(0, player.health - damage);
+      }
+    }
+  }
+
+  // Ship–warp gate and shop collision (same logic as asteroids, radius 40)
+  const STRUCTURE_SIZE_COLL = 40;
+  for (const st of structures) {
+    if (st.type !== 'warpgate' && st.type !== 'shop') continue;
+    const dx = ship.x - st.x;
+    const dy = ship.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const minDist = SHIP_COLLISION_RADIUS + STRUCTURE_SIZE_COLL;
+    if (dist < minDist && dist > 0) {
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const overlap = minDist - dist;
+      ship.x += nx * overlap;
+      ship.y += ny * overlap;
+      const normalSpeed = ship.vx * nx + ship.vy * ny;
+      if (normalSpeed < 0) {
+        const impactSpeed = -normalSpeed;
+        const bounce = impactSpeed * (1 + BOUNCE_RESTITUTION);
+        ship.vx += nx * bounce;
+        ship.vy += ny * bounce;
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
       }
@@ -436,6 +466,37 @@ function update(dt) {
     item.x += item.vx * dt;
     item.y += item.vy * dt;
 
+    // Collision with asteroids and warp gates: push out so items don't overlap
+    const FLOAT_ITEM_RADIUS = 10;
+    const STRUCTURE_SIZE_COLL = 40;
+    for (const ast of asteroids) {
+      const dx = item.x - ast.x;
+      const dy = item.y - ast.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = ast.radius + FLOAT_ITEM_RADIUS;
+      if (dist < minDist && dist > 0) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const overlap = minDist - dist;
+        item.x += nx * overlap;
+        item.y += ny * overlap;
+      }
+    }
+    for (const st of structures) {
+      if (st.type !== 'warpgate' && st.type !== 'shop') continue;
+      const dx = item.x - st.x;
+      const dy = item.y - st.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = STRUCTURE_SIZE_COLL + FLOAT_ITEM_RADIUS;
+      if (dist < minDist && dist > 0) {
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const overlap = minDist - dist;
+        item.x += nx * overlap;
+        item.y += ny * overlap;
+      }
+    }
+
     // Apply drag (exponential decay)
     const damp = Math.max(0, 1 - FLOAT_DRAG * dt);
     item.vx *= damp;
@@ -462,6 +523,17 @@ function update(dt) {
         for (let j = 0; j < hotbar.length; j++) {
           if (!hotbar[j]) {
             hotbar[j] = { item: item.item, energy: item.energy, maxEnergy: item.maxEnergy };
+            added = true;
+            break;
+          }
+        }
+        if (added) floatingItems.splice(i, 1);
+      } else if (item.item === 'mining laser' && item.heat != null) {
+        // Mining laser: restore heat/overheated
+        let added = false;
+        for (let j = 0; j < hotbar.length; j++) {
+          if (!hotbar[j]) {
+            hotbar[j] = { item: item.item, heat: item.heat, overheated: !!item.overheated };
             added = true;
             break;
           }
@@ -506,13 +578,13 @@ function render() {
   for (const item of floatingItems) {
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
-    const icon = item.item === 'cuprite' ? 'C' : (item.item === 'energy cell' ? 'E' : item.item.charAt(0).toUpperCase());
-    // Draw small glowing circle - energy cells are green-tinted
-    ctx.fillStyle = item.energy != null ? '#448844' : '#aa8844';
+    const icon = item.item === 'cuprite' ? 'C' : (item.item === 'energy cell' ? 'E' : (item.item === 'mining laser' ? 'L' : item.item.charAt(0).toUpperCase()));
+    // Draw small glowing circle - energy cells green, mining laser orange, ore default
+    ctx.fillStyle = item.energy != null ? '#448844' : (item.heat != null ? '#884422' : '#aa8844');
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = item.energy != null ? '#66cc66' : '#ccaa66';
+    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.heat != null ? '#cc6633' : '#ccaa66');
     ctx.lineWidth = 2;
     ctx.stroke();
     // Item icon
@@ -533,18 +605,39 @@ function render() {
 
   // Structures (render as circles)
   const STRUCTURE_SIZE = 40;
+  const WARP_GATE_DASHED_EXTRA = 80;
+  const SHOP_DASHED_EXTRA = 80;
   const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', warpgate: '#6644aa', piratebase: '#884422' };
   for (const st of structures) {
     const { x, y } = worldToScreen(st.x, st.y);
     const r = STRUCTURE_SIZE;
-    if (x + r < 0 || x - r > WIDTH || y + r < 0 || y - r > HEIGHT) continue;
+    const cullR = st.type === 'warpgate' ? STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA : (st.type === 'shop' ? STRUCTURE_SIZE + SHOP_DASHED_EXTRA : r);
+    if (x + cullR < 0 || x - cullR > WIDTH || y + cullR < 0 || y - cullR > HEIGHT) continue;
     ctx.fillStyle = STRUCTURE_STYLES[st.type] || '#446688';
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
+    if (st.type === 'warpgate') {
+      ctx.stroke();
+      const dashedR = STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.arc(x, y, dashedR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else if (st.type === 'shop') {
+      ctx.stroke();
+      const dashedR = STRUCTURE_SIZE + SHOP_DASHED_EXTRA;
+      ctx.setLineDash([8, 8]);
+      ctx.beginPath();
+      ctx.arc(x, y, dashedR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.stroke();
+    }
     ctx.fillStyle = '#fff';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
@@ -837,6 +930,11 @@ canvas.addEventListener('mouseup', (e) => {
             floatItem.energy = draggingItem.energy;
             floatItem.maxEnergy = draggingItem.maxEnergy;
           }
+          // Preserve mining laser heat/overheated
+          if (draggingItem.heat != null) {
+            floatItem.heat = draggingItem.heat;
+            floatItem.overheated = !!draggingItem.overheated;
+          }
           floatingItems.push(floatItem);
           hotbar[draggingSlot] = null;
         }
@@ -868,11 +966,75 @@ canvas.addEventListener('wheel', (e) => {
   }
 });
 
+function isShipInWarpGate() {
+  const STRUCTURE_SIZE = 40;
+  const WARP_GATE_DASHED_EXTRA = 80;
+  const interactRadius = STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA;
+  for (const st of structures) {
+    if (st.type !== 'warpgate') continue;
+    const dx = ship.x - st.x;
+    const dy = ship.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < interactRadius) return true;
+  }
+  return false;
+}
+
+function isShipInShop() {
+  const STRUCTURE_SIZE = 40;
+  const SHOP_DASHED_EXTRA = 80;
+  const interactRadius = STRUCTURE_SIZE + SHOP_DASHED_EXTRA;
+  for (const st of structures) {
+    if (st.type !== 'shop') continue;
+    const dx = ship.x - st.x;
+    const dy = ship.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < interactRadius) return true;
+  }
+  return false;
+}
+
+function hasCuprite() {
+  for (let i = 0; i < hotbar.length; i++) {
+    if (hotbar[i] && hotbar[i].item === 'cuprite' && hotbar[i].quantity > 0) return true;
+  }
+  return false;
+}
+
+function hasEmptyHotbarSlot() {
+  for (let i = 0; i < hotbar.length; i++) {
+    if (!hotbar[i]) return true;
+  }
+  return false;
+}
+
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Control') ctrlBrake = true;
   // Hotbar slot selection (1-9)
   if (e.key >= '1' && e.key <= '9') {
     selectedSlot = parseInt(e.key) - 1;
+  }
+  // Key in E position (KeyE): open warp gate or shop menu when inside (warp has priority)
+  if (e.code === 'KeyE') {
+    if (!warpMenuOpen && !shopMenuOpen && !gamePaused && isShipInWarpGate()) {
+      e.preventDefault();
+      gamePaused = true;
+      warpMenuOpen = true;
+      const overlay = document.getElementById('warp-menu-overlay');
+      if (overlay) overlay.style.display = 'flex';
+      const payBtn = document.getElementById('warp-pay-btn');
+      if (payBtn) payBtn.disabled = player.credits < 100;
+    } else if (!warpMenuOpen && !shopMenuOpen && !gamePaused && isShipInShop()) {
+      e.preventDefault();
+      gamePaused = true;
+      shopMenuOpen = true;
+      const overlay = document.getElementById('shop-menu-overlay');
+      if (overlay) overlay.style.display = 'flex';
+      const buyBtn = document.getElementById('shop-buy-btn');
+      if (buyBtn) buyBtn.disabled = player.credits < 3 || !hasEmptyHotbarSlot();
+      const sell1Btn = document.getElementById('shop-sell1-btn');
+      if (sell1Btn) sell1Btn.disabled = !hasCuprite();
+    }
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -932,6 +1094,69 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+function closeWarpMenu() {
+  warpMenuOpen = false;
+  gamePaused = warpMenuOpen || shopMenuOpen;
+  const overlay = document.getElementById('warp-menu-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function closeShopMenu() {
+  shopMenuOpen = false;
+  gamePaused = warpMenuOpen || shopMenuOpen;
+  const overlay = document.getElementById('shop-menu-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+const warpMenuOverlay = document.getElementById('warp-menu-overlay');
+const warpPayBtn = document.getElementById('warp-pay-btn');
+const warpCancelBtn = document.getElementById('warp-cancel-btn');
+if (warpCancelBtn) {
+  warpCancelBtn.addEventListener('click', () => closeWarpMenu());
+}
+if (warpPayBtn) {
+  warpPayBtn.addEventListener('click', () => {
+    if (player.credits >= 100) {
+      player.credits -= 100;
+      closeWarpMenu();
+    }
+  });
+}
+
+const shopCloseBtn = document.getElementById('shop-close-btn');
+const shopSell1Btn = document.getElementById('shop-sell1-btn');
+const shopBuyBtn = document.getElementById('shop-buy-btn');
+if (shopCloseBtn) {
+  shopCloseBtn.addEventListener('click', () => closeShopMenu());
+}
+if (shopSell1Btn) {
+  shopSell1Btn.addEventListener('click', () => {
+    for (let j = 0; j < hotbar.length; j++) {
+      if (hotbar[j] && hotbar[j].item === 'cuprite' && hotbar[j].quantity > 0) {
+        hotbar[j].quantity--;
+        if (hotbar[j].quantity <= 0) hotbar[j] = null;
+        player.credits += 1;
+        shopSell1Btn.disabled = !hasCuprite();
+        break;
+      }
+    }
+  });
+}
+if (shopBuyBtn) {
+  shopBuyBtn.addEventListener('click', () => {
+    if (player.credits >= 3 && hasEmptyHotbarSlot()) {
+      for (let j = 0; j < hotbar.length; j++) {
+        if (!hotbar[j]) {
+          hotbar[j] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
+          player.credits -= 3;
+          shopBuyBtn.disabled = player.credits < 3 || !hasEmptyHotbarSlot();
+          break;
+        }
+      }
+    }
+  });
+}
+
 // Game loop
 let lastTime = performance.now();
 initStars();
@@ -946,7 +1171,7 @@ function gameLoop(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
-  update(dt);
+  if (!gamePaused) update(dt);
   render();
 
   requestAnimationFrame(gameLoop);

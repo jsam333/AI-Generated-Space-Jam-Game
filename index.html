@@ -9,6 +9,24 @@
 <body>
   <div id="game-container">
     <canvas id="game-canvas" tabindex="1"></canvas>
+    <div id="warp-menu-overlay" style="display: none;">
+      <div id="warp-menu">
+        <p>Use warp gate?</p>
+        <p>Cost: 100 credits</p>
+        <button type="button" id="warp-pay-btn">Pay 100</button>
+        <button type="button" id="warp-cancel-btn">Cancel</button>
+      </div>
+    </div>
+    <div id="shop-menu-overlay" style="display: none;">
+      <div id="shop-menu">
+        <p>Shop</p>
+        <p>Sell cuprite: 1 credit each</p>
+        <button type="button" id="shop-sell1-btn">Sell 1</button>
+        <p>Buy energy cell: 3 credits</p>
+        <button type="button" id="shop-buy-btn">Buy</button>
+        <button type="button" id="shop-close-btn">Close</button>
+      </div>
+    </div>
     <div id="game-ui">
       <a href="editor.html">Level Editor</a>
       <span>Press L to load a level</span>
