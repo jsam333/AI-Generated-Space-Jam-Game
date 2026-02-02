@@ -15,7 +15,7 @@
       <button id="apply-size">Apply Size</button>
     </div>
     <div class="tool-group">
-      <label>Asteroid Size: <input type="range" id="asteroid-size" min="10" max="150" value="40"></label>
+      <label>Asteroid Size: <input type="range" id="asteroid-size" min="10" max="300" step="10" value="40"></label>
       <span id="size-display">40</span>
     </div>
     <div class="tool-group">
@@ -28,14 +28,26 @@
       <a href="index.html">Back to Game</a>
     </div>
     <div id="instructions">
-      <p>Left-click: Place asteroid</p>
-      <p>Right-click: Remove asteroid</p>
+      <p>Left-click: Place selected object</p>
+      <p>Right-click: Remove object</p>
       <p>Scroll: Zoom in/out</p>
       <p>Middle-click drag: Pan view</p>
     </div>
   </div>
   <div id="editor-container">
     <canvas id="editor-canvas" tabindex="1"></canvas>
+    <div id="tool-palette">
+      <div class="palette-title">Place</div>
+      <div class="palette-grid">
+        <button class="palette-btn selected" data-tool="asteroid" title="Asteroid">Asteroid</button>
+        <button class="palette-btn" data-tool="shop" title="Shop Station">Shop</button>
+        <button class="palette-btn" data-tool="shipyard" title="Shipyard">Shipyard</button>
+        <button class="palette-btn" data-tool="refinery" title="Refinery">Refinery</button>
+        <button class="palette-btn" data-tool="fueling" title="Fueling Station">Fueling</button>
+        <button class="palette-btn" data-tool="warpgate" title="Warp Gate">Warp Gate</button>
+        <button class="palette-btn" data-tool="piratebase" title="Pirate Base">Pirate Base</button>
+      </div>
+    </div>
   </div>
   <script src="js/editor.js"></script>
 </body>

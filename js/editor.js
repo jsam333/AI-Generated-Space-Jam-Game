@@ -10,6 +10,8 @@ let mouseInCanvas = false;
 let levelWidth = 5000;
 let levelHeight = 5000;
 let asteroids = [];
+let structures = [];
+let selectedTool = 'asteroid';
 
 // Camera
 let camX = 0;
@@ -25,6 +27,27 @@ let panCamStartY = 0;
 
 // Current tool
 let currentAsteroidSize = 40;
+
+const STORAGE_KEY = 'spacejam-level-editor';
+
+function saveLevel() {
+  const level = { width: levelWidth, height: levelHeight, asteroids, structures };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(level));
+}
+
+function loadLevel() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    const level = JSON.parse(stored);
+    levelWidth = level.width || 5000;
+    levelHeight = level.height || 5000;
+    asteroids = level.asteroids || [];
+    structures = level.structures || [];
+    document.getElementById('level-width').value = levelWidth;
+    document.getElementById('level-height').value = levelHeight;
+  } catch (e) { /* ignore invalid stored data */ }
+}
 
 // Resize canvas to fill container
 function resizeCanvas() {
@@ -105,6 +128,16 @@ function render() {
   ctx.lineTo(origin.x, origin.y + 15);
   ctx.stroke();
 
+  const STRUCTURE_SIZE = 80;
+  const STRUCTURE_STYLES = {
+    shop: { fill: '#446688', stroke: '#6699bb' },
+    shipyard: { fill: '#664466', stroke: '#886688' },
+    refinery: { fill: '#666644', stroke: '#888866' },
+    fueling: { fill: '#446644', stroke: '#668866' },
+    warpgate: { fill: '#6644aa', stroke: '#8866cc' },
+    piratebase: { fill: '#884422', stroke: '#aa6644' }
+  };
+
   // Draw asteroids
   for (const ast of asteroids) {
     const s = worldToScreen(ast.x, ast.y);
@@ -118,24 +151,75 @@ function render() {
     ctx.stroke();
   }
 
-  // Draw preview asteroid at mouse (if in bounds)
+  // Draw structures
+  for (const st of structures) {
+    const s = worldToScreen(st.x, st.y);
+    const r = STRUCTURE_SIZE * zoom;
+    const style = STRUCTURE_STYLES[st.type] || STRUCTURE_STYLES.shop;
+    ctx.fillStyle = style.fill;
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(s.x - r, s.y - r * 0.6, r * 2, r * 1.2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = `${Math.max(8, r * 0.4)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+      const label = st.type === 'warpgate' ? 'W' : (st.type === 'piratebase' ? 'P' : st.type.charAt(0).toUpperCase());
+      ctx.fillText(label, s.x, s.y);
+  }
+
+  // Draw viewport scale box at mouse (1200x900 = game screen size in world units)
+  const GAME_VIEW_WIDTH = 1200;
+  const GAME_VIEW_HEIGHT = 900;
+  if (mouseInCanvas) {
+    const boxW = GAME_VIEW_WIDTH * zoom;
+    const boxH = GAME_VIEW_HEIGHT * zoom;
+    ctx.strokeStyle = 'rgba(100, 150, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(mouseX - boxW / 2, mouseY - boxH / 2, boxW, boxH);
+    ctx.setLineDash([]);
+  }
+
+  // Draw preview at mouse (if in bounds)
   if (mouseInCanvas) {
     const world = screenToWorld(mouseX, mouseY);
     const s = worldToScreen(world.x, world.y);
-    const r = currentAsteroidSize * zoom;
-    ctx.fillStyle = 'rgba(102, 85, 68, 0.5)';
-    ctx.strokeStyle = '#aaa';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (selectedTool === 'asteroid') {
+      const r = currentAsteroidSize * zoom;
+      ctx.fillStyle = 'rgba(102, 85, 68, 0.5)';
+      ctx.strokeStyle = '#aaa';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (STRUCTURE_STYLES[selectedTool]) {
+      const r = STRUCTURE_SIZE * zoom;
+      const style = STRUCTURE_STYLES[selectedTool];
+      ctx.fillStyle = style.fill + '99';
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.rect(s.x - r, s.y - r * 0.6, r * 2, r * 1.2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = `${Math.max(8, r * 0.4)}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const label = selectedTool === 'warpgate' ? 'W' : (selectedTool === 'piratebase' ? 'P' : selectedTool.charAt(0).toUpperCase());
+      ctx.fillText(label, s.x, s.y);
+    }
   }
 
   // Info
   ctx.fillStyle = '#666';
   ctx.font = '12px Arial';
-  ctx.fillText(`Asteroids: ${asteroids.length} | Zoom: ${(zoom * 100).toFixed(0)}% | Level: ${levelWidth}x${levelHeight}`, 10, 20);
+  ctx.fillText(`Asteroids: ${asteroids.length} | Structures: ${structures.length} | Zoom: ${(zoom * 100).toFixed(0)}%`, 10, 20);
 }
 
 canvas.addEventListener('mousemove', (e) => {
@@ -165,12 +249,17 @@ canvas.addEventListener('mousedown', (e) => {
   mouseY = e.clientY - rect.top;
 
   if (e.button === 0) {
-    // Left click - place asteroid
+    // Left click - place selected object
     const world = screenToWorld(mouseX, mouseY);
-    asteroids.push({ x: world.x, y: world.y, radius: currentAsteroidSize });
+    if (selectedTool === 'asteroid') {
+      asteroids.push({ x: world.x, y: world.y, radius: currentAsteroidSize });
+    } else if (['shop', 'shipyard', 'refinery', 'fueling', 'warpgate', 'piratebase'].includes(selectedTool)) {
+      structures.push({ x: world.x, y: world.y, type: selectedTool });
+    }
+    saveLevel();
     render();
   } else if (e.button === 2) {
-    // Right click - remove asteroid under cursor
+    // Right click - remove object under cursor
     const world = screenToWorld(mouseX, mouseY);
     for (let i = asteroids.length - 1; i >= 0; i--) {
       const a = asteroids[i];
@@ -178,6 +267,20 @@ canvas.addEventListener('mousedown', (e) => {
       const dy = a.y - world.y;
       if (Math.sqrt(dx * dx + dy * dy) < a.radius) {
         asteroids.splice(i, 1);
+        saveLevel();
+        render();
+        return;
+      }
+    }
+    const structHalfW = 80;
+    const structHalfH = 48;
+    for (let i = structures.length - 1; i >= 0; i--) {
+      const st = structures[i];
+      const dx = st.x - world.x;
+      const dy = st.y - world.y;
+      if (Math.abs(dx) < structHalfW && Math.abs(dy) < structHalfH) {
+        structures.splice(i, 1);
+        saveLevel();
         break;
       }
     }
@@ -214,15 +317,28 @@ document.getElementById('asteroid-size').addEventListener('input', (e) => {
   render();
 });
 
+// Tool palette selection
+document.querySelectorAll('.palette-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedTool = btn.dataset.tool;
+    document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    render();
+  });
+});
+
 document.getElementById('apply-size').addEventListener('click', () => {
   levelWidth = parseInt(document.getElementById('level-width').value) || 5000;
   levelHeight = parseInt(document.getElementById('level-height').value) || 5000;
+  saveLevel();
   render();
 });
 
 document.getElementById('clear-all').addEventListener('click', () => {
-  if (confirm('Clear all asteroids?')) {
+  if (confirm('Clear all asteroids and structures?')) {
     asteroids = [];
+    structures = [];
+    saveLevel();
     render();
   }
 });
@@ -231,7 +347,8 @@ document.getElementById('export-level').addEventListener('click', () => {
   const level = {
     width: levelWidth,
     height: levelHeight,
-    asteroids: asteroids
+    asteroids,
+    structures
   };
   const json = JSON.stringify(level, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -257,8 +374,10 @@ document.getElementById('import-file').addEventListener('change', (e) => {
       levelWidth = level.width || 5000;
       levelHeight = level.height || 5000;
       asteroids = level.asteroids || [];
+      structures = level.structures || [];
       document.getElementById('level-width').value = levelWidth;
       document.getElementById('level-height').value = levelHeight;
+      saveLevel();
       render();
     } catch (err) {
       alert('Invalid level file');
@@ -267,6 +386,9 @@ document.getElementById('import-file').addEventListener('change', (e) => {
   reader.readAsText(file);
   e.target.value = '';
 });
+
+// Load saved level on startup
+loadLevel();
 
 // Initial render
 render();

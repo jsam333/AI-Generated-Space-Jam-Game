@@ -35,6 +35,7 @@ let fireCooldown = 0;
 
 // Asteroids (loaded from level)
 let asteroids = [];
+let structures = [];
 let levelWidth = 10000;
 let levelHeight = 10000;
 
@@ -186,6 +187,28 @@ function render() {
     ctx.stroke();
   }
 
+  // Structures (render as circles)
+  const STRUCTURE_SIZE = 40;
+  const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', warpgate: '#6644aa', piratebase: '#884422' };
+  for (const st of structures) {
+    const { x, y } = worldToScreen(st.x, st.y);
+    const r = STRUCTURE_SIZE;
+    if (x + r < 0 || x - r > WIDTH || y + r < 0 || y - r > HEIGHT) continue;
+    ctx.fillStyle = STRUCTURE_STYLES[st.type] || '#446688';
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const label = st.type === 'warpgate' ? 'W' : (st.type === 'piratebase' ? 'P' : (st.type ? st.type.charAt(0).toUpperCase() : '?'));
+    ctx.fillText(label, x, y);
+  }
+
   // Level bounds
   const boundLeft = worldToScreen(-levelWidth / 2, 0).x;
   const boundRight = worldToScreen(levelWidth / 2, 0).x;
@@ -244,6 +267,7 @@ function loadLevel(levelData) {
   levelWidth = levelData.width || 10000;
   levelHeight = levelData.height || 10000;
   asteroids = levelData.asteroids || [];
+  structures = levelData.structures || [];
   // Regenerate stars to match level size
   stars.length = 0;
   const spread = Math.max(levelWidth, levelHeight) / 2;
@@ -290,6 +314,12 @@ window.addEventListener('keydown', (e) => {
 // Game loop
 let lastTime = performance.now();
 initStars();
+
+// Auto-load level1.json
+fetch('levels/level1.json')
+  .then(res => res.json())
+  .then(level => loadLevel(level))
+  .catch(err => console.log('No level1.json found, using default level'));
 
 function gameLoop(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
