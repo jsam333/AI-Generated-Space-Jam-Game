@@ -19,16 +19,66 @@
     </div>
     <div id="shop-menu-overlay" style="display: none;">
       <div id="shop-menu">
-        <p>Shop</p>
-        <p>Sell cuprite: 1 credit each</p>
-        <button type="button" id="shop-sell1-btn">Sell 1</button>
-        <p>Buy energy cell: 3 credits</p>
-        <button type="button" id="shop-buy-btn">Buy</button>
-        <button type="button" id="shop-close-btn">Close</button>
+        <div id="shop-header">
+          <span>Shop</span>
+          <button type="button" id="shop-close-btn">Close</button>
+        </div>
+        <div id="shop-main">
+          <div id="shop-buy-area">
+            <div class="shop-section-title">Buy</div>
+            <div id="shop-buy-slots">
+              <div class="shop-buy-slot" data-buy-slot="0"></div>
+              <div class="shop-buy-slot" data-buy-slot="1"></div>
+              <div class="shop-buy-slot" data-buy-slot="2"></div>
+              <div class="shop-buy-slot" data-buy-slot="3"></div>
+              <div class="shop-buy-slot" data-buy-slot="4"></div>
+              <div class="shop-buy-slot" data-buy-slot="5"></div>
+              <div class="shop-buy-slot" data-buy-slot="6"></div>
+              <div class="shop-buy-slot" data-buy-slot="7"></div>
+              <div class="shop-buy-slot" data-buy-slot="8"></div>
+            </div>
+            <div id="shop-price-list"></div>
+          </div>
+          <div id="shop-sell-area">
+            <div class="shop-section-title">Sell</div>
+            <div id="shop-sell-slots">
+              <div class="shop-sell-slot" data-sell-slot="0"></div>
+              <div class="shop-sell-slot" data-sell-slot="1"></div>
+              <div class="shop-sell-slot" data-sell-slot="2"></div>
+              <div class="shop-sell-slot" data-sell-slot="3"></div>
+              <div class="shop-sell-slot" data-sell-slot="4"></div>
+              <div class="shop-sell-slot" data-sell-slot="5"></div>
+              <div class="shop-sell-slot" data-sell-slot="6"></div>
+              <div class="shop-sell-slot" data-sell-slot="7"></div>
+              <div class="shop-sell-slot" data-sell-slot="8"></div>
+            </div>
+            <div id="shop-sell-total">Total: 0 credits</div>
+            <button type="button" id="shop-sell-btn">Sell</button>
+          </div>
+        </div>
       </div>
+      <div id="shop-hotbar-overlay" aria-label="Hotbar">
+        <div id="shop-hotbar">
+          <div class="shop-slot" data-slot="0"></div>
+          <div class="shop-slot" data-slot="1"></div>
+          <div class="shop-slot" data-slot="2"></div>
+          <div class="shop-slot" data-slot="3"></div>
+          <div class="shop-slot" data-slot="4"></div>
+          <div class="shop-slot" data-slot="5"></div>
+          <div class="shop-slot" data-slot="6"></div>
+          <div class="shop-slot" data-slot="7"></div>
+          <div class="shop-slot" data-slot="8"></div>
+        </div>
+        <div id="shop-credits">
+          <div class="shop-credits-label">Credits</div>
+          <div class="shop-credits-value">0</div>
+        </div>
+      </div>
+      <div id="shop-drag-ghost" style="display: none;" aria-hidden="true"></div>
     </div>
     <div id="game-ui">
       <a href="editor.html">Level Editor</a>
+      <label>Level: <select id="level-select"></select></label>
       <span>Press L to load a level</span>
     </div>
   </div>

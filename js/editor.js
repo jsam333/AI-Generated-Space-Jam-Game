@@ -9,6 +9,7 @@ let mouseInCanvas = false;
 // Level data
 let levelWidth = 5000;
 let levelHeight = 5000;
+let levelSeed = 12345;
 let asteroids = [];
 let structures = [];
 let selectedTool = 'asteroid';
@@ -31,7 +32,7 @@ let currentAsteroidSize = 40;
 const STORAGE_KEY = 'spacejam-level-editor';
 
 function saveLevel() {
-  const level = { width: levelWidth, height: levelHeight, asteroids, structures };
+  const level = { width: levelWidth, height: levelHeight, seed: levelSeed, asteroids, structures };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(level));
 }
 
@@ -42,6 +43,7 @@ function loadLevel() {
     const level = JSON.parse(stored);
     levelWidth = level.width || 5000;
     levelHeight = level.height || 5000;
+    levelSeed = level.seed != null ? (level.seed >>> 0) : 12345;
     asteroids = level.asteroids || [];
     structures = level.structures || [];
     document.getElementById('level-width').value = levelWidth;
@@ -317,6 +319,24 @@ document.getElementById('asteroid-size').addEventListener('input', (e) => {
   render();
 });
 
+function updateAsteroidSizeFromValue() {
+  document.getElementById('asteroid-size').value = currentAsteroidSize;
+  document.getElementById('size-display').textContent = currentAsteroidSize;
+  render();
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    currentAsteroidSize = Math.min(300, currentAsteroidSize + 10);
+    updateAsteroidSizeFromValue();
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    currentAsteroidSize = Math.max(10, currentAsteroidSize - 10);
+    updateAsteroidSizeFromValue();
+  }
+});
+
 // Tool palette selection
 document.querySelectorAll('.palette-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -347,6 +367,7 @@ document.getElementById('export-level').addEventListener('click', () => {
   const level = {
     width: levelWidth,
     height: levelHeight,
+    seed: levelSeed,
     asteroids,
     structures
   };
@@ -373,6 +394,7 @@ document.getElementById('import-file').addEventListener('change', (e) => {
       const level = JSON.parse(ev.target.result);
       levelWidth = level.width || 5000;
       levelHeight = level.height || 5000;
+      levelSeed = level.seed != null ? (level.seed >>> 0) : 12345;
       asteroids = level.asteroids || [];
       structures = level.structures || [];
       document.getElementById('level-width').value = levelWidth;

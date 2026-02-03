@@ -22,6 +22,7 @@ body {
   /* Fixed pixel size - prevents 4K from scaling canvas and tanking performance */
   width: 1200px;
   height: 900px;
+  cursor: none;
 }
 
 #game-ui {
@@ -45,6 +46,21 @@ body {
 
 #game-ui span {
   color: #666;
+}
+
+#game-ui label {
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#game-ui select {
+  background: #333;
+  color: #fff;
+  border: 1px solid #555;
+  padding: 2px 6px;
+  font-size: 12px;
 }
 
 #warp-menu-overlay {
@@ -105,30 +121,301 @@ body {
   top: 0;
   width: 1200px;
   height: 900px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
   z-index: 10;
+  pointer-events: auto;
+  cursor: default;
 }
 
 #shop-menu {
-  background: #2a2a2a;
-  padding: 24px;
+  background: rgba(30, 30, 30, 0.95);
+  padding: 20px;
   border-radius: 8px;
-  min-width: 200px;
+  min-width: 320px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #555;
+  gap: 16px;
+  border: 1px solid #666;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-#shop-menu p {
-  margin: 0;
+#shop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#shop-header span {
   color: #eee;
   font-family: Arial, sans-serif;
+  font-size: 18px;
+}
+
+#shop-main {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+#shop-buy-area,
+#shop-sell-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shop-section-title {
+  color: #bbb;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+#shop-buy-slots,
+#shop-sell-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  gap: 0;
+}
+
+.shop-buy-slot {
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #555;
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+
+.shop-buy-slot.has-item {
+  cursor: grab;
+}
+
+.shop-buy-slot.has-item:active {
+  cursor: grabbing;
+}
+
+.shop-buy-slot .shop-slot-icon {
+  margin-top: -4px;
+}
+
+.shop-buy-slot .shop-slot-energy {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #aaffaa;
+}
+
+#shop-price-list {
+  margin-top: 8px;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  color: #ccc;
+}
+
+#shop-price-list .price-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+#shop-price-list .price-label {
+  color: #aaa;
+}
+
+#shop-price-list .price-value {
+  color: #9c9;
+}
+
+.shop-buy-slot .shop-slot-bar {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 32px;
+  background: #333;
+}
+
+.shop-buy-slot .shop-slot-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+
+.shop-buy-slot .shop-slot-qty {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: #aaa;
+}
+
+.shop-slot {
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #555;
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+
+.shop-slot.selected {
+  border: 2px solid #fff;
+  background: #444;
+}
+
+.shop-slot.has-item {
+  cursor: grab;
+}
+
+.shop-slot.has-item:active {
+  cursor: grabbing;
+}
+
+.shop-slot .shop-slot-num {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 10px;
+  color: #666;
+}
+
+.shop-slot .shop-slot-icon {
+  margin-top: -4px;
+}
+
+.shop-slot .shop-slot-energy {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #aaffaa;
+}
+
+.shop-slot .shop-slot-qty {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: #aaa;
+}
+
+.shop-slot .shop-slot-bar {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 32px;
+  background: #333;
+}
+
+.shop-slot .shop-slot-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+
+.shop-sell-slot {
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #555;
+  background: #222;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+
+.shop-sell-slot.has-item {
+  cursor: grab;
+}
+
+.shop-sell-slot.has-item:active {
+  cursor: grabbing;
+}
+
+.shop-sell-slot.droppable {
+  border-color: #6a6;
+  background: #2a3a2a;
+}
+
+.shop-sell-slot .shop-slot-icon {
+  margin-top: -4px;
+}
+
+.shop-sell-slot .shop-slot-energy {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #aaffaa;
+}
+
+.shop-sell-slot .shop-slot-bar {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 32px;
+  background: #333;
+}
+
+.shop-sell-slot .shop-slot-bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+
+.shop-sell-slot .shop-slot-qty {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+  color: #aaa;
+}
+
+#shop-sell-total {
+  color: #9c9;
+  font-family: Arial, sans-serif;
   font-size: 14px;
+  margin-top: 4px;
 }
 
 #shop-menu button {
@@ -149,4 +436,60 @@ body {
 #shop-menu button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+#shop-hotbar-overlay {
+  position: absolute;
+  /* Hotbar is 360px wide, centered in 1200px = starts at 420px */
+  left: 420px;
+  bottom: 0;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row;
+}
+
+#shop-hotbar {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+}
+
+#shop-credits {
+  width: 80px;
+  height: 40px;
+  background: #222;
+  border: 1px solid #555;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.shop-credits-label {
+  color: #ffcc00;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
+
+.shop-credits-value {
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+}
+
+#shop-drag-ghost {
+  position: fixed;
+  width: 40px;
+  height: 40px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 2px solid #aaa;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 20;
 }
