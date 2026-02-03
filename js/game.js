@@ -114,7 +114,7 @@ function spawnSparks(x, y, count) {
 
 
 const MAX_ORE_STACK = 10;
-const ORE_ITEMS = ['cuprite']; // items that stack up to MAX_ORE_STACK
+const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite']; // items that stack up to MAX_ORE_STACK
 
 function getMaxStack(itemName) {
   return ORE_ITEMS.includes(itemName) ? MAX_ORE_STACK : 1;
@@ -484,7 +484,7 @@ function update(dt) {
             y: ast.y,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            item: 'cuprite',
+            item: ast.oreType || 'cuprite',
             quantity: 1
           });
         }
@@ -589,6 +589,16 @@ function update(dt) {
           }
         }
         if (added) floatingItems.splice(i, 1);
+      } else if (item.oxygen != null && item.item === 'oxygen canister') {
+        let added = false;
+        for (let j = 0; j < hotbar.length; j++) {
+          if (!hotbar[j]) {
+            hotbar[j] = { item: item.item, oxygen: item.oxygen, maxOxygen: item.maxOxygen };
+            added = true;
+            break;
+          }
+        }
+        if (added) floatingItems.splice(i, 1);
       } else if (item.item === 'mining laser' && item.heat != null) {
         // Mining laser: restore heat/overheated
         let added = false;
@@ -626,8 +636,18 @@ function render() {
     const { x, y } = worldToScreen(ast.x, ast.y);
     const r = ast.radius;
     if (x + r < 0 || x - r > WIDTH || y + r < 0 || y - r > HEIGHT) continue;
-    ctx.fillStyle = '#665544';
-    ctx.strokeStyle = '#998877';
+    
+    // Asteroid colors based on ore type
+    let fill = '#665544';
+    let stroke = '#998877';
+    
+    if (ast.oreType === 'hematite') { fill = '#8B4513'; stroke = '#A0522D'; }
+    else if (ast.oreType === 'aurite') { fill = '#B8860B'; stroke = '#FFD700'; }
+    else if (ast.oreType === 'diamite') { fill = '#A9A9A9'; stroke = '#C0C0C0'; }
+    else if (ast.oreType === 'platinite') { fill = '#D3D3D3'; stroke = '#E5E4E2'; }
+    
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -639,13 +659,26 @@ function render() {
   for (const item of floatingItems) {
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
-    const icon = item.item === 'cuprite' ? 'C' : (item.item === 'energy cell' ? 'E' : (item.item === 'fuel can' ? 'F' : (item.item === 'mining laser' ? 'L' : item.item.charAt(0).toUpperCase())));
-    // Draw small glowing circle - energy cells green, fuel cans orange, mining laser orange, ore default
-    ctx.fillStyle = item.energy != null ? '#448844' : (item.fuel != null ? '#886622' : (item.heat != null ? '#884422' : '#aa8844'));
+    const icon = item.item === 'cuprite' ? 'C' : 
+                 (item.item === 'hematite' ? 'H' : 
+                 (item.item === 'aurite' ? 'A' : 
+                 (item.item === 'diamite' ? 'D' : 
+                 (item.item === 'platinite' ? 'P' : 
+                 (item.item === 'energy cell' ? 'E' : (item.item === 'fuel can' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : item.item.charAt(0).toUpperCase()))))))));
+    // Draw small glowing circle - energy green, fuel orange, oxygen blue, laser orange, ore default
+    ctx.fillStyle = item.energy != null ? '#448844' : 
+                    (item.fuel != null ? '#886622' : 
+                    (item.oxygen != null ? '#446688' : 
+                    (item.heat != null ? '#884422' : 
+                    (item.item === 'hematite' ? '#8B4513' : 
+                    (item.item === 'aurite' ? '#FFD700' : 
+                    (item.item === 'diamite' ? '#C0C0C0' : 
+                    (item.item === 'platinite' ? '#E5E4E2' : 
+                    '#aa8844')))))));
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.heat != null ? '#cc6633' : '#ccaa66'));
+    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.heat != null ? '#cc6633' : '#ccaa66')));
     ctx.lineWidth = 2;
     ctx.stroke();
     // Item icon
@@ -706,15 +739,6 @@ function render() {
     const label = st.type === 'warpgate' ? 'W' : (st.type === 'piratebase' ? 'P' : (st.type ? st.type.charAt(0).toUpperCase() : '?'));
     ctx.fillText(label, x, y);
   }
-
-  // Level bounds
-  const boundLeft = worldToScreen(-levelWidth / 2, 0).x;
-  const boundRight = worldToScreen(levelWidth / 2, 0).x;
-  const boundTop = worldToScreen(0, -levelHeight / 2).y;
-  const boundBottom = worldToScreen(0, levelHeight / 2).y;
-  ctx.strokeStyle = '#335';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(boundLeft, boundTop, boundRight - boundLeft, boundBottom - boundTop);
 
   // Bullets (fillRect faster than arc)
   for (const b of bullets) {
@@ -908,7 +932,7 @@ function hasEmptyHotbarSlot() {
 
 // Can we accept this floating item (for magnet: don't attract if inventory can't take it)
 function canAcceptFloatingItem(item) {
-  if (item.energy != null || item.fuel != null || (item.item === 'mining laser' && item.heat != null)) {
+  if (item.energy != null || item.fuel != null || item.oxygen != null || (item.item === 'mining laser' && item.heat != null)) {
     return hasEmptyHotbarSlot();
   }
   const qty = item.quantity != null ? item.quantity : 1;
@@ -924,25 +948,31 @@ function canAcceptFloatingItem(item) {
   return space >= qty;
 }
 
-// Shop: buy inventory (3x3 grid, items don't restock) and sell prices
-const ITEM_BUY_PRICE = { 'energy cell': 30, 'fuel can': 50, 'mining laser': 150 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'mining laser': 100, 'fuel can': 20 };
-const shopBuySlots = [null, null, null, null, null, null, null, null, null]; // 9 buy slots
-const shopSellSlots = [null, null, null, null, null, null, null, null, null]; // 9 sell slots
+// Shop: buy/sell 5x3 grid (15 slots)
+const ITEM_BUY_PRICE = { 'energy cell': 30, 'fuel can': 50, 'oxygen canister': 40, 'mining laser': 150 };
+const ITEM_SELL_PRICE = { cuprite: 10, hematite: 15, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 100, 'fuel can': 20, 'oxygen canister': 10 };
+const shopBuySlots = Array(15).fill(null);
+const shopSellSlots = Array(15).fill(null);
 
 function initShopBuySlots() {
-  // Top/middle rows: energy cells; bottom row: fuel cans
-  for (let i = 0; i < 6; i++) {
+  // Row 0-1: energy cells (5); row 2: fuel cans (5); row 3: oxygen canisters (5)
+  for (let i = 0; i < 5; i++) {
     shopBuySlots[i] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
   }
-  for (let i = 6; i < 9; i++) {
+  for (let i = 5; i < 10; i++) {
     shopBuySlots[i] = { item: 'fuel can', fuel: 10, maxFuel: 10 };
+  }
+  for (let i = 10; i < 15; i++) {
+    shopBuySlots[i] = { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
   }
 }
 
 function getShopItemPayload(itemKey) {
   if (itemKey === 'energy cell') {
     return { item: 'energy cell', energy: 10, maxEnergy: 10 };
+  }
+  if (itemKey === 'oxygen canister') {
+    return { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
   }
   return { item: itemKey };
 }
@@ -952,7 +982,12 @@ function getItemLabel(it) {
   if (it.item === 'mining laser') return 'L';
   if (it.item === 'energy cell') return 'E';
   if (it.item === 'fuel can') return 'F';
+  if (it.item === 'oxygen canister') return 'O';
   if (it.item === 'cuprite') return 'C';
+  if (it.item === 'hematite') return 'H';
+  if (it.item === 'aurite') return 'A';
+  if (it.item === 'diamite') return 'D';
+  if (it.item === 'platinite') return 'P';
   return (it.item && it.item.charAt(0).toUpperCase()) || '';
 }
 
@@ -981,6 +1016,13 @@ function getSlotHTML(it) {
       const fillH = Math.round(32 * charge);
       const color = charge > 0.5 ? '#ffaa44' : (charge > 0.25 ? '#ffcc66' : '#ff8844');
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
+    } else if (it.item === 'oxygen canister' && it.oxygen != null) {
+      // Oxygen canister: oxygen value + charge bar (blue)
+      html += `<span class="slot-energy">${it.oxygen.toFixed(1)}</span>`;
+      const charge = it.maxOxygen > 0 ? it.oxygen / it.maxOxygen : 0;
+      const fillH = Math.round(32 * charge);
+      const color = charge > 0.5 ? '#66aaff' : (charge > 0.25 ? '#88ccff' : '#4488dd');
+      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
     } else if (it.quantity != null && it.quantity > 1) {
       html += `<span class="slot-qty">${it.quantity}</span>`;
     }
@@ -1004,6 +1046,13 @@ function getItemSellPrice(item) {
     if (chargeRatio > 0) return 1;
     return 0;
   }
+  // Oxygen canister: 10 when full, 5 when >0
+  if (item.item === 'oxygen canister' && item.oxygen != null && item.maxOxygen != null) {
+    const chargeRatio = item.maxOxygen > 0 ? item.oxygen / item.maxOxygen : 0;
+    if (chargeRatio > 0.5) return 10;
+    if (chargeRatio > 0) return 5;
+    return 0;
+  }
   // Static prices for other items
   const price = ITEM_SELL_PRICE[item.item];
   return price != null ? price : 0;
@@ -1021,7 +1070,7 @@ function getSellTotal() {
 }
 
 function syncShopBuyArea() {
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < shopBuySlots.length; i++) {
     const el = document.querySelector(`#shop-buy-slots .shop-buy-slot[data-buy-slot="${i}"]`);
     if (!el) continue;
     const it = shopBuySlots[i];
@@ -1037,7 +1086,17 @@ function syncShopBuyArea() {
   // Build price list (unchanged)
   const priceList = document.getElementById('shop-price-list');
   if (priceList) {
-    const itemNames = { 'energy cell': 'Energy Cell', 'fuel can': 'Fuel Can', 'mining laser': 'Mining Laser', cuprite: 'Cuprite' };
+    const itemNames = { 
+      'energy cell': 'Energy Cell', 
+      'fuel can': 'Fuel Can', 
+      'oxygen canister': 'Oxygen Canister',
+      'mining laser': 'Mining Laser', 
+      cuprite: 'Cuprite',
+      hematite: 'Hematite',
+      aurite: 'Aurite',
+      diamite: 'Diamite',
+      platinite: 'Platinite'
+    };
     let html = '';
     for (const [itemKey, price] of Object.entries(ITEM_BUY_PRICE)) {
       const label = itemNames[itemKey] || itemKey;
@@ -1072,7 +1131,7 @@ const syncShopHotbar = updateHUD;
 const syncShopCredits = updateHUD;
 
 function syncShopSellArea() {
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < shopSellSlots.length; i++) {
     const el = document.querySelector(`#shop-sell-slots .shop-sell-slot[data-sell-slot="${i}"]`);
     if (!el) continue;
     const it = shopSellSlots[i];
@@ -1386,7 +1445,7 @@ function beginDragFromHotbar(slotIndex, clientX, clientY) {
   const it = hotbar[slotIndex];
   if (!it) return;
   inventoryDrag = { kind: 'hotbar', fromSlot: slotIndex };
-  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : ''));
+  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : '')));
   setDragGhostContent(getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
@@ -1397,7 +1456,7 @@ function beginDragFromBuy(buyIndex, clientX, clientY) {
   if (!it) return;
   const price = ITEM_BUY_PRICE[it.item] || 0;
   inventoryDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
-  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : ''));
+  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : '')));
   setDragGhostContent(getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
@@ -1407,7 +1466,7 @@ function beginDragFromSell(sellIndex, clientX, clientY) {
   const it = shopSellSlots[sellIndex];
   if (!it) return;
   inventoryDrag = { kind: 'sell', fromSellSlot: sellIndex };
-  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : ''));
+  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : '')));
   setDragGhostContent(getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
@@ -1417,17 +1476,31 @@ function endDrag(clientX, clientY) {
   const drag = inventoryDrag;
   inventoryDrag = null;
   setDragGhostVisible(false);
-  // Remove fuel bar highlight
+  // Remove fuel and O2 bar highlights
   const fuelBarEl = document.getElementById('fuel-bar-drop-zone');
   if (fuelBarEl) fuelBarEl.classList.remove('highlight');
+  const oxygenBarEl = document.getElementById('oxygen-bar-drop-zone');
+  if (oxygenBarEl) oxygenBarEl.classList.remove('highlight');
   if (!drag) return;
 
   const under = document.elementFromPoint(clientX, clientY);
-  // Check if we are over a slot or the fuel bar
   let targetSlotEl = null;
   const isOverFuelBar = under && under.closest('#fuel-bar-drop-zone');
+  const isOverO2Bar = under && under.closest('#oxygen-bar-drop-zone');
   if (under) {
     targetSlotEl = under.closest('.slot') || under.closest('.shop-buy-slot') || under.closest('.shop-sell-slot');
+  }
+
+  // Handle drop on O2 bar: oxygen canister adds 10 O2
+  if (isOverO2Bar && drag.kind === 'hotbar') {
+    const from = drag.fromSlot;
+    const it = hotbar[from];
+    if (it && it.item === 'oxygen canister') {
+      player.oxygen = Math.min(player.maxOxygen, player.oxygen + 10);
+      hotbar[from] = null;
+      updateHUD();
+      return;
+    }
   }
 
   // Handle drop on fuel bar: fuel can adds 10 fuel
@@ -1468,6 +1541,10 @@ function endDrag(clientX, clientY) {
         if (it.fuel != null) {
           floatItem.fuel = it.fuel;
           floatItem.maxFuel = it.maxFuel;
+        }
+        if (it.oxygen != null) {
+          floatItem.oxygen = it.oxygen;
+          floatItem.maxOxygen = it.maxOxygen;
         }
         if (it.heat != null) {
           floatItem.heat = it.heat;
@@ -1594,24 +1671,28 @@ window.addEventListener('mousedown', (e) => {
 window.addEventListener('mousemove', (e) => {
   if (inventoryDrag) {
     setDragGhostPos(e.clientX, e.clientY);
-    // Highlight fuel bar if dragging a fuel can over it
     const fuelBarEl = document.getElementById('fuel-bar-drop-zone');
-    if (fuelBarEl) {
-      let isDraggingFuelCan = false;
-      if (inventoryDrag.kind === 'hotbar') {
-        const it = hotbar[inventoryDrag.fromSlot];
-        if (it && it.item === 'fuel can') isDraggingFuelCan = true;
-      }
-      if (isDraggingFuelCan) {
-        const under = document.elementFromPoint(e.clientX, e.clientY);
-        if (under && under.closest('#fuel-bar-drop-zone')) {
+    const oxygenBarEl = document.getElementById('oxygen-bar-drop-zone');
+    if (inventoryDrag.kind === 'hotbar') {
+      const it = hotbar[inventoryDrag.fromSlot];
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      if (fuelBarEl) {
+        if (it && it.item === 'fuel can' && under && under.closest('#fuel-bar-drop-zone')) {
           fuelBarEl.classList.add('highlight');
         } else {
           fuelBarEl.classList.remove('highlight');
         }
-      } else {
-        fuelBarEl.classList.remove('highlight');
       }
+      if (oxygenBarEl) {
+        if (it && it.item === 'oxygen canister' && under && under.closest('#oxygen-bar-drop-zone')) {
+          oxygenBarEl.classList.add('highlight');
+        } else {
+          oxygenBarEl.classList.remove('highlight');
+        }
+      }
+    } else {
+      if (fuelBarEl) fuelBarEl.classList.remove('highlight');
+      if (oxygenBarEl) oxygenBarEl.classList.remove('highlight');
     }
   }
 });

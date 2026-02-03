@@ -182,7 +182,7 @@ body {
 #shop-buy-slots,
 #shop-sell-slots {
   display: grid;
-  grid-template-columns: repeat(3, 40px);
+  grid-template-columns: repeat(5, 40px);
   gap: 0;
 }
 
@@ -366,6 +366,23 @@ body {
 #shop-menu button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+#oxygen-bar-drop-zone {
+  position: absolute;
+  left: 1070px;
+  bottom: 20px;
+  width: 40px;
+  height: 50px;
+  pointer-events: auto;
+  z-index: 15;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+
+#oxygen-bar-drop-zone.highlight {
+  border-color: #fff;
 }
 
 #fuel-bar-drop-zone {

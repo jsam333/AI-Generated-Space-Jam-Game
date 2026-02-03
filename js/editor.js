@@ -12,7 +12,7 @@ let levelHeight = 5000;
 let levelSeed = 12345;
 let asteroids = [];
 let structures = [];
-let selectedTool = 'asteroid';
+let selectedTool = 'asteroid_cuprite';
 
 // Camera
 let camX = 0;
@@ -144,8 +144,19 @@ function render() {
   for (const ast of asteroids) {
     const s = worldToScreen(ast.x, ast.y);
     const r = ast.radius * zoom;
-    ctx.fillStyle = '#665544';
-    ctx.strokeStyle = '#998877';
+    
+    // Default to cuprite if no type
+    const oreType = ast.oreType || 'cuprite';
+    let fill = '#665544';
+    let stroke = '#998877';
+    
+    if (oreType === 'hematite') { fill = '#8B4513'; stroke = '#A0522D'; }
+    else if (oreType === 'aurite') { fill = '#B8860B'; stroke = '#FFD700'; }
+    else if (oreType === 'diamite') { fill = '#A9A9A9'; stroke = '#C0C0C0'; }
+    else if (oreType === 'platinite') { fill = '#D3D3D3'; stroke = '#E5E4E2'; }
+
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
@@ -190,9 +201,17 @@ function render() {
   if (mouseInCanvas) {
     const world = screenToWorld(mouseX, mouseY);
     const s = worldToScreen(world.x, world.y);
-    if (selectedTool === 'asteroid') {
+    if (selectedTool.startsWith('asteroid_')) {
       const r = currentAsteroidSize * zoom;
-      ctx.fillStyle = 'rgba(102, 85, 68, 0.5)';
+      const type = selectedTool.replace('asteroid_', '');
+      
+      let fill = '#665544';
+      if (type === 'hematite') fill = '#8B4513';
+      else if (type === 'aurite') fill = '#B8860B';
+      else if (type === 'diamite') fill = '#A9A9A9';
+      else if (type === 'platinite') fill = '#D3D3D3';
+      
+      ctx.fillStyle = fill + '80'; // semi-transparent
       ctx.strokeStyle = '#aaa';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -253,8 +272,9 @@ canvas.addEventListener('mousedown', (e) => {
   if (e.button === 0) {
     // Left click - place selected object
     const world = screenToWorld(mouseX, mouseY);
-    if (selectedTool === 'asteroid') {
-      asteroids.push({ x: world.x, y: world.y, radius: currentAsteroidSize });
+    if (selectedTool.startsWith('asteroid_')) {
+      const oreType = selectedTool.replace('asteroid_', '');
+      asteroids.push({ x: world.x, y: world.y, radius: currentAsteroidSize, oreType });
     } else if (['shop', 'shipyard', 'refinery', 'fueling', 'warpgate', 'piratebase'].includes(selectedTool)) {
       structures.push({ x: world.x, y: world.y, type: selectedTool });
     }
