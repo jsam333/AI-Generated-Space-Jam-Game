@@ -118,3 +118,38 @@
 {"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770091097742,"sessionId":"debug-session","hypothesisId":"A"}
 {"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18.5},"timestamp":1770091097742,"sessionId":"debug-session","hypothesisId":"C"}
 {"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770091097742,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770098746984,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770098746984,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770098746983,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770098746985,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":54.1},"timestamp":1770098746985,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770103935611,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770103935612,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770103935611,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":586.3},"timestamp":1770103935613,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770103935612,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770104373672,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770104373672,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"energy cell","energy":10,"maxEnergy":10}},"timestamp":1770104373673,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770104373673,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":20.4},"timestamp":1770104373673,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770104597396,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770104597397,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"energy cell","energy":10,"maxEnergy":10}},"timestamp":1770104597398,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770104597398,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":19.8},"timestamp":1770104597398,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770104688997,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"energy cell","energy":10,"maxEnergy":10}},"timestamp":1770104688998,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770104688998,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770104688998,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":21.9},"timestamp":1770104688999,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770104725351,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770104725351,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"energy cell","energy":10,"maxEnergy":10}},"timestamp":1770104725352,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770104725352,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":21.3},"timestamp":1770104725352,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770104959937,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770104959938,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"light blaster","heat":0,"overheated":false}},"timestamp":1770104959938,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770104959938,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":19.8},"timestamp":1770104959939,"sessionId":"debug-session","hypothesisId":"C"}

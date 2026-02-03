@@ -49,7 +49,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 1000
+  credits: 0
 };
 const OXYGEN_DEPLETION_RATE = 1 / 10; // 1 per 10 seconds
 
@@ -749,7 +749,7 @@ function render() {
                  (item.item === 'aurite' ? 'A' : 
                  (item.item === 'diamite' ? 'D' : 
                  (item.item === 'platinite' ? 'P' : 
-                 (item.item === 'energy cell' ? 'E' : (item.item === 'fuel can' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))));
+                 (item.item === 'energy cell' ? 'E' : (item.item === 'fuel tank' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))));
     // Draw small glowing circle - energy green, fuel orange, oxygen blue, laser orange, ore default
     ctx.fillStyle = item.energy != null ? '#448844' : 
                     (item.fuel != null ? '#886622' : 
@@ -1035,20 +1035,20 @@ function canAcceptFloatingItem(item) {
 }
 
 // Shop: buy/sell 5x3 grid (15 slots)
-const ITEM_BUY_PRICE = { 'energy cell': 30, 'oxygen canister': 40, 'fuel can': 50, 'mining laser': 200, 'light blaster': 400 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel can': 20, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 100, 'light blaster': 150 };
+const ITEM_BUY_PRICE = { 'energy cell': 150, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 800 };
+const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel tank': 20, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 100, 'light blaster': 150 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
 function initShopBuySlots() {
-  // Slot 0: light mining laser; 1: light blaster; 2-9: energy cells; 10-12: fuel; 13-14: oxygen
-  shopBuySlots[0] = { item: 'mining laser', heat: 0, overheated: false };
-  shopBuySlots[1] = { item: 'light blaster', heat: 0, overheated: false };
+  // Slot 0: light blaster; 1-9: energy cells; 10-12: fuel; 13-14: oxygen
+  shopBuySlots[0] = { item: 'light blaster', heat: 0, overheated: false };
+  shopBuySlots[1] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
   for (let i = 2; i < 10; i++) {
     shopBuySlots[i] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
   }
   for (let i = 10; i < 13; i++) {
-    shopBuySlots[i] = { item: 'fuel can', fuel: 10, maxFuel: 10 };
+    shopBuySlots[i] = { item: 'fuel tank', fuel: 10, maxFuel: 10 };
   }
   for (let i = 13; i < 15; i++) {
     shopBuySlots[i] = { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
@@ -1073,7 +1073,7 @@ function getItemLabel(it) {
   if (it.item === 'mining laser') return 'L';
   if (it.item === 'light blaster') return 'B';
   if (it.item === 'energy cell') return 'E';
-  if (it.item === 'fuel can') return 'F';
+  if (it.item === 'fuel tank') return 'F';
   if (it.item === 'oxygen canister') return 'O';
   if (it.item === 'cuprite') return 'C';
   if (it.item === 'hematite') return 'H';
@@ -1127,17 +1127,18 @@ function getSlotHTML(it) {
   return html;
 }
 
+const ENERGY_CELL_FULL_SELL = 150; // same as buy price; proportional sell with min below
+const ENERGY_CELL_MIN_SELL = 10;
+
 function getItemSellPrice(item) {
   if (!item) return 0;
-  // Energy cell: 3 when full, 2 when >50%, 1 when <=50%
+  // Energy cell: proportional to charge (full = ENERGY_CELL_FULL_SELL), minimum ENERGY_CELL_MIN_SELL cr
   if (item.item === 'energy cell' && item.energy != null && item.maxEnergy != null) {
     const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
-    if (chargeRatio >= 1) return 3;
-    if (chargeRatio > 0.5) return 2;
-    return 1;
+    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(ENERGY_CELL_FULL_SELL * chargeRatio));
   }
   // Fuel cell: 2 when full, 1 when >0
-  if (item.item === 'fuel can' && item.fuel != null && item.maxFuel != null) {
+  if (item.item === 'fuel tank' && item.fuel != null && item.maxFuel != null) {
     const chargeRatio = item.maxFuel > 0 ? item.fuel / item.maxFuel : 0;
     if (chargeRatio > 0.5) return 2;
     if (chargeRatio > 0) return 1;
@@ -1185,9 +1186,8 @@ function syncShopBuyArea() {
   if (priceList) {
     const itemNames = { 
       'energy cell': 'Energy Cell', 
-      'fuel can': 'Fuel Can', 
+      'fuel tank': 'Fuel Tank', 
       'oxygen canister': 'Oxygen Canister',
-      'mining laser': 'Mining Laser',
       'light blaster': 'Light Blaster',
       cuprite: 'Cuprite',
       hematite: 'Hematite',
@@ -1196,7 +1196,8 @@ function syncShopBuyArea() {
       platinite: 'Platinite'
     };
     let html = '';
-    for (const [itemKey, price] of Object.entries(ITEM_BUY_PRICE)) {
+    const sortedPrices = Object.entries(ITEM_BUY_PRICE).sort((a, b) => a[1] - b[1]);
+    for (const [itemKey, price] of sortedPrices) {
       const label = itemNames[itemKey] || itemKey;
       html += `<div class="price-row"><span class="price-label">${label}</span><span class="price-value">${price} cr</span></div>`;
     }
@@ -1290,7 +1291,7 @@ window.addEventListener('keydown', (e) => {
       const overlay = document.getElementById('warp-menu-overlay');
       if (overlay) overlay.style.display = 'flex';
       const payBtn = document.getElementById('warp-pay-btn');
-      if (payBtn) payBtn.disabled = player.credits < 1000;
+      if (payBtn) payBtn.disabled = player.credits < 2000;
     } else if (!warpMenuOpen && !gamePaused && isShipInShop()) {
       e.preventDefault();
       openShopMenu();
@@ -1491,8 +1492,8 @@ if (warpCancelBtn) {
 }
 if (warpPayBtn) {
   warpPayBtn.addEventListener('click', () => {
-    if (player.credits >= 1000) {
-      player.credits -= 1000;
+    if (player.credits >= 2000) {
+      player.credits -= 2000;
       closeWarpMenu();
     }
   });
@@ -1603,11 +1604,11 @@ function endDrag(clientX, clientY) {
     }
   }
 
-  // Handle drop on fuel bar: fuel can adds 10 fuel
+  // Handle drop on fuel bar: fuel tank adds 10 fuel
   if (isOverFuelBar && drag.kind === 'hotbar') {
     const from = drag.fromSlot;
     const it = hotbar[from];
-    if (it && it.item === 'fuel can') {
+    if (it && it.item === 'fuel tank') {
       player.fuel = Math.min(player.maxFuel, player.fuel + 10);
       hotbar[from] = null;
       updateHUD();
@@ -1743,6 +1744,18 @@ window.addEventListener('mousedown', (e) => {
     const slotIndex = parseInt(hotbarSlotEl.dataset.slot, 10);
     if (slotIndex >= 0 && hotbar[slotIndex]) {
       e.preventDefault();
+      // Shift+click (with shop open): transfer item to first empty sell slot
+      if (e.shiftKey && shopMenuOpen) {
+        const it = hotbar[slotIndex];
+        const firstEmpty = shopSellSlots.findIndex(s => !s);
+        if (firstEmpty >= 0) {
+          shopSellSlots[firstEmpty] = { ...it };
+          hotbar[slotIndex] = null;
+          syncShopSellArea();
+          updateHUD();
+        }
+        return;
+      }
       beginDragFromHotbar(slotIndex, e.clientX, e.clientY);
     }
     return;
@@ -1777,7 +1790,7 @@ window.addEventListener('mousemove', (e) => {
       const it = hotbar[inventoryDrag.fromSlot];
       const under = document.elementFromPoint(e.clientX, e.clientY);
       if (fuelBarEl) {
-        if (it && it.item === 'fuel can' && under && under.closest('#fuel-bar-drop-zone')) {
+        if (it && it.item === 'fuel tank' && under && under.closest('#fuel-bar-drop-zone')) {
           fuelBarEl.classList.add('highlight');
         } else {
           fuelBarEl.classList.remove('highlight');
