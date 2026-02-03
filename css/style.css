@@ -158,6 +158,18 @@ body {
   font-size: 18px;
 }
 
+.shop-title-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+#shop-credits-display {
+  color: #eee;
+  font-family: Arial, sans-serif;
+  font-size: 18px;
+}
+
 #shop-main {
   display: flex;
   flex-direction: row;

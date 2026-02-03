@@ -1,0 +1,95 @@
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770086951163,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770086951164,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770086951164,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770086951165,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":13.1},"timestamp":1770086951165,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087140566,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087140566,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087140567,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087140567,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":20.8},"timestamp":1770087140570,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087208103,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087208103,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087208102,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087208103,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18},"timestamp":1770087208104,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087214103,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087214104,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087214104,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087214104,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":17.9},"timestamp":1770087214105,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087215468,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087215469,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087215469,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":15.5},"timestamp":1770087215470,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087215470,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087223187,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087223188,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087223188,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087223188,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18.5},"timestamp":1770087223190,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087241222,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087241222,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087241223,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087241223,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18.6},"timestamp":1770087241225,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087318293,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087318294,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087318294,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":17.7},"timestamp":1770087318295,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087318294,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087388451,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087388451,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087388452,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087388452,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":19.7},"timestamp":1770087388454,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770087399153,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770087399154,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770087399154,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770087399154,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":20},"timestamp":1770087399156,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088403645,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088403646,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088403646,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":20.4},"timestamp":1770088403647,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088403647,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088456811,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088456811,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088456812,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088456812,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":17.6},"timestamp":1770088456812,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088465636,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088465637,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088465637,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088465638,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":17.2},"timestamp":1770088465638,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088553189,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088553189,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088553190,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088553190,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":17.2},"timestamp":1770088553190,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088557678,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088557679,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088557679,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088557678,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18},"timestamp":1770088557681,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088609190,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088609190,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088609191,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088609191,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18.1},"timestamp":1770088609191,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088687837,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088687837,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088687838,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088687838,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":19.1},"timestamp":1770088687838,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088728625,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088728626,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088728627,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":20.8},"timestamp":1770088728629,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088728627,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770088809311,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770088809312,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088809313,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":16.7},"timestamp":1770088809313,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088809313,"sessionId":"debug-session","hypothesisId":"A"}

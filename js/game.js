@@ -1,5 +1,14 @@
+// #region agent log
+window.onerror = function(msg, url, line, col, error) {
+  fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:error',message:'Uncaught error',data:{msg,url,line,col,errorMsg:error?error.message:''},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+};
+// #endregion
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
+
+// #region agent log
+fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:1',message:'Script started parsing',data:{canvasFound:!!canvas,ctxFound:!!ctx},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+// #endregion
 
 const WIDTH = 1200;
 const HEIGHT = 900;
@@ -8,7 +17,7 @@ const ACCEL = 150;
 const FRICTION = 0.15;
 const MAX_SPEED = 175;
 const BRAKE_FRICTION = 1.5;
-const BULLET_SPEED = 1000;
+const BULLET_SPEED = 500;
 const FIRE_COOLDOWN = 0.03;
 
 canvas.width = WIDTH;
@@ -40,7 +49,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 0
+  credits: 1000
 };
 const OXYGEN_DEPLETION_RATE = 1 / 10; // 1 per 10 seconds
 
@@ -53,12 +62,26 @@ const hotbar = [
 ];
 const LASER_HEAT_RATE = 1;    // per second when firing (full in 1 sec)
 const LASER_COOL_RATE = 1 / 3; // per second when not firing (empty in 3 sec)
+const BLASTER_ENERGY_PER_SHOT = 0.2;
+const BLASTER_HEAT_PER_SHOT = 0.05;
+const BLASTER_COOL_RATE = 1 / 3;
+const BLASTER_FIRE_RATE = 10;  // pellets per second
 let selectedSlot = 0;
+let blasterFireAccum = 0;
 
 function getFirstChargedCell() {
   for (let i = 0; i < hotbar.length; i++) {
     const cell = hotbar[i];
     if (cell && cell.item === 'energy cell' && cell.energy != null && cell.energy > 0) return cell;
+  }
+  return null;
+}
+
+/** First energy cell with at least min energy (for blaster so we switch to next cell when current runs out). */
+function getFirstCellWithMinEnergy(min) {
+  for (let i = 0; i < hotbar.length; i++) {
+    const cell = hotbar[i];
+    if (cell && cell.item === 'energy cell' && cell.energy != null && cell.energy >= min) return cell;
   }
   return null;
 }
@@ -242,6 +265,20 @@ function fireBullet() {
   }
 }
 
+function fireBlasterPellet() {
+  const dx = mouseX - WIDTH / 2;
+  const dy = mouseY - HEIGHT / 2;
+  const dir = normalize(dx, dy);
+  if (dir.x === 0 && dir.y === 0) return;
+  bullets.push({
+    x: ship.x + dir.x * SHIP_SIZE,
+    y: ship.y + dir.y * SHIP_SIZE,
+    vx: dir.x * BULLET_SPEED + ship.vx,
+    vy: dir.y * BULLET_SPEED + ship.vy,
+    lifespan: 2
+  });
+}
+
 function drawShip() {
   const cx = WIDTH / 2;
   const cy = HEIGHT / 2;
@@ -289,9 +326,10 @@ function drawShip() {
     ctx.lineTo(crosshairX + armLen, crosshairY);
     ctx.stroke();
 
-    // Heat bar under crosshair for currently equipped weapon (mining laser)
+    // Heat bar under crosshair for mining laser or light blaster
     const equipped = hotbar[selectedSlot];
-    if (equipped && equipped.item === 'mining laser' && equipped.heat != null && equipped.heat > 0) {
+    const hasHeatWeapon = equipped && equipped.heat != null && equipped.heat > 0 && (equipped.item === 'mining laser' || equipped.item === 'light blaster');
+    if (hasHeatWeapon) {
       const barW = 16;
       const barH = 4;
       const barY = mouseY + 8;
@@ -448,13 +486,50 @@ function update(dt) {
     }
   }
 
-  // Bullets
+  // Light blaster: 5 pellets/sec, 0.5 energy per pellet, 0.1 heat per pellet, cool 1/3 per sec
+  const blaster = hotbar[selectedSlot] && hotbar[selectedSlot].item === 'light blaster' ? hotbar[selectedSlot] : null;
+  if (blaster && blaster.heat != null) {
+    if (blaster.heat >= 1) blaster.overheated = true;
+    if (blaster.heat <= 0) blaster.overheated = false;
+    const blasterCanFire = !blaster.overheated;
+    const hasBlasterEnergy = getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT) != null;
+    if (blasterCanFire && leftMouseDown && hasBlasterEnergy) {
+      blasterFireAccum += BLASTER_FIRE_RATE * dt;
+      while (blasterFireAccum >= 1) {
+        blasterFireAccum -= 1;
+        const c = getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT);
+        if (!c) break;
+        c.energy = Math.max(0, c.energy - BLASTER_ENERGY_PER_SHOT);
+        blaster.heat = Math.min(1, blaster.heat + BLASTER_HEAT_PER_SHOT);
+        fireBlasterPellet();
+      }
+    } else {
+      blaster.heat = Math.max(0, blaster.heat - BLASTER_COOL_RATE * dt);
+    }
+  }
+
+  // Bullets (movement + bullet-asteroid collision)
+  const BULLET_DAMAGE = 2;            // base damage per pellet (e.g. for structures/enemies)
+  const BULLET_DAMAGE_ASTEROID = 0.25; // pellets deal only 0.25 to asteroids
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.x += b.vx * dt;
     b.y += b.vy * dt;
     b.lifespan -= dt;
-    if (b.lifespan <= 0) bullets.splice(i, 1);
+    let remove = b.lifespan <= 0;
+    if (!remove) {
+      for (const ast of asteroids) {
+        const dx = b.x - ast.x;
+        const dy = b.y - ast.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < ast.radius) {
+          ast.health -= BULLET_DAMAGE_ASTEROID;
+          remove = true;
+          break;
+        }
+      }
+    }
+    if (remove) bullets.splice(i, 1);
   }
 
   // Particles (sparks)
@@ -610,6 +685,16 @@ function update(dt) {
           }
         }
         if (added) floatingItems.splice(i, 1);
+      } else if (item.item === 'light blaster' && item.heat != null) {
+        let added = false;
+        for (let j = 0; j < hotbar.length; j++) {
+          if (!hotbar[j]) {
+            hotbar[j] = { item: item.item, heat: item.heat, overheated: !!item.overheated };
+            added = true;
+            break;
+          }
+        }
+        if (added) floatingItems.splice(i, 1);
       } else if (addToInventory(item.item, item.quantity)) {
         floatingItems.splice(i, 1);
       }
@@ -664,21 +749,22 @@ function render() {
                  (item.item === 'aurite' ? 'A' : 
                  (item.item === 'diamite' ? 'D' : 
                  (item.item === 'platinite' ? 'P' : 
-                 (item.item === 'energy cell' ? 'E' : (item.item === 'fuel can' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : item.item.charAt(0).toUpperCase()))))))));
+                 (item.item === 'energy cell' ? 'E' : (item.item === 'fuel can' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))));
     // Draw small glowing circle - energy green, fuel orange, oxygen blue, laser orange, ore default
     ctx.fillStyle = item.energy != null ? '#448844' : 
                     (item.fuel != null ? '#886622' : 
                     (item.oxygen != null ? '#446688' : 
+                    (item.item === 'light blaster' ? '#6644aa' : 
                     (item.heat != null ? '#884422' : 
                     (item.item === 'hematite' ? '#8B4513' : 
                     (item.item === 'aurite' ? '#FFD700' : 
                     (item.item === 'diamite' ? '#C0C0C0' : 
                     (item.item === 'platinite' ? '#E5E4E2' : 
-                    '#aa8844')))))));
+                    '#aa8844'))))))));
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.heat != null ? '#cc6633' : '#ccaa66')));
+    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : '#ccaa66'))));
     ctx.lineWidth = 2;
     ctx.stroke();
     // Item icon
@@ -932,7 +1018,7 @@ function hasEmptyHotbarSlot() {
 
 // Can we accept this floating item (for magnet: don't attract if inventory can't take it)
 function canAcceptFloatingItem(item) {
-  if (item.energy != null || item.fuel != null || item.oxygen != null || (item.item === 'mining laser' && item.heat != null)) {
+  if (item.energy != null || item.fuel != null || item.oxygen != null || (item.item === 'mining laser' && item.heat != null) || (item.item === 'light blaster' && item.heat != null)) {
     return hasEmptyHotbarSlot();
   }
   const qty = item.quantity != null ? item.quantity : 1;
@@ -949,20 +1035,22 @@ function canAcceptFloatingItem(item) {
 }
 
 // Shop: buy/sell 5x3 grid (15 slots)
-const ITEM_BUY_PRICE = { 'energy cell': 30, 'fuel can': 50, 'oxygen canister': 40, 'mining laser': 150 };
-const ITEM_SELL_PRICE = { cuprite: 10, hematite: 15, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 100, 'fuel can': 20, 'oxygen canister': 10 };
+const ITEM_BUY_PRICE = { 'energy cell': 30, 'oxygen canister': 40, 'fuel can': 50, 'mining laser': 200, 'light blaster': 400 };
+const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel can': 20, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 100, 'light blaster': 150 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
 function initShopBuySlots() {
-  // Row 0-1: energy cells (5); row 2: fuel cans (5); row 3: oxygen canisters (5)
-  for (let i = 0; i < 5; i++) {
+  // Slot 0: light mining laser; 1: light blaster; 2-9: energy cells; 10-12: fuel; 13-14: oxygen
+  shopBuySlots[0] = { item: 'mining laser', heat: 0, overheated: false };
+  shopBuySlots[1] = { item: 'light blaster', heat: 0, overheated: false };
+  for (let i = 2; i < 10; i++) {
     shopBuySlots[i] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
   }
-  for (let i = 5; i < 10; i++) {
+  for (let i = 10; i < 13; i++) {
     shopBuySlots[i] = { item: 'fuel can', fuel: 10, maxFuel: 10 };
   }
-  for (let i = 10; i < 15; i++) {
+  for (let i = 13; i < 15; i++) {
     shopBuySlots[i] = { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
   }
 }
@@ -974,12 +1062,16 @@ function getShopItemPayload(itemKey) {
   if (itemKey === 'oxygen canister') {
     return { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
   }
+  if (itemKey === 'light blaster') {
+    return { item: 'light blaster', heat: 0, overheated: false };
+  }
   return { item: itemKey };
 }
 
 function getItemLabel(it) {
   if (!it) return '';
   if (it.item === 'mining laser') return 'L';
+  if (it.item === 'light blaster') return 'B';
   if (it.item === 'energy cell') return 'E';
   if (it.item === 'fuel can') return 'F';
   if (it.item === 'oxygen canister') return 'O';
@@ -998,6 +1090,11 @@ function getSlotHTML(it) {
     
     // Mining laser: heat bar (red)
     if (it.item === 'mining laser' && it.heat != null) {
+      const fillH = Math.round(32 * it.heat);
+      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
+    }
+    // Light blaster: heat bar (red)
+    if (it.item === 'light blaster' && it.heat != null) {
       const fillH = Math.round(32 * it.heat);
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
     }
@@ -1090,7 +1187,8 @@ function syncShopBuyArea() {
       'energy cell': 'Energy Cell', 
       'fuel can': 'Fuel Can', 
       'oxygen canister': 'Oxygen Canister',
-      'mining laser': 'Mining Laser', 
+      'mining laser': 'Mining Laser',
+      'light blaster': 'Light Blaster',
       cuprite: 'Cuprite',
       hematite: 'Hematite',
       aurite: 'Aurite',
@@ -1124,6 +1222,8 @@ function updateHUD() {
   // Sync Credits
   const valueEl = document.querySelector('.credits-value');
   if (valueEl) valueEl.textContent = player.credits;
+  const shopCreditsEl = document.getElementById('shop-credits-display');
+  if (shopCreditsEl) shopCreditsEl.textContent = `You have ${player.credits} credits`;
 }
 
 // Alias for compatibility if needed, or I can replace calls
@@ -1445,7 +1545,7 @@ function beginDragFromHotbar(slotIndex, clientX, clientY) {
   const it = hotbar[slotIndex];
   if (!it) return;
   inventoryDrag = { kind: 'hotbar', fromSlot: slotIndex };
-  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : '')));
+  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
   setDragGhostContent(getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
@@ -1456,7 +1556,7 @@ function beginDragFromBuy(buyIndex, clientX, clientY) {
   if (!it) return;
   const price = ITEM_BUY_PRICE[it.item] || 0;
   inventoryDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
-  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : '')));
+  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
   setDragGhostContent(getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
@@ -1466,7 +1566,7 @@ function beginDragFromSell(sellIndex, clientX, clientY) {
   const it = shopSellSlots[sellIndex];
   if (!it) return;
   inventoryDrag = { kind: 'sell', fromSellSlot: sellIndex };
-  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : '')));
+  const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
   setDragGhostContent(getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
@@ -1706,12 +1806,23 @@ window.addEventListener('mouseup', (e) => {
 
 // Game loop
 let lastTime = performance.now();
+// #region agent log
+fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:init',message:'Before initStars/initShopBuySlots',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+// #endregion
 initStars();
 initShopBuySlots();
+// #region agent log
+fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:init',message:'After initStars/initShopBuySlots',data:{starsCount:stars.length,shopBuySlot0:shopBuySlots[0]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+// #endregion
 
 // Initial level load is handled in level select init above (restore saved or level1)
 
+let gameLoopCount = 0;
 function gameLoop(now) {
+  // #region agent log
+  if (gameLoopCount === 0) fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:gameLoop',message:'First gameLoop call',data:{now},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+  gameLoopCount++;
+  // #endregion
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
@@ -1721,4 +1832,7 @@ function gameLoop(now) {
 
   requestAnimationFrame(gameLoop);
 }
+// #region agent log
+fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:end',message:'Script fully parsed, starting gameLoop',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+// #endregion
 requestAnimationFrame(gameLoop);
