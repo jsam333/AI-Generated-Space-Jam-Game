@@ -109,9 +109,8 @@ function spawnSparks(x, y, count) {
   }
 }
 
-// Drag state for hotbar
-let draggingSlot = null;
-let draggingItem = null;
+// Drag state for hotbar (Legacy canvas drag removed)
+
 
 const MAX_ORE_STACK = 5;
 const ORE_ITEMS = ['cuprite']; // items that stack up to MAX_ORE_STACK
@@ -807,140 +806,6 @@ function render() {
   drawMeter(rightmost - 60, player.oxygen, player.maxOxygen, '#44aaff', 'O2');
   drawMeter(rightmost - 30, player.fuel, player.maxFuel, '#ffaa44', 'Fuel');
   drawMeter(rightmost, player.health, player.maxHealth, '#ff4444', 'HP');
-
-  if (!shopMenuOpen) {
-    // Hotbar (9 slots, bottom center)
-    const slotSize = 40;
-    const slotSpacing = 0;
-    const hotbarWidth = 9 * slotSize;
-    const hotbarX = (WIDTH - hotbarWidth) / 2;
-    const hotbarY = HEIGHT - slotSize;
-
-    for (let i = 0; i < 9; i++) {
-      const sx = hotbarX + i * (slotSize + slotSpacing);
-      // Slot background
-      ctx.fillStyle = i === selectedSlot ? '#444' : '#222';
-      ctx.fillRect(sx, hotbarY, slotSize, slotSize);
-      // Slot border
-      ctx.strokeStyle = i === selectedSlot ? '#fff' : '#555';
-      ctx.lineWidth = i === selectedSlot ? 2 : 1;
-      ctx.strokeRect(sx, hotbarY, slotSize, slotSize);
-      // Slot number
-      ctx.fillStyle = '#666';
-      ctx.font = '10px Arial';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(i + 1, sx + 2, hotbarY + 2);
-      // Item (if any)
-      if (hotbar[i]) {
-        const it = hotbar[i];
-        const icon = it.item === 'mining laser' ? 'L' : (it.item === 'energy cell' ? 'E' : it.item.charAt(0).toUpperCase());
-        ctx.fillStyle = '#fff';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(icon, sx + slotSize / 2, hotbarY + slotSize / 2 - 4);
-        // Mining laser heat bar (red, right side)
-        if (it.item === 'mining laser' && it.heat != null) {
-          const barWidth = 5;
-          const barX = sx + slotSize - barWidth - 2;
-          const barY = hotbarY + 2;
-          const barHeight = slotSize - 4;
-          ctx.fillStyle = '#222';
-          ctx.fillRect(barX, barY, barWidth, barHeight);
-          ctx.fillStyle = '#cc2222';
-          ctx.fillRect(barX, barY + barHeight * (1 - it.heat), barWidth, barHeight * it.heat);
-        }
-        // Quantity or energy
-        if (it.energy != null) {
-          ctx.fillStyle = '#aaffaa';
-          ctx.font = '9px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(it.energy.toFixed(1), sx + slotSize / 2, hotbarY + slotSize / 2 + 2);
-          // Vertical charge bar on right side of slot
-          const barWidth = 5;
-          const barX = sx + slotSize - barWidth - 2;
-          const barY = hotbarY + 2;
-          const barHeight = slotSize - 4;
-          ctx.fillStyle = '#222';
-          ctx.fillRect(barX, barY, barWidth, barHeight);
-          const charge = it.maxEnergy > 0 ? it.energy / it.maxEnergy : 0;
-          ctx.fillStyle = charge > 0.5 ? '#66ff66' : (charge > 0.25 ? '#ffff66' : '#ff6666');
-          ctx.fillRect(barX, barY + barHeight * (1 - charge), barWidth, barHeight * charge);
-        } else if (it.quantity > 1) {
-          ctx.fillStyle = '#aaa';
-          ctx.font = '10px Arial';
-          ctx.textAlign = 'right';
-          ctx.textBaseline = 'bottom';
-          ctx.fillText(it.quantity, sx + slotSize - 2, hotbarY + slotSize - 2);
-        }
-      }
-    }
-
-    // Credits counter (to the right of hotbar, touching)
-    const creditsX = hotbarX + hotbarWidth;
-    ctx.fillStyle = '#222';
-    ctx.fillRect(creditsX, hotbarY, 80, slotSize);
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(creditsX, hotbarY, 80, slotSize);
-    ctx.fillStyle = '#ffcc00';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText('Credits', creditsX + 40, hotbarY + 4);
-    ctx.fillStyle = '#fff';
-    ctx.font = '14px Arial';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(player.credits, creditsX + 40, hotbarY + slotSize - 4);
-
-    // Dragged item following cursor
-    if (draggingItem) {
-      const icon = draggingItem.item === 'mining laser' ? 'L' : (draggingItem.item === 'energy cell' ? 'E' : draggingItem.item.charAt(0).toUpperCase());
-      ctx.fillStyle = 'rgba(40, 40, 40, 0.8)';
-      ctx.fillRect(mouseX - 20, mouseY - 20, 40, 40);
-      ctx.strokeStyle = '#aaa';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(mouseX - 20, mouseY - 20, 40, 40);
-      ctx.fillStyle = '#fff';
-      ctx.font = '14px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(icon, mouseX, mouseY);
-    }
-  }
-}
-
-// Hotbar slot detection helper
-function getHotbarSlotAt(mx, my) {
-  const slotSize = 40;
-  const hotbarWidth = 9 * slotSize;
-  const hotbarX = (WIDTH - hotbarWidth) / 2;
-  const hotbarY = HEIGHT - slotSize;
-  if (my >= hotbarY && my < hotbarY + slotSize) {
-    const relX = mx - hotbarX;
-    if (relX >= 0 && relX < hotbarWidth) {
-      return Math.floor(relX / slotSize);
-    }
-  }
-  return -1;
-}
-
-// Check if mouse is over hotbar area (any slot) or credits indicator
-function isOverHotbarArea(mx, my) {
-  const slotSize = 40;
-  const hotbarWidth = 9 * slotSize;
-  const hotbarX = (WIDTH - hotbarWidth) / 2;
-  const hotbarY = HEIGHT - slotSize;
-  const creditsWidth = 80;
-  // Check hotbar slots or credits indicator
-  if (my >= hotbarY && my < hotbarY + slotSize) {
-    if (mx >= hotbarX && mx < hotbarX + hotbarWidth + creditsWidth) {
-      return true;
-    }
-  }
-  return false;
 }
 
 // Input
@@ -950,28 +815,12 @@ canvas.addEventListener('mousemove', (e) => {
   const scaleY = canvas.height / rect.height;
   mouseX = (e.clientX - rect.left) * scaleX;
   mouseY = (e.clientY - rect.top) * scaleY;
-  
-  // Change cursor to pointer when hovering over hotbar area (slots or credits)
-  if (!shopMenuOpen) {
-    if (isOverHotbarArea(mouseX, mouseY)) {
-      canvas.style.cursor = 'pointer';
-    } else {
-      canvas.style.cursor = 'none';
-    }
-  }
 });
 
 canvas.addEventListener('mousedown', (e) => {
   if (shopMenuOpen) return;
   if (e.button === 0) {
-    // Check if clicking on hotbar slot with item to start dragging
-    const slot = getHotbarSlotAt(mouseX, mouseY);
-    if (slot >= 0 && hotbar[slot]) {
-      draggingSlot = slot;
-      draggingItem = hotbar[slot];
-    } else {
-      leftMouseDown = true;
-    }
+    leftMouseDown = true;
   } else if (e.button === 2) {
     rightMouseDown = true;
   }
@@ -980,46 +829,6 @@ canvas.addEventListener('mousedown', (e) => {
 canvas.addEventListener('mouseup', (e) => {
   if (shopMenuOpen) return;
   if (e.button === 0) {
-    // Handle drag end
-    if (draggingSlot !== null && draggingItem) {
-      const targetSlot = getHotbarSlotAt(mouseX, mouseY);
-      if (targetSlot >= 0 && targetSlot !== draggingSlot) {
-        // Swap items between slots
-        const temp = hotbar[targetSlot];
-        hotbar[targetSlot] = hotbar[draggingSlot];
-        hotbar[draggingSlot] = temp;
-      } else if (targetSlot < 0) {
-        // Jettison item in front of ship
-        const dx = mouseX - WIDTH / 2;
-        const dy = mouseY - HEIGHT / 2;
-        const dir = normalize(dx, dy);
-        if (dir.x !== 0 || dir.y !== 0) {
-          const jettSpeed = 240;
-          const floatItem = {
-            x: ship.x + dir.x * 20,
-            y: ship.y + dir.y * 20,
-            vx: dir.x * jettSpeed + ship.vx * 0.3,
-            vy: dir.y * jettSpeed + ship.vy * 0.3,
-            item: draggingItem.item,
-            quantity: draggingItem.quantity || 1
-          };
-          // Preserve energy cell charge
-          if (draggingItem.energy != null) {
-            floatItem.energy = draggingItem.energy;
-            floatItem.maxEnergy = draggingItem.maxEnergy;
-          }
-          // Preserve mining laser heat/overheated
-          if (draggingItem.heat != null) {
-            floatItem.heat = draggingItem.heat;
-            floatItem.overheated = !!draggingItem.overheated;
-          }
-          floatingItems.push(floatItem);
-          hotbar[draggingSlot] = null;
-        }
-      }
-      draggingSlot = null;
-      draggingItem = null;
-    }
     leftMouseDown = false;
   }
   if (e.button === 2) rightMouseDown = false;
@@ -1028,9 +837,6 @@ canvas.addEventListener('mouseup', (e) => {
 canvas.addEventListener('mouseleave', () => {
   rightMouseDown = false;
   leftMouseDown = false;
-  // Cancel drag on leave
-  draggingSlot = null;
-  draggingItem = null;
 });
 
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1115,6 +921,31 @@ function getItemLabel(it) {
   return (it.item && it.item.charAt(0).toUpperCase()) || '';
 }
 
+function getSlotHTML(it) {
+  let html = '';
+  if (it) {
+    html += `<span class="slot-icon">${getItemLabel(it)}</span>`;
+    
+    // Mining laser: heat bar (red)
+    if (it.item === 'mining laser' && it.heat != null) {
+      const fillH = Math.round(32 * it.heat);
+      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
+    }
+    
+    // Energy cell: energy value + charge bar
+    if (it.energy != null) {
+      html += `<span class="slot-energy">${it.energy.toFixed(1)}</span>`;
+      const charge = it.maxEnergy > 0 ? it.energy / it.maxEnergy : 0;
+      const fillH = Math.round(32 * charge);
+      const color = charge > 0.5 ? '#66ff66' : (charge > 0.25 ? '#ffff66' : '#ff6666');
+      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
+    } else if (it.quantity != null && it.quantity > 1) {
+      html += `<span class="slot-qty">${it.quantity}</span>`;
+    }
+  }
+  return html;
+}
+
 function getItemSellPrice(item) {
   if (!item) return 0;
   // Energy cell: 3 when full, 2 when >50%, 1 when <=50%
@@ -1147,26 +978,14 @@ function syncShopBuyArea() {
     const it = shopBuySlots[i];
     el.classList.toggle('has-item', !!it);
     
-    let html = '';
-    if (it) {
-      html += `<span class="shop-slot-icon">${getItemLabel(it)}</span>`;
-      
-      // Energy cell: energy value + charge bar
-      if (it.energy != null) {
-        html += `<span class="shop-slot-energy">${it.energy.toFixed(1)}</span>`;
-        const charge = it.maxEnergy > 0 ? it.energy / it.maxEnergy : 0;
-        const fillH = Math.round(32 * charge);
-        const color = charge > 0.5 ? '#66ff66' : (charge > 0.25 ? '#ffff66' : '#ff6666');
-        html += `<div class="shop-slot-bar"><div class="shop-slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
-      } else if (it.quantity != null && it.quantity > 1) {
-        html += `<span class="shop-slot-qty">${it.quantity}</span>`;
-      }
-    }
+    // We can reuse getSlotHTML, but buy slots don't usually need dynamic heat/energy bars if they are static store items.
+    // However, our shop items DO have energy/maxEnergy properties (like energy cells).
+    // So getSlotHTML works fine.
     
-    el.innerHTML = html;
+    el.innerHTML = getSlotHTML(it);
   }
   
-  // Build price list
+  // Build price list (unchanged)
   const priceList = document.getElementById('shop-price-list');
   if (priceList) {
     const itemNames = { 'energy cell': 'Energy Cell', 'mining laser': 'Mining Laser', cuprite: 'Cuprite' };
@@ -1180,41 +999,28 @@ function syncShopBuyArea() {
 }
 
 
-function syncShopHotbar() {
+function updateHUD() {
+  // Sync Hotbar
   for (let i = 0; i < 9; i++) {
-    const el = document.querySelector(`#shop-hotbar .shop-slot[data-slot="${i}"]`);
+    const el = document.querySelector(`#hotbar .slot[data-slot="${i}"]`);
     if (!el) continue;
     const it = hotbar[i];
     el.classList.toggle('has-item', !!it);
     el.classList.toggle('selected', i === selectedSlot);
     
-    let html = `<span class="shop-slot-num">${i + 1}</span>`;
-    
-    if (it) {
-      html += `<span class="shop-slot-icon">${getItemLabel(it)}</span>`;
-      
-      // Mining laser: heat bar (red)
-      if (it.item === 'mining laser' && it.heat != null) {
-        const fillH = Math.round(32 * it.heat);
-        html += `<div class="shop-slot-bar"><div class="shop-slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
-      }
-      
-      // Energy cell: energy value + charge bar (green/yellow/red)
-      if (it.energy != null) {
-        html += `<span class="shop-slot-energy">${it.energy.toFixed(1)}</span>`;
-        const charge = it.maxEnergy > 0 ? it.energy / it.maxEnergy : 0;
-        const fillH = Math.round(32 * charge);
-        const color = charge > 0.5 ? '#66ff66' : (charge > 0.25 ? '#ffff66' : '#ff6666');
-        html += `<div class="shop-slot-bar"><div class="shop-slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
-      } else if (it.quantity != null && it.quantity > 1) {
-        // Quantity (only if > 1)
-        html += `<span class="shop-slot-qty">${it.quantity}</span>`;
-      }
-    }
-    
+    let html = `<span class="slot-num">${i + 1}</span>`;
+    html += getSlotHTML(it);
     el.innerHTML = html;
   }
+  
+  // Sync Credits
+  const valueEl = document.querySelector('.credits-value');
+  if (valueEl) valueEl.textContent = player.credits;
 }
+
+// Alias for compatibility if needed, or I can replace calls
+const syncShopHotbar = updateHUD;
+const syncShopCredits = updateHUD;
 
 function syncShopSellArea() {
   for (let i = 0; i < 9; i++) {
@@ -1223,29 +1029,7 @@ function syncShopSellArea() {
     const it = shopSellSlots[i];
     el.classList.toggle('has-item', !!it);
     
-    let html = '';
-    if (it) {
-      html += `<span class="shop-slot-icon">${getItemLabel(it)}</span>`;
-      
-      // Mining laser: heat bar (red)
-      if (it.item === 'mining laser' && it.heat != null) {
-        const fillH = Math.round(32 * it.heat);
-        html += `<div class="shop-slot-bar"><div class="shop-slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
-      }
-      
-      // Energy cell: energy value + charge bar
-      if (it.energy != null) {
-        html += `<span class="shop-slot-energy">${it.energy.toFixed(1)}</span>`;
-        const charge = it.maxEnergy > 0 ? it.energy / it.maxEnergy : 0;
-        const fillH = Math.round(32 * charge);
-        const color = charge > 0.5 ? '#66ff66' : (charge > 0.25 ? '#ffff66' : '#ff6666');
-        html += `<div class="shop-slot-bar"><div class="shop-slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
-      } else if (it.quantity != null && it.quantity > 1) {
-        html += `<span class="shop-slot-qty">${it.quantity}</span>`;
-      }
-    }
-    
-    el.innerHTML = html;
+    el.innerHTML = getSlotHTML(it);
   }
   const totalEl = document.getElementById('shop-sell-total');
   if (totalEl) totalEl.textContent = `Total: ${getSellTotal()} credits`;
@@ -1253,10 +1037,8 @@ function syncShopSellArea() {
   if (sellBtn) sellBtn.disabled = getSellTotal() === 0;
 }
 
-function syncShopCredits() {
-  const valueEl = document.querySelector('.shop-credits-value');
-  if (valueEl) valueEl.textContent = player.credits;
-}
+// syncShopCredits merged into updateHUD
+
 
 function returnSellAreaToHotbar() {
   for (let i = 0; i < shopSellSlots.length; i++) {
@@ -1475,9 +1257,8 @@ function openShopMenu() {
   shopMenuOpen = true;
   for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
   syncShopBuyArea();
-  syncShopHotbar();
+  updateHUD();
   syncShopSellArea();
-  syncShopCredits();
   const overlay = document.getElementById('shop-menu-overlay');
   if (overlay) overlay.style.display = 'flex';
   const ghost = document.getElementById('shop-drag-ghost');
@@ -1522,110 +1303,153 @@ if (shopSellBtn) {
     player.credits += total;
     for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
     syncShopSellArea();
-    syncShopCredits();
+    updateHUD();
   });
 }
 
-// Shop overlay drag (custom ghost so dragging visually overlaps everything)
-let shopDrag = null; // { kind: 'hotbar'|'buy', fromSlot?: number, itemKey?: string, price?: number }
+// Inventory drag state (unified for HUD and Shop)
+let inventoryDrag = null; // { kind: 'hotbar'|'buy'|'sell', fromSlot?: number, fromBuySlot?: number, fromSellSlot?: number, price?: number }
 
-function setShopGhostVisible(visible) {
+function setDragGhostVisible(visible) {
   const ghost = document.getElementById('shop-drag-ghost');
   if (!ghost) return;
   ghost.style.display = visible ? 'flex' : 'none';
 }
 
-function setShopGhostContent(label, qtyText) {
+function setDragGhostContent(label, qtyText) {
   const ghost = document.getElementById('shop-drag-ghost');
   if (!ghost) return;
   if (qtyText) {
-    ghost.innerHTML = `${label}<span class="shop-slot-qty">${qtyText}</span>`;
+    ghost.innerHTML = `${label}<span class="slot-qty">${qtyText}</span>`;
   } else {
     ghost.textContent = label;
   }
 }
 
-function setShopGhostPos(clientX, clientY) {
+function setDragGhostPos(clientX, clientY) {
   const ghost = document.getElementById('shop-drag-ghost');
   if (!ghost) return;
   ghost.style.left = (clientX - 22) + 'px';
   ghost.style.top = (clientY - 22) + 'px';
 }
 
-function beginShopDragFromHotbar(slotIndex, clientX, clientY) {
+function beginDragFromHotbar(slotIndex, clientX, clientY) {
   const it = hotbar[slotIndex];
   if (!it) return;
-  shopDrag = { kind: 'hotbar', fromSlot: slotIndex };
+  inventoryDrag = { kind: 'hotbar', fromSlot: slotIndex };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : '');
-  setShopGhostContent(getItemLabel(it), qty);
-  setShopGhostPos(clientX, clientY);
-  setShopGhostVisible(true);
+  setDragGhostContent(getItemLabel(it), qty);
+  setDragGhostPos(clientX, clientY);
+  setDragGhostVisible(true);
 }
 
-function beginShopDragFromBuy(buyIndex, clientX, clientY) {
+function beginDragFromBuy(buyIndex, clientX, clientY) {
   const it = shopBuySlots[buyIndex];
   if (!it) return;
   const price = ITEM_BUY_PRICE[it.item] || 0;
-  shopDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
+  inventoryDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : '');
-  setShopGhostContent(getItemLabel(it), qty);
-  setShopGhostPos(clientX, clientY);
-  setShopGhostVisible(true);
+  setDragGhostContent(getItemLabel(it), qty);
+  setDragGhostPos(clientX, clientY);
+  setDragGhostVisible(true);
 }
 
-function beginShopDragFromSell(sellIndex, clientX, clientY) {
+function beginDragFromSell(sellIndex, clientX, clientY) {
   const it = shopSellSlots[sellIndex];
   if (!it) return;
-  shopDrag = { kind: 'sell', fromSellSlot: sellIndex };
+  inventoryDrag = { kind: 'sell', fromSellSlot: sellIndex };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : '');
-  setShopGhostContent(getItemLabel(it), qty);
-  setShopGhostPos(clientX, clientY);
-  setShopGhostVisible(true);
+  setDragGhostContent(getItemLabel(it), qty);
+  setDragGhostPos(clientX, clientY);
+  setDragGhostVisible(true);
 }
 
-function endShopDrag(clientX, clientY) {
-  const drag = shopDrag;
-  shopDrag = null;
-  setShopGhostVisible(false);
+function endDrag(clientX, clientY) {
+  const drag = inventoryDrag;
+  inventoryDrag = null;
+  setDragGhostVisible(false);
   if (!drag) return;
 
   const under = document.elementFromPoint(clientX, clientY);
-  if (!under) return;
+  // If dropped on canvas (or not on UI), and not shop open -> jettison?
+  // Check if we are over a slot
+  let targetSlotEl = null;
+  if (under) {
+    targetSlotEl = under.closest('.slot') || under.closest('.shop-buy-slot') || under.closest('.shop-sell-slot');
+  }
 
-  const sellSlotEl = under.closest && under.closest('.shop-sell-slot');
-  const hotbarSlotEl = under.closest && under.closest('#shop-hotbar .shop-slot');
+  // Handle Jettison if dropped outside of UI and shop is closed
+  if (!targetSlotEl && !shopMenuOpen && drag.kind === 'hotbar') {
+    // Drop into space
+    const from = drag.fromSlot;
+    const it = hotbar[from];
+    if (it) {
+      const dx = mouseX - WIDTH / 2;
+      const dy = mouseY - HEIGHT / 2;
+      const dir = normalize(dx, dy);
+      if (dir.x !== 0 || dir.y !== 0) {
+        const jettSpeed = 240;
+        const floatItem = {
+          x: ship.x + dir.x * 20,
+          y: ship.y + dir.y * 20,
+          vx: dir.x * jettSpeed + ship.vx * 0.3,
+          vy: dir.y * jettSpeed + ship.vy * 0.3,
+          item: it.item,
+          quantity: it.quantity || 1
+        };
+        if (it.energy != null) {
+          floatItem.energy = it.energy;
+          floatItem.maxEnergy = it.maxEnergy;
+        }
+        if (it.heat != null) {
+          floatItem.heat = it.heat;
+          floatItem.overheated = !!it.overheated;
+        }
+        floatingItems.push(floatItem);
+        hotbar[from] = null;
+        updateHUD();
+      }
+    }
+    return;
+  }
+
+  if (!targetSlotEl) return;
+
+  // Determine target type
+  const isHotbar = targetSlotEl.classList.contains('slot');
+  const isSell = targetSlotEl.classList.contains('shop-sell-slot');
+  const isBuy = targetSlotEl.classList.contains('shop-buy-slot'); // Can't drop onto buy slots generally
 
   if (drag.kind === 'hotbar') {
     const from = drag.fromSlot;
     const it = hotbar[from];
     if (!it) return;
 
-    if (sellSlotEl) {
-      const sellIndex = parseInt(sellSlotEl.dataset.sellSlot, 10);
+    if (isSell && shopMenuOpen) {
+      const sellIndex = parseInt(targetSlotEl.dataset.sellSlot, 10);
       if (sellIndex >= 0 && !shopSellSlots[sellIndex]) {
         shopSellSlots[sellIndex] = { ...it };
         hotbar[from] = null;
-        syncShopHotbar();
+        updateHUD();
         syncShopSellArea();
         return;
       }
-    }
-    if (hotbarSlotEl) {
-      const to = parseInt(hotbarSlotEl.dataset.slot, 10);
+    } else if (isHotbar) {
+      const to = parseInt(targetSlotEl.dataset.slot, 10);
       if (to >= 0 && to !== from) {
         const tmp = hotbar[to];
         hotbar[to] = hotbar[from];
         hotbar[from] = tmp;
-        syncShopHotbar();
+        updateHUD();
         return;
       }
     }
   } else if (drag.kind === 'buy') {
-    if (!hotbarSlotEl) return;
+    if (!isHotbar) return;
     const from = drag.fromBuySlot;
     const it = shopBuySlots[from];
     if (!it) return;
-    const to = parseInt(hotbarSlotEl.dataset.slot, 10);
+    const to = parseInt(targetSlotEl.dataset.slot, 10);
     if (to < 0) return;
     if (hotbar[to]) return;
     if (player.credits < drag.price) return;
@@ -1633,27 +1457,23 @@ function endShopDrag(clientX, clientY) {
     hotbar[to] = { ...it };
     shopBuySlots[from] = null;
     syncShopBuyArea();
-    syncShopHotbar();
-    syncShopCredits();
+    updateHUD();
   } else if (drag.kind === 'sell') {
-    // Dragging from sell slot back to hotbar
     const from = drag.fromSellSlot;
     const it = shopSellSlots[from];
     if (!it) return;
     
-    if (hotbarSlotEl) {
-      const to = parseInt(hotbarSlotEl.dataset.slot, 10);
+    if (isHotbar) {
+      const to = parseInt(targetSlotEl.dataset.slot, 10);
       if (to >= 0 && !hotbar[to]) {
         hotbar[to] = { ...it };
         shopSellSlots[from] = null;
-        syncShopHotbar();
+        updateHUD();
         syncShopSellArea();
         return;
       }
-    }
-    // Swap within sell slots
-    if (sellSlotEl) {
-      const toSell = parseInt(sellSlotEl.dataset.sellSlot, 10);
+    } else if (isSell) {
+      const toSell = parseInt(targetSlotEl.dataset.sellSlot, 10);
       if (toSell >= 0 && toSell !== from) {
         const tmp = shopSellSlots[toSell];
         shopSellSlots[toSell] = shopSellSlots[from];
@@ -1665,28 +1485,34 @@ function endShopDrag(clientX, clientY) {
   }
 }
 
-const shopOverlayEl = document.getElementById('shop-menu-overlay');
-if (shopOverlayEl) {
-  shopOverlayEl.addEventListener('mousedown', (e) => {
-    if (!shopMenuOpen) return;
-    if (e.button !== 0) return;
-    const t = e.target;
-    const hotbarSlotEl = t.closest && t.closest('#shop-hotbar .shop-slot');
-    const buySlotEl = t.closest && t.closest('.shop-buy-slot');
-    const sellSlotEl = t.closest && t.closest('.shop-sell-slot');
-    if (hotbarSlotEl) {
-      const slotIndex = parseInt(hotbarSlotEl.dataset.slot, 10);
-      if (slotIndex >= 0 && hotbar[slotIndex]) {
+// UI Drag Start Listener
+window.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return;
+  const t = e.target;
+  
+  const hotbarSlotEl = t.closest && t.closest('#hotbar .slot');
+  const buySlotEl = t.closest && t.closest('.shop-buy-slot');
+  const sellSlotEl = t.closest && t.closest('.shop-sell-slot');
+  
+  if (hotbarSlotEl) {
+    const slotIndex = parseInt(hotbarSlotEl.dataset.slot, 10);
+    if (slotIndex >= 0) {
+      selectedSlot = slotIndex;
+      updateHUD();
+      if (hotbar[slotIndex]) {
         e.preventDefault();
-        beginShopDragFromHotbar(slotIndex, e.clientX, e.clientY);
+        beginDragFromHotbar(slotIndex, e.clientX, e.clientY);
       }
-      return;
     }
+    return;
+  }
+  
+  if (shopMenuOpen) {
     if (buySlotEl) {
       const buyIndex = parseInt(buySlotEl.dataset.buySlot, 10);
       if (buyIndex >= 0 && shopBuySlots[buyIndex]) {
         e.preventDefault();
-        beginShopDragFromBuy(buyIndex, e.clientX, e.clientY);
+        beginDragFromBuy(buyIndex, e.clientX, e.clientY);
       }
       return;
     }
@@ -1694,23 +1520,24 @@ if (shopOverlayEl) {
       const sellIndex = parseInt(sellSlotEl.dataset.sellSlot, 10);
       if (sellIndex >= 0 && shopSellSlots[sellIndex]) {
         e.preventDefault();
-        beginShopDragFromSell(sellIndex, e.clientX, e.clientY);
+        beginDragFromSell(sellIndex, e.clientX, e.clientY);
       }
+      return;
     }
-  });
-}
+  }
+});
 
 window.addEventListener('mousemove', (e) => {
-  if (!shopMenuOpen) return;
-  if (!shopDrag) return;
-  setShopGhostPos(e.clientX, e.clientY);
+  if (inventoryDrag) {
+    setDragGhostPos(e.clientX, e.clientY);
+  }
 });
 
 window.addEventListener('mouseup', (e) => {
   if (e.button !== 0) return;
-  if (!shopMenuOpen) return;
-  if (!shopDrag) return;
-  endShopDrag(e.clientX, e.clientY);
+  if (inventoryDrag) {
+    endDrag(e.clientX, e.clientY);
+  }
 });
 
 // Game loop
@@ -1726,6 +1553,7 @@ function gameLoop(now) {
 
   if (!gamePaused) update(dt);
   render();
+  updateHUD(); // Sync HUD every frame (or could optimize to only when changed)
 
   requestAnimationFrame(gameLoop);
 }
