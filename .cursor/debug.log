@@ -93,3 +93,23 @@
 {"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770088809313,"sessionId":"debug-session","hypothesisId":"B"}
 {"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":16.7},"timestamp":1770088809313,"sessionId":"debug-session","hypothesisId":"C"}
 {"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770088809313,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770089280723,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770089280723,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770089280724,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":38.6},"timestamp":1770089280724,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770089280724,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770089566288,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770089566289,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770089566289,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770089566289,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18.5},"timestamp":1770089566290,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770089659523,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770089659523,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770089659524,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770089659524,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":17.2},"timestamp":1770089659524,"sessionId":"debug-session","hypothesisId":"C"}
+{"location":"game.js:1","message":"Script started parsing","data":{"canvasFound":true,"ctxFound":true},"timestamp":1770090374968,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:init","message":"Before initStars/initShopBuySlots","data":{},"timestamp":1770090374969,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:init","message":"After initStars/initShopBuySlots","data":{"starsCount":2400,"shopBuySlot0":{"item":"mining laser","heat":0,"overheated":false}},"timestamp":1770090374970,"sessionId":"debug-session","hypothesisId":"B"}
+{"location":"game.js:end","message":"Script fully parsed, starting gameLoop","data":{},"timestamp":1770090374970,"sessionId":"debug-session","hypothesisId":"A"}
+{"location":"game.js:gameLoop","message":"First gameLoop call","data":{"now":18.8},"timestamp":1770090374971,"sessionId":"debug-session","hypothesisId":"C"}

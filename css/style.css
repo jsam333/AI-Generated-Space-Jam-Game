@@ -382,10 +382,10 @@ body {
 
 #oxygen-bar-drop-zone {
   position: absolute;
-  left: 1070px;
+  left: 1050px;
   bottom: 20px;
   width: 40px;
-  height: 50px;
+  height: 60px;
   pointer-events: auto;
   z-index: 15;
   box-sizing: border-box;
