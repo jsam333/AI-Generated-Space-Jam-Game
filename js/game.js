@@ -8,9 +8,12 @@ const ctx = canvas.getContext('2d');
 
 // Three.js ship layer (3D model from scout-ship.glb)
 let shipCanvas, shipScene, shipCamera, shipRenderer, shipMesh, shipModelLoaded = false;
-// Small asteroid 3D models (radius 10 & 20)
-let smallAsteroidModel = null;
+// Small asteroid 3D models (radius 10-30)
+let smallAsteroidModels = [null, null, null];
+// Medium asteroid 3D models (radius 40-90)
+let mediumAsteroidModels = [null, null];
 let asteroidContainer = null;
+let levelSeed = 0;
 
 // #region agent log
 fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:1',message:'Script started parsing',data:{canvasFound:!!canvas,ctxFound:!!ctx},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
@@ -28,6 +31,13 @@ const FIRE_COOLDOWN = 0.03;
 
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
+
+let uiCanvas = document.getElementById('ui-canvas');
+let uiCtx = uiCanvas ? uiCanvas.getContext('2d') : null;
+if (uiCanvas) {
+  uiCanvas.width = WIDTH;
+  uiCanvas.height = HEIGHT;
+}
 
 // Seeded RNG for reproducible starfield per level (mulberry32)
 function createSeededRandom(seed) {
@@ -314,24 +324,26 @@ function drawShip2D() {
 }
 
 function drawCrosshairAndHeatBar() {
+  if (!uiCtx) return;
+  uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
   if (shopMenuOpen) return;
   const armLen = 6;
   const centerGap = 2;
   const crosshairX = Math.floor(mouseX) + 0.5;
   const crosshairY = Math.floor(mouseY) + 0.5;
   const armW = 2;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.fillRect(crosshairX - armW / 2, crosshairY - armLen, armW, armLen - centerGap);
-  ctx.fillRect(crosshairX - armW / 2, crosshairY + centerGap, armW, armLen - centerGap);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.lineWidth = 1;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(crosshairX - armLen, crosshairY);
-  ctx.lineTo(crosshairX - centerGap, crosshairY);
-  ctx.moveTo(crosshairX + centerGap, crosshairY);
-  ctx.lineTo(crosshairX + armLen, crosshairY);
-  ctx.stroke();
+  uiCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  uiCtx.fillRect(crosshairX - armW / 2, crosshairY - armLen, armW, armLen - centerGap);
+  uiCtx.fillRect(crosshairX - armW / 2, crosshairY + centerGap, armW, armLen - centerGap);
+  uiCtx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  uiCtx.lineWidth = 1;
+  uiCtx.lineCap = 'round';
+  uiCtx.beginPath();
+  uiCtx.moveTo(crosshairX - armLen, crosshairY);
+  uiCtx.lineTo(crosshairX - centerGap, crosshairY);
+  uiCtx.moveTo(crosshairX + centerGap, crosshairY);
+  uiCtx.lineTo(crosshairX + armLen, crosshairY);
+  uiCtx.stroke();
   const equipped = hotbar[selectedSlot];
   const hasHeatWeapon = equipped && equipped.heat != null && equipped.heat > 0 && (MINING_LASER_STATS[equipped.item] || equipped.item === 'light blaster');
   if (hasHeatWeapon) {
@@ -340,10 +352,10 @@ function drawCrosshairAndHeatBar() {
     const barY = mouseY + 8;
     const barX = mouseX - barW / 2;
     const isOverheated = equipped.overheated;
-    ctx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
-    ctx.fillRect(barX, barY, barW, barH);
-    ctx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
-    ctx.fillRect(barX, barY, barW * Math.min(1, equipped.heat), barH);
+    uiCtx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
+    uiCtx.fillRect(barX, barY, barW, barH);
+    uiCtx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
+    uiCtx.fillRect(barX, barY, barW * Math.min(1, equipped.heat), barH);
   }
 }
 
@@ -383,7 +395,7 @@ function initShip3D() {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = (SHIP_SIZE * 2) / (maxDim > 0 ? maxDim : 1);
+    const scale = (SHIP_SIZE * 2) / (maxDim > 0 ? maxDim : 1) * 1.2;
     model.scale.setScalar(scale);
     model.position.sub(center.multiplyScalar(scale));
     // Convert common glTF orientation (Y-up, Z-forward) into our top-down XY view.
@@ -400,10 +412,7 @@ function initShip3D() {
     console.error('[ship3d] Failed to load scout-ship.glb', err);
   });
 
-  const asteroidUrl = new URL('assets/small-asteroid1.glb', window.location.href).toString();
-  loader.load(asteroidUrl, (gltf) => {
-    const model = gltf.scene;
-    // Convert materials to MeshStandardMaterial so they respond to lighting
+  function setupAsteroidModel(model) {
     model.traverse((child) => {
       if (child.isMesh && child.material) {
         const oldMat = child.material;
@@ -427,26 +436,66 @@ function initShip3D() {
     model.scale.setScalar(scale);
     model.position.sub(center.multiplyScalar(scale));
     model.rotation.x = -Math.PI / 2;
-    smallAsteroidModel = model;
-    refreshAsteroidMeshes();
-    console.log('[ship3d] Loaded small-asteroid1.glb');
-  }, undefined, (err) => {
-    console.error('[ship3d] Failed to load small-asteroid1.glb', err);
+  }
+  let asteroidsLoaded = 0;
+  const TOTAL_ASTEROID_MODELS = 5;
+  const SMALL_ASTEROID_FILES = ['small-asteroid1.glb', 'small-asteroid2.glb', 'small-asteroid3.glb'];
+  const MEDIUM_ASTEROID_FILES = ['medium-asteroid1.glb', 'medium-asteroid2.glb'];
+  function onAsteroidLoaded() {
+    asteroidsLoaded++;
+    if (asteroidsLoaded === TOTAL_ASTEROID_MODELS) refreshAsteroidMeshes();
+  }
+  SMALL_ASTEROID_FILES.forEach((filename, i) => {
+    const url = new URL('assets/' + filename, window.location.href).toString();
+    loader.load(url, (gltf) => {
+      const model = gltf.scene;
+      setupAsteroidModel(model);
+      smallAsteroidModels[i] = model;
+      onAsteroidLoaded();
+      console.log('[ship3d] Loaded ' + filename);
+    }, undefined, (err) => console.error('[ship3d] Failed to load ' + filename, err));
+  });
+  MEDIUM_ASTEROID_FILES.forEach((filename, i) => {
+    const url = new URL('assets/' + filename, window.location.href).toString();
+    loader.load(url, (gltf) => {
+      const model = gltf.scene;
+      setupAsteroidModel(model);
+      mediumAsteroidModels[i] = model;
+      onAsteroidLoaded();
+      console.log('[ship3d] Loaded ' + filename);
+    }, undefined, (err) => console.error('[ship3d] Failed to load ' + filename, err));
   });
 }
 
 function refreshAsteroidMeshes() {
-  if (!asteroidContainer || !smallAsteroidModel) return;
+  const smallLoaded = smallAsteroidModels.every(m => m != null);
+  const mediumLoaded = mediumAsteroidModels.every(m => m != null);
+  if (!asteroidContainer || !smallLoaded || !mediumLoaded) return;
   while (asteroidContainer.children.length) asteroidContainer.remove(asteroidContainer.children[0]);
+  const rng = createSeededRandom(levelSeed);
   for (const ast of asteroids) {
     ast._mesh = null;
-    if (ast.radius !== 10 && ast.radius !== 20) continue;
-    const clone = smallAsteroidModel.clone(true);
-    clone.rotation.y = Math.random() * Math.PI * 2;
+    let src = null;
+    if (ast.radius >= 10 && ast.radius <= 30) {
+      const modelIndex = Math.floor(rng() * 3);
+      src = smallAsteroidModels[modelIndex];
+    } else if (ast.radius >= 40 && ast.radius <= 90) {
+      const modelIndex = rng() < 0.8 ? 0 : 1; // 80% medium-asteroid1, 20% medium-asteroid2
+      src = mediumAsteroidModels[modelIndex];
+    }
+    if (!src) continue;
+    ast._initialSpinPhase = rng() * Math.PI * 2;
+    const spinAxis = Math.floor(rng() * 3);
+    const spinDirection = rng() < 0.5 ? -1 : 1;
+    ast._spinSpeed = 0.3 * (0.7 + rng() * 0.6);
+    ast._spinAxis = spinAxis;
+    ast._spinDirection = spinDirection;
+    const clone = src.clone(true);
+    clone.rotation[['x', 'y', 'z'][spinAxis]] = ast._initialSpinPhase;
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const scale = (ast.radius * 2) / maxDim;
+    const scale = ((ast.radius * 2) / maxDim) * 1.2;
     clone.scale.setScalar(scale);
     ast._mesh = clone;
     asteroidContainer.add(clone);
@@ -843,9 +892,9 @@ function render(dt = 1 / 60) {
     ctx.fillRect(sx - s / 2, sy - s / 2, s, s);
   }
 
-  // Asteroids (2D circles; radius 10 & 20 use 3D model instead)
+  // Asteroids (2D circles; radius 10-30 use 3D model instead)
   for (const ast of asteroids) {
-    if (ast.radius === 10 || ast.radius === 20) continue;
+    if ((ast.radius >= 10 && ast.radius <= 30) || (ast.radius >= 40 && ast.radius <= 90)) continue;
     const { x, y } = worldToScreen(ast.x, ast.y);
     const r = ast.radius;
     if (x + r < 0 || x - r > WIDTH || y + r < 0 || y - r > HEIGHT) continue;
@@ -974,11 +1023,13 @@ function render(dt = 1 / 60) {
   }
 
   // Update 3D asteroid positions (camera-follow coordinates; negate Y to match 2D canvas)
-  const ASTEROID_SPIN = 0.3; // radians per second
   for (const ast of asteroids) {
     if (ast._mesh) {
       ast._mesh.position.set(ast.x - ship.x, -(ast.y - ship.y), 0);
-      ast._mesh.rotation.z += ASTEROID_SPIN * dt;
+      const spin = (ast._spinSpeed ?? 0.3) * (ast._spinDirection ?? 1) * dt;
+      if (ast._spinAxis === 0) ast._mesh.rotation.x += spin;
+      else if (ast._spinAxis === 1) ast._mesh.rotation.y += spin;
+      else ast._mesh.rotation.z += spin;
     }
   }
 
@@ -1044,39 +1095,41 @@ function render(dt = 1 / 60) {
   }
 
   // Player stats meters (bottom right) - bar height in pixels = max value in units
-  const meterWidth = 40;
-  const meterSpacing = 50;
-  const meterY = HEIGHT - 20;
+  if (uiCtx) {
+    const meterWidth = 40;
+    const meterSpacing = 50;
+    const meterY = HEIGHT - 20;
 
-  function drawMeter(x, value, max, color, label) {
-    const barHeight = max * 2; // 2 pixels per unit
-    const fillH = (value / max) * barHeight;
-    // Background
-    ctx.fillStyle = '#222';
-    ctx.fillRect(x - meterWidth / 2, meterY - barHeight, meterWidth, barHeight);
-    // Fill
-    ctx.fillStyle = color;
-    ctx.fillRect(x - meterWidth / 2, meterY - fillH, meterWidth, fillH);
-    // Border
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x - meterWidth / 2, meterY - barHeight, meterWidth, barHeight);
-    // Label
-    ctx.fillStyle = '#aaa';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(label, x, meterY + 4);
-    // Value
-    ctx.fillStyle = '#fff';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(value.toFixed(1), x, meterY - barHeight - 2);
+    function drawMeter(x, value, max, color, label) {
+      const barHeight = max * 2; // 2 pixels per unit
+      const fillH = (value / max) * barHeight;
+      // Background
+      uiCtx.fillStyle = '#222';
+      uiCtx.fillRect(x - meterWidth / 2, meterY - barHeight, meterWidth, barHeight);
+      // Fill
+      uiCtx.fillStyle = color;
+      uiCtx.fillRect(x - meterWidth / 2, meterY - fillH, meterWidth, fillH);
+      // Border
+      uiCtx.strokeStyle = '#555';
+      uiCtx.lineWidth = 1;
+      uiCtx.strokeRect(x - meterWidth / 2, meterY - barHeight, meterWidth, barHeight);
+      // Label
+      uiCtx.fillStyle = '#aaa';
+      uiCtx.font = '10px Arial';
+      uiCtx.textAlign = 'center';
+      uiCtx.textBaseline = 'top';
+      uiCtx.fillText(label, x, meterY + 4);
+      // Value
+      uiCtx.fillStyle = '#fff';
+      uiCtx.textBaseline = 'bottom';
+      uiCtx.fillText(value.toFixed(1), x, meterY - barHeight - 2);
+    }
+
+    const rightmost = WIDTH - 30;
+    drawMeter(rightmost - 100, player.oxygen, player.maxOxygen, '#44aaff', 'O2');
+    drawMeter(rightmost - 50, player.fuel, player.maxFuel, '#ffaa44', 'Fuel');
+    drawMeter(rightmost, player.health, player.maxHealth, '#ff4444', 'HP');
   }
-
-  const rightmost = WIDTH - 30;
-  drawMeter(rightmost - 100, player.oxygen, player.maxOxygen, '#44aaff', 'O2');
-  drawMeter(rightmost - 50, player.fuel, player.maxFuel, '#ffaa44', 'Fuel');
-  drawMeter(rightmost, player.health, player.maxHealth, '#ff4444', 'HP');
 }
 
 // Input
@@ -1484,8 +1537,8 @@ function loadLevel(levelData) {
   structures = levelData.structures || [];
   floatingItems.length = 0; // Clear floating items on level load
   // Regenerate stars: same density as a 3000x3000 level, using level seed for reproducibility
-  const seed = levelData.seed != null ? levelData.seed : 0;
-  const rng = createSeededRandom(typeof seed === 'number' ? seed >>> 0 : 0);
+  levelSeed = typeof levelData.seed === 'number' ? levelData.seed >>> 0 : 0;
+  const rng = createSeededRandom(levelSeed);
   const REFERENCE_AREA = 3000 * 3000;
   const numStars = Math.round(NUM_STARS * (levelWidth * levelHeight) / REFERENCE_AREA);
   stars.length = 0;

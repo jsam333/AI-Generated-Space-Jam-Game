@@ -35,6 +35,16 @@ body {
   z-index: 2;
 }
 
+#ui-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  pointer-events: none;
+  z-index: 3;
+}
+
 #game-ui {
   position: absolute;
   top: 10px;
