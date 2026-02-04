@@ -392,10 +392,9 @@ function initShip3D() {
   if (typeof THREE === 'undefined') return;
   shipCanvas = document.getElementById('ship-canvas');
   if (!shipCanvas) return;
-  const halfW = WIDTH / 2;
-  const halfH = (HEIGHT / WIDTH) * halfW;
-  shipCamera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 2000);
-  shipCamera.position.z = 500;
+  const aspect = WIDTH / HEIGHT;
+  shipCamera = new THREE.PerspectiveCamera(15, aspect, 1, 5000);
+  shipCamera.position.set(0, 0, 3380);
   shipCamera.lookAt(0, 0, 0);
   shipScene = new THREE.Scene();
   asteroidContainer = new THREE.Group();
