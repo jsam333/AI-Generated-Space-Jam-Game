@@ -6,6 +6,12 @@ window.onerror = function(msg, url, line, col, error) {
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
+// Three.js ship layer (3D model from scout-ship.glb)
+let shipCanvas, shipScene, shipCamera, shipRenderer, shipMesh, shipModelLoaded = false;
+// Small asteroid 3D models (radius 10 & 20)
+let smallAsteroidModel = null;
+let asteroidContainer = null;
+
 // #region agent log
 fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:1',message:'Script started parsing',data:{canvasFound:!!canvas,ctxFound:!!ctx},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
 // #endregion
@@ -51,17 +57,23 @@ const player = {
   maxOxygen: 30.0,
   credits: 0
 };
-const OXYGEN_DEPLETION_RATE = 1 / 10; // 1 per 10 seconds
+const OXYGEN_DEPLETION_RATE = 1 / 25; // 1 per 25 seconds
+const FUEL_DEPLETION_RATE = 1 / 3; // 1 per 3 seconds while right-clicking
 
 // Inventory hotbar (9 slots, each can hold { item, quantity?, energy?, maxEnergy? } or null)
 const hotbar = [
   { item: 'mining laser', heat: 0, overheated: false }, // heat 0-1, overheated locks until cooled to 0
-  { item: 'energy cell', energy: 10, maxEnergy: 10 },
-  { item: 'energy cell', energy: 10, maxEnergy: 10 },
+  { item: 'small energy cell', energy: 10, maxEnergy: 10 },
+  { item: 'small energy cell', energy: 10, maxEnergy: 10 },
   null, null, null, null, null, null
 ];
 const LASER_HEAT_RATE = 1;    // per second when firing (full in 1 sec)
 const LASER_COOL_RATE = 1 / 3; // per second when not firing (empty in 3 sec)
+const WEAPON_ENERGY_DRAIN = 1; // per second when firing (light laser)
+const MINING_LASER_STATS = {
+  'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 5, energyDrain: 1 },           // 1s heat, 3s cool, 5 DPS
+  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.5 }  // 1.5s heat, 3s cool, 10 DPS, 50% faster energy
+};
 const BLASTER_ENERGY_PER_SHOT = 0.2;
 const BLASTER_HEAT_PER_SHOT = 0.05;
 const BLASTER_COOL_RATE = 1 / 3;
@@ -72,7 +84,7 @@ let blasterFireAccum = 0;
 function getFirstChargedCell() {
   for (let i = 0; i < hotbar.length; i++) {
     const cell = hotbar[i];
-    if (cell && cell.item === 'energy cell' && cell.energy != null && cell.energy > 0) return cell;
+    if (cell && (cell.item === 'small energy cell' || cell.item === 'medium energy cell') && cell.energy != null && cell.energy > 0) return cell;
   }
   return null;
 }
@@ -81,12 +93,10 @@ function getFirstChargedCell() {
 function getFirstCellWithMinEnergy(min) {
   for (let i = 0; i < hotbar.length; i++) {
     const cell = hotbar[i];
-    if (cell && cell.item === 'energy cell' && cell.energy != null && cell.energy >= min) return cell;
+    if (cell && (cell.item === 'small energy cell' || cell.item === 'medium energy cell') && cell.energy != null && cell.energy >= min) return cell;
   }
   return null;
 }
-
-const WEAPON_ENERGY_DRAIN = 1; // per second when firing
 
 // Mouse state
 let mouseX = WIDTH / 2;
@@ -279,14 +289,13 @@ function fireBlasterPellet() {
   });
 }
 
-function drawShip() {
+function drawShip2D() {
   const cx = WIDTH / 2;
   const cy = HEIGHT / 2;
   const dx = mouseX - cx;
   const dy = mouseY - cy;
   const dir = normalize(dx, dy);
   const angle = Math.atan2(dir.y, dir.x);
-
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
@@ -302,44 +311,145 @@ function drawShip() {
   ctx.fill();
   ctx.stroke();
   ctx.restore();
+}
 
-  if (!shopMenuOpen) {
-    // Custom crosshair: vertical arms 2px wide (filled rects), horizontal arms 1px strokes
-    const armLen = 6;
-    const centerGap = 2;
-    const crosshairX = Math.floor(mouseX) + 0.5;
-    const crosshairY = Math.floor(mouseY) + 0.5;
-    const armW = 2;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    // Top stick (2px wide)
-    ctx.fillRect(crosshairX - armW / 2, crosshairY - armLen, armW, armLen - centerGap);
-    // Bottom stick (2px wide)
-    ctx.fillRect(crosshairX - armW / 2, crosshairY + centerGap, armW, armLen - centerGap);
-    // Left/right arms (1px strokes, pixel-aligned)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = 1;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(crosshairX - armLen, crosshairY);
-    ctx.lineTo(crosshairX - centerGap, crosshairY);
-    ctx.moveTo(crosshairX + centerGap, crosshairY);
-    ctx.lineTo(crosshairX + armLen, crosshairY);
-    ctx.stroke();
+function drawCrosshairAndHeatBar() {
+  if (shopMenuOpen) return;
+  const armLen = 6;
+  const centerGap = 2;
+  const crosshairX = Math.floor(mouseX) + 0.5;
+  const crosshairY = Math.floor(mouseY) + 0.5;
+  const armW = 2;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.fillRect(crosshairX - armW / 2, crosshairY - armLen, armW, armLen - centerGap);
+  ctx.fillRect(crosshairX - armW / 2, crosshairY + centerGap, armW, armLen - centerGap);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 1;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(crosshairX - armLen, crosshairY);
+  ctx.lineTo(crosshairX - centerGap, crosshairY);
+  ctx.moveTo(crosshairX + centerGap, crosshairY);
+  ctx.lineTo(crosshairX + armLen, crosshairY);
+  ctx.stroke();
+  const equipped = hotbar[selectedSlot];
+  const hasHeatWeapon = equipped && equipped.heat != null && equipped.heat > 0 && (MINING_LASER_STATS[equipped.item] || equipped.item === 'light blaster');
+  if (hasHeatWeapon) {
+    const barW = 16;
+    const barH = 4;
+    const barY = mouseY + 8;
+    const barX = mouseX - barW / 2;
+    const isOverheated = equipped.overheated;
+    ctx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
+    ctx.fillRect(barX, barY, barW * Math.min(1, equipped.heat), barH);
+  }
+}
 
-    // Heat bar under crosshair for mining laser or light blaster
-    const equipped = hotbar[selectedSlot];
-    const hasHeatWeapon = equipped && equipped.heat != null && equipped.heat > 0 && (equipped.item === 'mining laser' || equipped.item === 'light blaster');
-    if (hasHeatWeapon) {
-      const barW = 16;
-      const barH = 4;
-      const barY = mouseY + 8;
-      const barX = mouseX - barW / 2;
-      const isOverheated = equipped.overheated;
-      ctx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
-      ctx.fillRect(barX, barY, barW, barH);
-      ctx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)';
-      ctx.fillRect(barX, barY, barW * Math.min(1, equipped.heat), barH);
-    }
+function initShip3D() {
+  if (typeof THREE === 'undefined') return;
+  shipCanvas = document.getElementById('ship-canvas');
+  if (!shipCanvas) return;
+  const halfW = WIDTH / 2;
+  const halfH = (HEIGHT / WIDTH) * halfW;
+  shipCamera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 1000);
+  shipCamera.position.z = 100;
+  shipCamera.lookAt(0, 0, 0);
+  shipScene = new THREE.Scene();
+  asteroidContainer = new THREE.Group();
+  shipScene.add(asteroidContainer);
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(20, 20, 50);
+  shipScene.add(light);
+  const light2 = new THREE.DirectionalLight(0xffffff, 0.8);
+  light2.position.set(-50, -30, 40);
+  shipScene.add(light2);
+  const topLight = new THREE.DirectionalLight(0xffffff, 3.0);
+  topLight.position.set(0, 100, 20);
+  shipScene.add(topLight);
+  shipScene.add(new THREE.AmbientLight(0xffffff, 1.0));
+  shipRenderer = new THREE.WebGLRenderer({ canvas: shipCanvas, antialias: true, alpha: true });
+  shipRenderer.setPixelRatio(window.devicePixelRatio || 1);
+  shipRenderer.setSize(WIDTH, HEIGHT);
+  shipRenderer.setClearColor(0x000000, 0);
+  const LoaderClass = (window.GLTFLoader || (THREE && THREE.GLTFLoader));
+  if (!LoaderClass) return;
+  const loader = new LoaderClass();
+  const glbUrl = new URL('assets/scout-ship.glb', window.location.href).toString();
+  loader.load(glbUrl, (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = (SHIP_SIZE * 2) / (maxDim > 0 ? maxDim : 1);
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    // Convert common glTF orientation (Y-up, Z-forward) into our top-down XY view.
+    model.rotation.x = -Math.PI / 2;
+    // Shift centerpoint up a bit for better visual alignment
+    model.position.y += 3;
+    shipMesh = model;
+    shipScene.add(shipMesh);
+    shipModelLoaded = true;
+    // eslint-disable-next-line no-console
+    console.log('[ship3d] Loaded scout-ship.glb');
+  }, undefined, (err) => {
+    // eslint-disable-next-line no-console
+    console.error('[ship3d] Failed to load scout-ship.glb', err);
+  });
+
+  const asteroidUrl = new URL('assets/small-asteroid1.glb', window.location.href).toString();
+  loader.load(asteroidUrl, (gltf) => {
+    const model = gltf.scene;
+    // Convert materials to MeshStandardMaterial so they respond to lighting
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const oldMat = child.material;
+        const newMat = new THREE.MeshStandardMaterial({
+          color: oldMat.color ? oldMat.color.clone() : 0x888888,
+          map: oldMat.map || null,
+          roughness: 0.8,
+          metalness: 0.2,
+          emissive: 0x333333,
+          emissiveMap: oldMat.map || null,
+          emissiveIntensity: 50.0
+        });
+        child.material = newMat;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1 / (maxDim > 0 ? maxDim : 1);
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    model.rotation.x = -Math.PI / 2;
+    smallAsteroidModel = model;
+    refreshAsteroidMeshes();
+    console.log('[ship3d] Loaded small-asteroid1.glb');
+  }, undefined, (err) => {
+    console.error('[ship3d] Failed to load small-asteroid1.glb', err);
+  });
+}
+
+function refreshAsteroidMeshes() {
+  if (!asteroidContainer || !smallAsteroidModel) return;
+  while (asteroidContainer.children.length) asteroidContainer.remove(asteroidContainer.children[0]);
+  for (const ast of asteroids) {
+    ast._mesh = null;
+    if (ast.radius !== 10 && ast.radius !== 20) continue;
+    const clone = smallAsteroidModel.clone(true);
+    clone.rotation.y = Math.random() * Math.PI * 2;
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = (ast.radius * 2) / maxDim;
+    clone.scale.setScalar(scale);
+    ast._mesh = clone;
+    asteroidContainer.add(clone);
   }
 }
 
@@ -353,7 +463,7 @@ function update(dt) {
     if (dir.x !== 0 || dir.y !== 0) {
       ship.vx += dir.x * ACCEL * dt;
       ship.vy += dir.y * ACCEL * dt;
-      player.fuel = Math.max(0, player.fuel - 1 * dt);
+      player.fuel = Math.max(0, player.fuel - FUEL_DEPLETION_RATE * dt);
     }
   }
 
@@ -402,6 +512,9 @@ function update(dt) {
         // Damage from impact speed, max 20
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
+        // Asteroid takes half the damage the player takes
+        const currentHealth = ast.health ?? ast.radius;
+        ast.health = Math.max(0, currentHealth - damage / 2);
       }
     }
   }
@@ -440,39 +553,31 @@ function update(dt) {
     player.health = Math.max(0, player.health - 1 * dt);
   }
 
-  // Fire only when mining laser is selected; drain energy; heat blocks fire when full
+  // Mining lasers (light + medium): unified logic via MINING_LASER_STATS
   const hasEnergy = getFirstChargedCell() != null;
-  const miningLaser = hotbar[selectedSlot] && hotbar[selectedSlot].item === 'mining laser' ? hotbar[selectedSlot] : null;
-  const miningLaserSelected = miningLaser != null;
+  const selectedItem = hotbar[selectedSlot];
+  const miningLaser = selectedItem && MINING_LASER_STATS[selectedItem.item] ? selectedItem : null;
+  const laserStats = miningLaser ? MINING_LASER_STATS[miningLaser.item] : null;
 
-  if (miningLaser && miningLaser.heat != null) {
-    // Set overheated when heat reaches 1
-    if (miningLaser.heat >= 1) {
-      miningLaser.overheated = true;
-    }
-    // Clear overheated only when fully cooled
-    if (miningLaser.heat <= 0) {
-      miningLaser.overheated = false;
-    }
+  if (miningLaser && laserStats && miningLaser.heat != null) {
+    if (miningLaser.heat >= 1) miningLaser.overheated = true;
+    if (miningLaser.heat <= 0) miningLaser.overheated = false;
 
     const canFire = !miningLaser.overheated;
-    if (miningLaserSelected && leftMouseDown && hasEnergy && canFire) {
-      miningLaser.heat = Math.min(1, miningLaser.heat + LASER_HEAT_RATE * dt);
+    if (miningLaser && leftMouseDown && hasEnergy && canFire) {
+      miningLaser.heat = Math.min(1, miningLaser.heat + laserStats.heatRate * dt);
       const cell = getFirstChargedCell();
-      if (cell) cell.energy = Math.max(0, cell.energy - WEAPON_ENERGY_DRAIN * dt);
-      
-      // Laser damage to asteroids: 5 DPS
+      if (cell) cell.energy = Math.max(0, cell.energy - laserStats.energyDrain * dt);
+
       const dx = mouseX - WIDTH / 2;
       const dy = mouseY - HEIGHT / 2;
       const dir = normalize(dx, dy);
       if (dir.x !== 0 || dir.y !== 0) {
         const hit = laserHitAsteroid(ship.x, ship.y, dir.x, dir.y, 1500);
         if (hit) {
-          hit.asteroid.health -= 5 * dt;
-          // Spawn sparks at impact point
+          hit.asteroid.health -= laserStats.dps * dt;
           const hitX = ship.x + dir.x * hit.distance;
           const hitY = ship.y + dir.y * hit.distance;
-          // ~60 sparks per second, frame-rate independent
           sparkCarry += 60 * dt;
           const n = Math.floor(sparkCarry);
           if (n > 0) {
@@ -482,7 +587,7 @@ function update(dt) {
         }
       }
     } else {
-      miningLaser.heat = Math.max(0, miningLaser.heat - LASER_COOL_RATE * dt);
+      miningLaser.heat = Math.max(0, miningLaser.heat - laserStats.coolRate * dt);
     }
   }
 
@@ -545,11 +650,23 @@ function update(dt) {
     if (p.life <= 0) particles.splice(i, 1);
   }
 
-  // Check for destroyed asteroids and drop ore
+  // Check for destroyed asteroids and drop ore (diminishing returns: +10 at tier 1, then decreases by 1 every 2 tiers, min +4)
+  function calculateOreCount(radius) {
+    const tier = Math.floor(radius / 10);
+    if (tier <= 0) return 0;
+    if (tier === 1) return 10;
+    let ore = 10; // tier 1 base
+    for (let t = 2; t <= tier; t++) {
+      const increment = Math.max(4, 11 - Math.ceil(t / 2));
+      ore += increment;
+    }
+    return ore;
+  }
   for (let i = asteroids.length - 1; i >= 0; i--) {
     if (asteroids[i].health <= 0) {
       const ast = asteroids[i];
-      const oreCount = Math.floor(ast.radius / 10) * 10;
+      if (ast._mesh && asteroidContainer) asteroidContainer.remove(ast._mesh);
+      const oreCount = calculateOreCount(ast.radius);
       if (oreCount > 0) {
         for (let j = 0; j < oreCount; j++) {
           const angle = Math.random() * Math.PI * 2;
@@ -685,6 +802,16 @@ function update(dt) {
           }
         }
         if (added) floatingItems.splice(i, 1);
+      } else if (item.item === 'medium mining laser' && item.heat != null) {
+        let added = false;
+        for (let j = 0; j < hotbar.length; j++) {
+          if (!hotbar[j]) {
+            hotbar[j] = { item: item.item, heat: item.heat, overheated: !!item.overheated };
+            added = true;
+            break;
+          }
+        }
+        if (added) floatingItems.splice(i, 1);
       } else if (item.item === 'light blaster' && item.heat != null) {
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
@@ -702,7 +829,7 @@ function update(dt) {
   }
 }
 
-function render() {
+function render(dt = 1 / 60) {
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -716,8 +843,9 @@ function render() {
     ctx.fillRect(sx - s / 2, sy - s / 2, s, s);
   }
 
-  // Asteroids
+  // Asteroids (2D circles; radius 10 & 20 use 3D model instead)
   for (const ast of asteroids) {
+    if (ast.radius === 10 || ast.radius === 20) continue;
     const { x, y } = worldToScreen(ast.x, ast.y);
     const r = ast.radius;
     if (x + r < 0 || x - r > WIDTH || y + r < 0 || y - r > HEIGHT) continue;
@@ -749,7 +877,7 @@ function render() {
                  (item.item === 'aurite' ? 'A' : 
                  (item.item === 'diamite' ? 'D' : 
                  (item.item === 'platinite' ? 'P' : 
-                 (item.item === 'energy cell' ? 'E' : (item.item === 'fuel tank' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))));
+                 (item.item === 'small energy cell' ? 'E' : (item.item === 'medium energy cell' ? 'M' : (item.item === 'fuel tank' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))))));
     // Draw small glowing circle - energy green, fuel orange, oxygen blue, laser orange, ore default
     ctx.fillStyle = item.energy != null ? '#448844' : 
                     (item.fuel != null ? '#886622' : 
@@ -845,15 +973,35 @@ function render() {
     ctx.fillRect(x - p.size / 2, y - p.size / 2, p.size, p.size);
   }
 
-  // Ship
-  drawShip();
+  // Update 3D asteroid positions (camera-follow coordinates; negate Y to match 2D canvas)
+  const ASTEROID_SPIN = 0.3; // radians per second
+  for (const ast of asteroids) {
+    if (ast._mesh) {
+      ast._mesh.position.set(ast.x - ship.x, -(ast.y - ship.y), 0);
+      ast._mesh.rotation.z += ASTEROID_SPIN * dt;
+    }
+  }
 
-  // Mining laser (orange-red line) - only when selected, firing, has energy, and not overheated
+  // Ship: 3D model if loaded, else 2D triangle
+  const cx = WIDTH / 2;
+  const cy = HEIGHT / 2;
+  const aimAngle = Math.atan2(mouseY - cy, mouseX - cx);
+  // Always clear the ship canvas so it stays transparent before model load.
+  if (shipRenderer) shipRenderer.clear();
+  if (shipModelLoaded && shipMesh && shipRenderer && shipScene && shipCamera) {
+    shipMesh.rotation.y = aimAngle + Math.PI / 2;
+    shipRenderer.render(shipScene, shipCamera);
+  } else {
+    drawShip2D();
+  }
+  drawCrosshairAndHeatBar();
+
+  // Mining laser beam (orange-red line) - any mining laser in MINING_LASER_STATS
   const hasEnergy = getFirstChargedCell() != null;
-  const miningLaser = hotbar[selectedSlot] && hotbar[selectedSlot].item === 'mining laser' ? hotbar[selectedSlot] : null;
-  const miningLaserSelected = miningLaser != null;
+  const selectedItem = hotbar[selectedSlot];
+  const miningLaser = selectedItem && MINING_LASER_STATS[selectedItem.item] ? selectedItem : null;
   const canFire = miningLaser && !miningLaser.overheated;
-  if (miningLaserSelected && leftMouseDown && hasEnergy && canFire) {
+  if (miningLaser && leftMouseDown && hasEnergy && canFire) {
     const cx = WIDTH / 2;
     const cy = HEIGHT / 2;
     const dx = mouseX - cx;
@@ -1018,7 +1166,7 @@ function hasEmptyHotbarSlot() {
 
 // Can we accept this floating item (for magnet: don't attract if inventory can't take it)
 function canAcceptFloatingItem(item) {
-  if (item.energy != null || item.fuel != null || item.oxygen != null || (item.item === 'mining laser' && item.heat != null) || (item.item === 'light blaster' && item.heat != null)) {
+  if (item.energy != null || item.fuel != null || item.oxygen != null || (item.item === 'mining laser' && item.heat != null) || (item.item === 'medium mining laser' && item.heat != null) || (item.item === 'light blaster' && item.heat != null)) {
     return hasEmptyHotbarSlot();
   }
   const qty = item.quantity != null ? item.quantity : 1;
@@ -1035,18 +1183,20 @@ function canAcceptFloatingItem(item) {
 }
 
 // Shop: buy/sell 5x3 grid (15 slots)
-const ITEM_BUY_PRICE = { 'energy cell': 150, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 800 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel tank': 20, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 100, 'light blaster': 150 };
+const ITEM_BUY_PRICE = { 'small energy cell': 150, 'medium energy cell': 550, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 1000, 'medium mining laser': 1500 };
+const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel tank': 20, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
 function initShopBuySlots() {
-  // Slot 0: light blaster; 1-9: energy cells; 10-12: fuel; 13-14: oxygen
+  // Slot 0: light blaster; 1: medium mining laser; 2-7: small energy cell; 8-9: medium energy cell; 10-12: fuel; 13-14: oxygen
   shopBuySlots[0] = { item: 'light blaster', heat: 0, overheated: false };
-  shopBuySlots[1] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
-  for (let i = 2; i < 10; i++) {
-    shopBuySlots[i] = { item: 'energy cell', energy: 10, maxEnergy: 10 };
+  shopBuySlots[1] = { item: 'medium mining laser', heat: 0, overheated: false };
+  for (let i = 2; i < 8; i++) {
+    shopBuySlots[i] = { item: 'small energy cell', energy: 10, maxEnergy: 10 };
   }
+  shopBuySlots[8] = { item: 'medium energy cell', energy: 30, maxEnergy: 30 };
+  shopBuySlots[9] = { item: 'medium energy cell', energy: 30, maxEnergy: 30 };
   for (let i = 10; i < 13; i++) {
     shopBuySlots[i] = { item: 'fuel tank', fuel: 10, maxFuel: 10 };
   }
@@ -1056,8 +1206,11 @@ function initShopBuySlots() {
 }
 
 function getShopItemPayload(itemKey) {
-  if (itemKey === 'energy cell') {
-    return { item: 'energy cell', energy: 10, maxEnergy: 10 };
+  if (itemKey === 'small energy cell') {
+    return { item: 'small energy cell', energy: 10, maxEnergy: 10 };
+  }
+  if (itemKey === 'medium energy cell') {
+    return { item: 'medium energy cell', energy: 30, maxEnergy: 30 };
   }
   if (itemKey === 'oxygen canister') {
     return { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
@@ -1065,14 +1218,19 @@ function getShopItemPayload(itemKey) {
   if (itemKey === 'light blaster') {
     return { item: 'light blaster', heat: 0, overheated: false };
   }
+  if (itemKey === 'medium mining laser') {
+    return { item: 'medium mining laser', heat: 0, overheated: false };
+  }
   return { item: itemKey };
 }
 
 function getItemLabel(it) {
   if (!it) return '';
   if (it.item === 'mining laser') return 'L';
+  if (it.item === 'medium mining laser') return 'M';
   if (it.item === 'light blaster') return 'B';
-  if (it.item === 'energy cell') return 'E';
+  if (it.item === 'small energy cell') return 'E';
+  if (it.item === 'medium energy cell') return 'M';
   if (it.item === 'fuel tank') return 'F';
   if (it.item === 'oxygen canister') return 'O';
   if (it.item === 'cuprite') return 'C';
@@ -1090,6 +1248,11 @@ function getSlotHTML(it) {
     
     // Mining laser: heat bar (red)
     if (it.item === 'mining laser' && it.heat != null) {
+      const fillH = Math.round(32 * it.heat);
+      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
+    }
+    // Medium mining laser: heat bar (red)
+    if (it.item === 'medium mining laser' && it.heat != null) {
       const fillH = Math.round(32 * it.heat);
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
     }
@@ -1127,15 +1290,21 @@ function getSlotHTML(it) {
   return html;
 }
 
-const ENERGY_CELL_FULL_SELL = 150; // same as buy price; proportional sell with min below
+const SMALL_ENERGY_CELL_FULL_SELL = 150;
+const MEDIUM_ENERGY_CELL_FULL_SELL = 550;
 const ENERGY_CELL_MIN_SELL = 10;
 
 function getItemSellPrice(item) {
   if (!item) return 0;
-  // Energy cell: proportional to charge (full = ENERGY_CELL_FULL_SELL), minimum ENERGY_CELL_MIN_SELL cr
-  if (item.item === 'energy cell' && item.energy != null && item.maxEnergy != null) {
+  // Small energy cell: proportional to charge, min ENERGY_CELL_MIN_SELL cr
+  if (item.item === 'small energy cell' && item.energy != null && item.maxEnergy != null) {
     const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
-    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(ENERGY_CELL_FULL_SELL * chargeRatio));
+    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(SMALL_ENERGY_CELL_FULL_SELL * chargeRatio));
+  }
+  // Medium energy cell: proportional to charge, min ENERGY_CELL_MIN_SELL cr
+  if (item.item === 'medium energy cell' && item.energy != null && item.maxEnergy != null) {
+    const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
+    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(MEDIUM_ENERGY_CELL_FULL_SELL * chargeRatio));
   }
   // Fuel cell: 2 when full, 1 when >0
   if (item.item === 'fuel tank' && item.fuel != null && item.maxFuel != null) {
@@ -1185,10 +1354,12 @@ function syncShopBuyArea() {
   const priceList = document.getElementById('shop-price-list');
   if (priceList) {
     const itemNames = { 
-      'energy cell': 'Energy Cell', 
+      'small energy cell': 'Small Energy Cell',
+      'medium energy cell': 'Medium Energy Cell', 
       'fuel tank': 'Fuel Tank', 
       'oxygen canister': 'Oxygen Canister',
       'light blaster': 'Light Blaster',
+      'medium mining laser': 'Medium Mining Laser',
       cuprite: 'Cuprite',
       hematite: 'Hematite',
       aurite: 'Aurite',
@@ -1291,7 +1462,7 @@ window.addEventListener('keydown', (e) => {
       const overlay = document.getElementById('warp-menu-overlay');
       if (overlay) overlay.style.display = 'flex';
       const payBtn = document.getElementById('warp-pay-btn');
-      if (payBtn) payBtn.disabled = player.credits < 2000;
+      if (payBtn) payBtn.disabled = player.credits < 3000;
     } else if (!warpMenuOpen && !gamePaused && isShipInShop()) {
       e.preventDefault();
       openShopMenu();
@@ -1327,6 +1498,7 @@ function loadLevel(levelData) {
       brightness: 0.3 + rng() * 0.7
     });
   }
+  refreshAsteroidMeshes();
 }
 
 // Level select: known levels (in levels folder) + levels loaded via file picker
@@ -1492,8 +1664,8 @@ if (warpCancelBtn) {
 }
 if (warpPayBtn) {
   warpPayBtn.addEventListener('click', () => {
-    if (player.credits >= 2000) {
-      player.credits -= 2000;
+    if (player.credits >= 3000) {
+      player.credits -= 3000;
       closeWarpMenu();
     }
   });
@@ -1824,6 +1996,7 @@ fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{metho
 // #endregion
 initStars();
 initShopBuySlots();
+initShip3D();
 // #region agent log
 fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:init',message:'After initStars/initShopBuySlots',data:{starsCount:stars.length,shopBuySlot0:shopBuySlots[0]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
 // #endregion
@@ -1840,7 +2013,7 @@ function gameLoop(now) {
   lastTime = now;
 
   if (!gamePaused) update(dt);
-  render();
+  render(dt);
   updateHUD(); // Sync HUD every frame (or could optimize to only when changed)
 
   requestAnimationFrame(gameLoop);

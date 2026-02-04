@@ -9,11 +9,12 @@
 <body>
   <div id="game-container">
     <canvas id="game-canvas" tabindex="1"></canvas>
+    <canvas id="ship-canvas"></canvas>
     <div id="warp-menu-overlay" style="display: none;">
       <div id="warp-menu">
         <p>Use warp gate?</p>
-        <p>Cost: 2000 credits</p>
-        <button type="button" id="warp-pay-btn">Pay 2000</button>
+        <p>Cost: 3000 credits</p>
+        <button type="button" id="warp-pay-btn">Pay 3000</button>
         <button type="button" id="warp-cancel-btn">Cancel</button>
       </div>
     </div>
@@ -99,6 +100,14 @@
       <span>Press L to load a level</span>
     </div>
   </div>
-  <script src="js/game.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
