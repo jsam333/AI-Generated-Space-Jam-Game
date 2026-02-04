@@ -269,6 +269,12 @@ body {
   margin-top: -4px;
 }
 
+.slot-icon-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
 .slot-energy {
   position: absolute;
   bottom: 6px;
@@ -485,8 +491,15 @@ body {
   font-family: Arial, sans-serif;
   font-size: 14px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   pointer-events: none;
   z-index: 9999;
+}
+
+#shop-drag-ghost img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }

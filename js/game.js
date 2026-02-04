@@ -41,6 +41,25 @@ if (uiCanvas) {
   uiCanvas.height = HEIGHT;
 }
 
+// Item icon images (preloaded for floating items)
+const ITEM_IMAGES = {
+  'fuel tank': new Image(),
+  'small energy cell': new Image(),
+  'medium energy cell': new Image(),
+  'oxygen canister': new Image()
+};
+ITEM_IMAGES['fuel tank'].src = 'assets/fuel-can.png';
+ITEM_IMAGES['small energy cell'].src = 'assets/energy-cell.png';
+ITEM_IMAGES['medium energy cell'].src = 'assets/energy-cell.png';
+ITEM_IMAGES['oxygen canister'].src = 'assets/oxygen-can.png';
+
+function getItemImagePath(itemName) {
+  if (itemName === 'fuel tank') return 'assets/fuel-can.png';
+  if (itemName === 'small energy cell' || itemName === 'medium energy cell') return 'assets/energy-cell.png';
+  if (itemName === 'oxygen canister') return 'assets/oxygen-can.png';
+  return null;
+}
+
 // Seeded RNG for reproducible starfield per level (mulberry32)
 function createSeededRandom(seed) {
   return function () {
@@ -933,12 +952,6 @@ function render(dt = 1 / 60) {
   for (const item of floatingItems) {
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
-    const icon = item.item === 'cuprite' ? 'C' : 
-                 (item.item === 'hematite' ? 'H' : 
-                 (item.item === 'aurite' ? 'A' : 
-                 (item.item === 'diamite' ? 'D' : 
-                 (item.item === 'platinite' ? 'P' : 
-                 (item.item === 'small energy cell' ? 'E' : (item.item === 'medium energy cell' ? 'M' : (item.item === 'fuel tank' ? 'F' : (item.item === 'oxygen canister' ? 'O' : (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))))));
     // Draw small glowing circle - energy green, fuel orange, oxygen blue, laser orange, ore default
     ctx.fillStyle = item.energy != null ? '#448844' : 
                     (item.fuel != null ? '#886622' : 
@@ -956,12 +969,24 @@ function render(dt = 1 / 60) {
     ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : '#ccaa66'))));
     ctx.lineWidth = 2;
     ctx.stroke();
-    // Item icon
-    ctx.fillStyle = '#fff';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(icon, x, y);
+    // Item icon: image for fuel/energy/oxygen, else letter fallback
+    const img = ITEM_IMAGES[item.item];
+    if (img && img.complete && img.naturalWidth > 0) {
+      const size = 18;
+      ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+    } else {
+      const icon = item.item === 'cuprite' ? 'C' : 
+                   (item.item === 'hematite' ? 'H' : 
+                   (item.item === 'aurite' ? 'A' : 
+                   (item.item === 'diamite' ? 'D' : 
+                   (item.item === 'platinite' ? 'P' : 
+                   (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))));
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(icon, x, y);
+    }
     // Quantity if > 1
     if (item.quantity > 1) {
       ctx.fillStyle = '#ffcc00';
@@ -1309,7 +1334,12 @@ function getItemLabel(it) {
 function getSlotHTML(it) {
   let html = '';
   if (it) {
-    html += `<span class="slot-icon">${getItemLabel(it)}</span>`;
+    const imgPath = getItemImagePath(it.item);
+    if (imgPath) {
+      html += `<img src="${imgPath}" class="slot-icon slot-icon-img" alt="">`;
+    } else {
+      html += `<span class="slot-icon">${getItemLabel(it)}</span>`;
+    }
     
     // Mining laser: heat bar (red)
     if (it.item === 'mining laser' && it.heat != null) {
@@ -1762,13 +1792,22 @@ function setDragGhostVisible(visible) {
   ghost.style.display = visible ? 'flex' : 'none';
 }
 
-function setDragGhostContent(label, qtyText) {
+function setDragGhostContent(it, label, qtyText) {
   const ghost = document.getElementById('shop-drag-ghost');
   if (!ghost) return;
-  if (qtyText) {
-    ghost.innerHTML = `${label}<span class="slot-qty">${qtyText}</span>`;
+  const imgPath = it ? getItemImagePath(it.item) : null;
+  if (imgPath) {
+    if (qtyText) {
+      ghost.innerHTML = `<img src="${imgPath}" alt=""><span class="slot-qty">${qtyText}</span>`;
+    } else {
+      ghost.innerHTML = `<img src="${imgPath}" alt="">`;
+    }
   } else {
-    ghost.textContent = label;
+    if (qtyText) {
+      ghost.innerHTML = `${label}<span class="slot-qty">${qtyText}</span>`;
+    } else {
+      ghost.textContent = label;
+    }
   }
 }
 
@@ -1784,7 +1823,7 @@ function beginDragFromHotbar(slotIndex, clientX, clientY) {
   if (!it) return;
   inventoryDrag = { kind: 'hotbar', fromSlot: slotIndex };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
-  setDragGhostContent(getItemLabel(it), qty);
+  setDragGhostContent(it, getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
 }
@@ -1795,7 +1834,7 @@ function beginDragFromBuy(buyIndex, clientX, clientY) {
   const price = ITEM_BUY_PRICE[it.item] || 0;
   inventoryDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
-  setDragGhostContent(getItemLabel(it), qty);
+  setDragGhostContent(it, getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
 }
@@ -1805,7 +1844,7 @@ function beginDragFromSell(sellIndex, clientX, clientY) {
   if (!it) return;
   inventoryDrag = { kind: 'sell', fromSellSlot: sellIndex };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
-  setDragGhostContent(getItemLabel(it), qty);
+  setDragGhostContent(it, getItemLabel(it), qty);
   setDragGhostPos(clientX, clientY);
   setDragGhostVisible(true);
 }
