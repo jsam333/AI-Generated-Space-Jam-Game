@@ -9,6 +9,14 @@ body {
   align-items: center;
   min-height: 100vh;
   background: #1a1a1a;
+  font-family: 'Oxanium', Arial, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 #game-container {
@@ -51,7 +59,7 @@ body {
   left: 10px;
   display: flex;
   gap: 15px;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 12px;
 }
 
@@ -111,7 +119,7 @@ body {
 #warp-menu p {
   margin: 0;
   color: #eee;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 14px;
 }
 
@@ -174,7 +182,7 @@ body {
 
 #shop-header span {
   color: #eee;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 18px;
 }
 
@@ -186,7 +194,7 @@ body {
 
 #shop-credits-display {
   color: #eee;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 18px;
 }
 
@@ -206,7 +214,7 @@ body {
 
 .shop-section-title {
   color: #bbb;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 12px;
   text-transform: uppercase;
 }
@@ -228,7 +236,7 @@ body {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 12px;
   position: relative;
   user-select: none;
@@ -245,7 +253,7 @@ body {
 
 #shop-price-list {
   margin-top: 8px;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 11px;
   color: #ccc;
 }
@@ -327,7 +335,7 @@ body {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 12px;
   position: relative;
   user-select: none;
@@ -359,7 +367,7 @@ body {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 12px;
   position: relative;
   user-select: none;
@@ -381,7 +389,7 @@ body {
 
 #shop-sell-total {
   color: #9c9;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 14px;
   margin-top: 4px;
 }
@@ -471,13 +479,13 @@ body {
 
 .credits-label {
   color: #ffcc00;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 12px;
 }
 
 .credits-value {
   color: #fff;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 14px;
 }
 
@@ -488,7 +496,7 @@ body {
   background: rgba(40, 40, 40, 0.8);
   border: 2px solid #aaa;
   color: #fff;
-  font-family: Arial, sans-serif;
+  font-family: 'Oxanium', Arial, sans-serif;
   font-size: 14px;
   display: flex;
   flex-direction: column;

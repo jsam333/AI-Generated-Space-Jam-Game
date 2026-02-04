@@ -8,6 +8,7 @@ const ctx = canvas.getContext('2d');
 
 // Three.js ship layer (3D model from scout-ship.glb)
 let shipCanvas, shipScene, shipCamera, shipRenderer, shipMesh, shipModelLoaded = false;
+let shipFlames = []; // Thruster flame meshes
 // Small asteroid 3D models (radius 10-30)
 let smallAsteroidModels = [null, null, null];
 // Medium asteroid 3D models (radius 40-90)
@@ -15,6 +16,8 @@ let mediumAsteroidModels = [null, null];
 // Large asteroid 3D model (radius 100+)
 let largeAsteroidModel = null;
 let asteroidContainer = null;
+let structureModels = { warpgate: null, shop: null, piratebase: null };
+let structureContainer = null;
 let levelSeed = 0;
 
 // #region agent log
@@ -135,6 +138,11 @@ let mouseY = HEIGHT / 2;
 let rightMouseDown = false;
 let leftMouseDown = false;
 let ctrlBrake = false;
+
+// Ship tilt (banks when turning, decays when resting)
+let prevAimAngle = 0;
+let shipTilt = 0;
+let shipTiltInitialized = false;
 
 let gamePaused = false;
 let warpMenuOpen = false;
@@ -392,6 +400,8 @@ function initShip3D() {
   shipScene = new THREE.Scene();
   asteroidContainer = new THREE.Group();
   shipScene.add(asteroidContainer);
+  structureContainer = new THREE.Group();
+  shipScene.add(structureContainer);
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(20, 20, 50);
   shipScene.add(light);
@@ -425,6 +435,30 @@ function initShip3D() {
     model.position.y += 3;
     shipMesh = model;
     shipScene.add(shipMesh);
+    
+    // Create thruster flames (two small cones at the back)
+    const flameHeight = 0.42;
+    const flameGeom = new THREE.ConeGeometry(0.105, flameHeight, 8);
+    const flameMat = new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.9 });
+    const flame1 = new THREE.Mesh(flameGeom.clone(), flameMat.clone());
+    const flame2 = new THREE.Mesh(flameGeom.clone(), flameMat.clone());
+    flame1.rotation.x = -Math.PI / 2; // Point flames backward (horizontal)
+    flame2.rotation.x = -Math.PI / 2;
+    // Offset cone so base is at origin (for scaling from base)
+    flame1.position.set(0, 0, -flameHeight / 2);
+    flame2.position.set(0, 0, -flameHeight / 2);
+    const flameGroup1 = new THREE.Group();
+    const flameGroup2 = new THREE.Group();
+    flameGroup1.add(flame1);
+    flameGroup2.add(flame2);
+    flameGroup1.position.set(-0.15, 0.3, -0.9);
+    flameGroup2.position.set(0.15, 0.3, -0.9);
+    flameGroup1.visible = false;
+    flameGroup2.visible = false;
+    shipMesh.add(flameGroup1);
+    shipMesh.add(flameGroup2);
+    shipFlames = [flameGroup1, flameGroup2];
+    
     shipModelLoaded = true;
     // eslint-disable-next-line no-console
     console.log('[ship3d] Loaded scout-ship.glb');
@@ -493,6 +527,47 @@ function initShip3D() {
     onAsteroidLoaded();
     console.log('[ship3d] Loaded large-asteroid1.glb');
   }, undefined, (err) => console.error('[ship3d] Failed to load large-asteroid1.glb', err));
+
+  function setupStructureModel(model) {
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const oldMat = child.material;
+        const newMat = new THREE.MeshStandardMaterial({
+          color: oldMat.color ? oldMat.color.clone() : 0x888888,
+          map: oldMat.map || null,
+          roughness: 0.8,
+          metalness: 0.2,
+          emissive: 0x333333,
+          emissiveMap: oldMat.map || null,
+          emissiveIntensity: 50.0
+        });
+        child.material = newMat;
+      }
+    });
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const scale = 1 / (maxDim > 0 ? maxDim : 1);
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    model.rotation.x = Math.PI / 4; // 45°
+    model.rotation.y = Math.PI / 4; // 45°
+  }
+  const STRUCTURE_FILES = [
+    { type: 'warpgate', file: 'warp-gate.glb' },
+    { type: 'shop', file: 'shop.glb' },
+    { type: 'piratebase', file: 'pirate-base.glb' }
+  ];
+  STRUCTURE_FILES.forEach(({ type, file }) => {
+    loader.load(new URL('assets/' + file, window.location.href).toString(), (gltf) => {
+      const model = gltf.scene;
+      setupStructureModel(model);
+      structureModels[type] = model;
+      console.log('[ship3d] Loaded ' + file);
+      refreshStructureMeshes();
+    }, undefined, (err) => console.error('[ship3d] Failed to load ' + file, err));
+  });
 }
 
 function refreshAsteroidMeshes() {
@@ -517,7 +592,7 @@ function refreshAsteroidMeshes() {
     ast._initialSpinPhase = rng() * Math.PI * 2;
     const spinAxis = Math.floor(rng() * 3);
     const spinDirection = rng() < 0.5 ? -1 : 1;
-    ast._spinSpeed = 0.3 * (0.7 + rng() * 0.6);
+    ast._spinSpeed = 0.3 * (0.7 + rng() * 0.6) * (ast.radius >= 100 ? 0.7 : 1);
     ast._spinAxis = spinAxis;
     ast._spinDirection = spinDirection;
     const clone = src.clone(true);
@@ -530,6 +605,29 @@ function refreshAsteroidMeshes() {
     clone.scale.setScalar(scale);
     ast._mesh = clone;
     asteroidContainer.add(clone);
+  }
+}
+
+function refreshStructureMeshes() {
+  if (!structureContainer) return;
+  const STRUCTURE_SIZE = 40;
+  const STRUCTURE_DIAMETER = STRUCTURE_SIZE * 2;
+  const STRUCTURE_SCALE_MULT = 2.7; // base
+  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0 };
+  while (structureContainer.children.length) structureContainer.remove(structureContainer.children[0]);
+  for (const st of structures) {
+    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+    const src = structureModels[st.type];
+    if (!src) continue;
+    const clone = src.clone(true);
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const typeMult = scaleMultByType[st.type] ?? 1.0;
+    const scale = (STRUCTURE_DIAMETER / maxDim) * STRUCTURE_SCALE_MULT * typeMult;
+    clone.scale.setScalar(scale);
+    st._mesh = clone;
+    structureContainer.add(clone);
   }
 }
 
@@ -599,8 +697,8 @@ function update(dt) {
     }
   }
 
-  // Ship–warp gate and shop collision (same logic as asteroids, radius 40)
-  const STRUCTURE_SIZE_COLL = 40;
+  // Ship–warp gate and shop collision (radius 35% bigger than base 40)
+  const STRUCTURE_SIZE_COLL = 54;
   for (const st of structures) {
     if (st.type !== 'warpgate' && st.type !== 'shop') continue;
     const dx = ship.x - st.x;
@@ -791,7 +889,7 @@ function update(dt) {
 
     // Collision with asteroids and warp gates: push out so items don't overlap
     const FLOAT_ITEM_RADIUS = 10;
-    const STRUCTURE_SIZE_COLL = 40;
+    const STRUCTURE_SIZE_COLL = 54;
     for (const ast of asteroids) {
       const dx = item.x - ast.x;
       const dy = item.y - ast.y;
@@ -982,7 +1080,7 @@ function render(dt = 1 / 60) {
                    (item.item === 'platinite' ? 'P' : 
                    (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))));
       ctx.fillStyle = '#fff';
-      ctx.font = '10px Arial';
+      ctx.font = '10px Oxanium';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(icon, x, y);
@@ -990,50 +1088,69 @@ function render(dt = 1 / 60) {
     // Quantity if > 1
     if (item.quantity > 1) {
       ctx.fillStyle = '#ffcc00';
-      ctx.font = '8px Arial';
+      ctx.font = '8px Oxanium';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'bottom';
       ctx.fillText(item.quantity, x + 12, y + 12);
     }
   }
 
-  // Structures (render as circles)
+  // Structures (circles underneath 3D models; 2D circles for other types)
+  const STRUCTURE_RADIUS_3D = 54; // 35% bigger than 40
+  const WARP_GATE_DASHED_EXTRA_3D = 108; // 80 * 1.35
+  const SHOP_DASHED_EXTRA_3D = 108;
   const STRUCTURE_SIZE = 40;
   const WARP_GATE_DASHED_EXTRA = 80;
   const SHOP_DASHED_EXTRA = 80;
   const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', warpgate: '#6644aa', piratebase: '#884422' };
   for (const st of structures) {
+    const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'piratebase';
+    const r = is3D ? STRUCTURE_RADIUS_3D : STRUCTURE_SIZE;
+    const cullR = st.type === 'warpgate' ? STRUCTURE_RADIUS_3D + WARP_GATE_DASHED_EXTRA_3D : (st.type === 'shop' ? STRUCTURE_RADIUS_3D + SHOP_DASHED_EXTRA_3D : r);
     const { x, y } = worldToScreen(st.x, st.y);
-    const r = STRUCTURE_SIZE;
-    const cullR = st.type === 'warpgate' ? STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA : (st.type === 'shop' ? STRUCTURE_SIZE + SHOP_DASHED_EXTRA : r);
     if (x + cullR < 0 || x - cullR > WIDTH || y + cullR < 0 || y - cullR > HEIGHT) continue;
-    ctx.fillStyle = STRUCTURE_STYLES[st.type] || '#446688';
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    if (st.type === 'warpgate') {
-      ctx.stroke();
-      const dashedR = STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA;
-      ctx.setLineDash([8, 8]);
-      ctx.beginPath();
-      ctx.arc(x, y, dashedR, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    } else if (st.type === 'shop') {
-      ctx.stroke();
-      const dashedR = STRUCTURE_SIZE + SHOP_DASHED_EXTRA;
-      ctx.setLineDash([8, 8]);
-      ctx.beginPath();
-      ctx.arc(x, y, dashedR, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+    if (is3D) {
+      if (st.type === 'warpgate') {
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(x, y, STRUCTURE_RADIUS_3D + WARP_GATE_DASHED_EXTRA_3D, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (st.type === 'shop') {
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(x, y, STRUCTURE_RADIUS_3D + SHOP_DASHED_EXTRA_3D, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     } else {
-      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = STRUCTURE_STYLES[st.type] || '#446688';
+      ctx.fill();
+      if (st.type === 'warpgate') {
+        ctx.stroke();
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(x, y, STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (st.type === 'shop') {
+        ctx.stroke();
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(x, y, STRUCTURE_SIZE + SHOP_DASHED_EXTRA, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else {
+        ctx.stroke();
+      }
     }
+    if (is3D) continue;
     ctx.fillStyle = '#fff';
-    ctx.font = '14px Arial';
+    ctx.font = '14px Oxanium';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const label = st.type === 'warpgate' ? 'W' : (st.type === 'piratebase' ? 'P' : (st.type ? st.type.charAt(0).toUpperCase() : '?'));
@@ -1070,6 +1187,14 @@ function render(dt = 1 / 60) {
     }
   }
 
+  // Update 3D structure positions (camera-follow coordinates; negate Y to match 2D canvas)
+  for (const st of structures) {
+    if (st._mesh) {
+      const yOff = st.type === 'shop' ? 4 : 0;
+      st._mesh.position.set(st.x - ship.x, -(st.y - ship.y) + yOff, 0);
+    }
+  }
+
   // Ship: 3D model if loaded, else 2D triangle
   const cx = WIDTH / 2;
   const cy = HEIGHT / 2;
@@ -1077,7 +1202,34 @@ function render(dt = 1 / 60) {
   // Always clear the ship canvas so it stays transparent before model load.
   if (shipRenderer) shipRenderer.clear();
   if (shipModelLoaded && shipMesh && shipRenderer && shipScene && shipCamera) {
+    // Tilt when turning, decay when resting
+    if (!shipTiltInitialized) {
+      prevAimAngle = aimAngle;
+      shipTiltInitialized = true;
+    }
+    let deltaAngle = aimAngle - prevAimAngle;
+    while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+    while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+    prevAimAngle = aimAngle;
+    const TILT_SENSITIVITY = 8;
+    const TILT_DECAY = 4;
+    shipTilt += deltaAngle * TILT_SENSITIVITY - shipTilt * TILT_DECAY * dt;
+    shipTilt = Math.max(-0.5, Math.min(0.5, shipTilt));
     shipMesh.rotation.y = aimAngle + Math.PI / 2;
+    shipMesh.rotation.z = shipTilt;
+    // Show thruster flames when thrusting
+    const thrustDx = mouseX - WIDTH / 2;
+    const thrustDy = mouseY - HEIGHT / 2;
+    const isThrusting = rightMouseDown && player.fuel > 0 && (thrustDx !== 0 || thrustDy !== 0);
+    for (const flame of shipFlames) {
+      flame.visible = isThrusting;
+      flame.rotation.z = shipTilt; // Tilt flames with ship
+      if (isThrusting) {
+        // Animate flame length from base (oscillate between 0.7 and 1.3)
+        const flicker = 1 + 0.3 * Math.sin(performance.now() * 0.02);
+        flame.scale.set(1, 1, flicker);
+      }
+    }
     shipRenderer.render(shipScene, shipCamera);
   } else {
     drawShip2D();
@@ -1152,7 +1304,7 @@ function render(dt = 1 / 60) {
       uiCtx.strokeRect(x - meterWidth / 2, meterY - barHeight, meterWidth, barHeight);
       // Label
       uiCtx.fillStyle = '#aaa';
-      uiCtx.font = '10px Arial';
+      uiCtx.font = '10px Oxanium';
       uiCtx.textAlign = 'center';
       uiCtx.textBaseline = 'top';
       uiCtx.fillText(label, x, meterY + 4);
@@ -1213,9 +1365,7 @@ canvas.addEventListener('wheel', (e) => {
 });
 
 function isShipInWarpGate() {
-  const STRUCTURE_SIZE = 40;
-  const WARP_GATE_DASHED_EXTRA = 80;
-  const interactRadius = STRUCTURE_SIZE + WARP_GATE_DASHED_EXTRA;
+  const interactRadius = 54 + 108; // base 35% bigger
   for (const st of structures) {
     if (st.type !== 'warpgate') continue;
     const dx = ship.x - st.x;
@@ -1227,9 +1377,7 @@ function isShipInWarpGate() {
 }
 
 function isShipInShop() {
-  const STRUCTURE_SIZE = 40;
-  const SHOP_DASHED_EXTRA = 80;
-  const interactRadius = STRUCTURE_SIZE + SHOP_DASHED_EXTRA;
+  const interactRadius = 54 + 108; // base 35% bigger
   for (const st of structures) {
     if (st.type !== 'shop') continue;
     const dx = ship.x - st.x;
@@ -1594,6 +1742,7 @@ function loadLevel(levelData) {
     });
   }
   refreshAsteroidMeshes();
+  refreshStructureMeshes();
 }
 
 // Level select: known levels (in levels folder) + levels loaded via file picker
