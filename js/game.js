@@ -12,6 +12,8 @@ let shipCanvas, shipScene, shipCamera, shipRenderer, shipMesh, shipModelLoaded =
 let smallAsteroidModels = [null, null, null];
 // Medium asteroid 3D models (radius 40-90)
 let mediumAsteroidModels = [null, null];
+// Large asteroid 3D model (radius 100+)
+let largeAsteroidModel = null;
 let asteroidContainer = null;
 let levelSeed = 0;
 
@@ -365,8 +367,8 @@ function initShip3D() {
   if (!shipCanvas) return;
   const halfW = WIDTH / 2;
   const halfH = (HEIGHT / WIDTH) * halfW;
-  shipCamera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 1000);
-  shipCamera.position.z = 100;
+  shipCamera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 1, 2000);
+  shipCamera.position.z = 500;
   shipCamera.lookAt(0, 0, 0);
   shipScene = new THREE.Scene();
   asteroidContainer = new THREE.Group();
@@ -438,7 +440,7 @@ function initShip3D() {
     model.rotation.x = -Math.PI / 2;
   }
   let asteroidsLoaded = 0;
-  const TOTAL_ASTEROID_MODELS = 5;
+  const TOTAL_ASTEROID_MODELS = 6;
   const SMALL_ASTEROID_FILES = ['small-asteroid1.glb', 'small-asteroid2.glb', 'small-asteroid3.glb'];
   const MEDIUM_ASTEROID_FILES = ['medium-asteroid1.glb', 'medium-asteroid2.glb'];
   function onAsteroidLoaded() {
@@ -465,12 +467,19 @@ function initShip3D() {
       console.log('[ship3d] Loaded ' + filename);
     }, undefined, (err) => console.error('[ship3d] Failed to load ' + filename, err));
   });
+  loader.load(new URL('assets/large-asteroid1.glb', window.location.href).toString(), (gltf) => {
+    const model = gltf.scene;
+    setupAsteroidModel(model);
+    largeAsteroidModel = model;
+    onAsteroidLoaded();
+    console.log('[ship3d] Loaded large-asteroid1.glb');
+  }, undefined, (err) => console.error('[ship3d] Failed to load large-asteroid1.glb', err));
 }
 
 function refreshAsteroidMeshes() {
   const smallLoaded = smallAsteroidModels.every(m => m != null);
   const mediumLoaded = mediumAsteroidModels.every(m => m != null);
-  if (!asteroidContainer || !smallLoaded || !mediumLoaded) return;
+  if (!asteroidContainer || !smallLoaded || !mediumLoaded || !largeAsteroidModel) return;
   while (asteroidContainer.children.length) asteroidContainer.remove(asteroidContainer.children[0]);
   const rng = createSeededRandom(levelSeed);
   for (const ast of asteroids) {
@@ -482,6 +491,8 @@ function refreshAsteroidMeshes() {
     } else if (ast.radius >= 40 && ast.radius <= 90) {
       const modelIndex = rng() < 0.8 ? 0 : 1; // 80% medium-asteroid1, 20% medium-asteroid2
       src = mediumAsteroidModels[modelIndex];
+    } else if (ast.radius >= 100) {
+      src = largeAsteroidModel;
     }
     if (!src) continue;
     ast._initialSpinPhase = rng() * Math.PI * 2;
@@ -495,7 +506,8 @@ function refreshAsteroidMeshes() {
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const scale = ((ast.radius * 2) / maxDim) * 1.2;
+    const sizeMult = ast.radius >= 100 ? 1.35 : 1.2;
+    const scale = ((ast.radius * 2) / maxDim) * sizeMult;
     clone.scale.setScalar(scale);
     ast._mesh = clone;
     asteroidContainer.add(clone);
@@ -894,7 +906,7 @@ function render(dt = 1 / 60) {
 
   // Asteroids (2D circles; radius 10-30 use 3D model instead)
   for (const ast of asteroids) {
-    if ((ast.radius >= 10 && ast.radius <= 30) || (ast.radius >= 40 && ast.radius <= 90)) continue;
+    if ((ast.radius >= 10 && ast.radius <= 30) || (ast.radius >= 40 && ast.radius <= 90) || ast.radius >= 100) continue;
     const { x, y } = worldToScreen(ast.x, ast.y);
     const r = ast.radius;
     if (x + r < 0 || x - r > WIDTH || y + r < 0 || y - r > HEIGHT) continue;
