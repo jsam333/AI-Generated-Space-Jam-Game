@@ -434,16 +434,23 @@ document.getElementById('export-level').addEventListener('click', () => {
     height: state.level.height,
     seed: state.level.seed,
     asteroids: state.level.asteroids,
-    structures: state.level.structures
+    structures: state.level.structures.map(s => ({ x: s.x, y: s.y, type: s.type }))
   };
   const json = JSON.stringify(levelData, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'level.json';
+  const shopCount = levelData.structures.filter(s => s.type === 'shop').length;
+  const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  a.download = `level-${shopCount}shops-${levelData.structures.length}structures-${ts}.json`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  // Revoke async to avoid races in some browsers.
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 0);
 });
 
 document.getElementById('import-level').addEventListener('click', () => {

@@ -394,7 +394,7 @@ function initShip3D() {
   if (!shipCanvas) return;
   const aspect = WIDTH / HEIGHT;
   shipCamera = new THREE.PerspectiveCamera(15, aspect, 1, 5000);
-  shipCamera.position.set(0, 0, 3380);
+  shipCamera.position.set(0, 0, 3390);
   shipCamera.lookAt(0, 0, 0);
   shipScene = new THREE.Scene();
   asteroidContainer = new THREE.Group();
@@ -1723,7 +1723,11 @@ function loadLevel(levelData) {
     ...ast,
     health: ast.health ?? ast.radius // health defaults to radius if not specified
   }));
-  structures = levelData.structures || [];
+  structures = (levelData.structures || []).map(s => ({
+    x: Number(s.x) || 0,
+    y: Number(s.y) || 0,
+    type: String(s.type || 'shop')
+  }));
   floatingItems.length = 0; // Clear floating items on level load
   // Regenerate stars: same density as a 3000x3000 level, using level seed for reproducibility
   levelSeed = typeof levelData.seed === 'number' ? levelData.seed >>> 0 : 0;
