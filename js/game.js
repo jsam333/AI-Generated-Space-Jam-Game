@@ -198,7 +198,7 @@ function spawnSparks(x, y, count) {
 
 
 const MAX_ORE_STACK = 10;
-const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite']; // items that stack up to MAX_ORE_STACK
+const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap']; // items that stack up to MAX_ORE_STACK
 
 function getMaxStack(itemName) {
   return ORE_ITEMS.includes(itemName) ? MAX_ORE_STACK : 1;
@@ -300,6 +300,33 @@ function laserHitAsteroid(ox, oy, dx, dy, maxLen) {
   }
   
   return closest ? { asteroid: closest, distance: closestDist } : null;
+}
+
+// Ray vs circle for pirate base (radius 54)
+function laserHitPirateBase(ox, oy, dx, dy, maxLen) {
+  let closest = null;
+  let closestDist = maxLen;
+  const radius = 54;
+  const radiusSq = radius * radius;
+  for (const st of structures) {
+    if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
+    const fx = st.x - ox;
+    const fy = st.y - oy;
+    const t = fx * dx + fy * dy;
+    if (t < 0) continue;
+    const cx = ox + dx * t;
+    const cy = oy + dy * t;
+    const distSq = (st.x - cx) * (st.x - cx) + (st.y - cy) * (st.y - cy);
+    if (distSq < radiusSq) {
+      const offset = Math.sqrt(radiusSq - distSq);
+      const hitDist = t - offset;
+      if (hitDist > 0 && hitDist < closestDist) {
+        closest = st;
+        closestDist = hitDist;
+      }
+    }
+  }
+  return closest ? { structure: closest, distance: closestDist } : null;
 }
 
 const SHIP_SIZE = 10;
@@ -630,6 +657,7 @@ function refreshStructureMeshes() {
   while (structureContainer.children.length) structureContainer.remove(structureContainer.children[0]);
   for (const st of structures) {
     if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+    if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
     const src = structureModels[st.type];
     if (!src) continue;
     const clone = src.clone(true);
@@ -671,7 +699,71 @@ function spawnPirateGroup(minCount, maxCount) {
   }
 }
 
+const BASE_DEFENSE_ORBIT_RADIUS = 100;
+const BASE_DEFENSE_ORBIT_SPEED = 0.3;
+
+function spawnBaseDefensePirates(st) {
+  for (let i = 0; i < 12; i++) {
+    const orbitAngle = (i / 12) * Math.PI * 2;
+    pirates.push({
+      x: st.x + Math.cos(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
+      y: st.y + Math.sin(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
+      vx: 0,
+      vy: 0,
+      health: PIRATE_HEALTH,
+      maxHealth: PIRATE_HEALTH,
+      state: 'chase',
+      stateTimer: Math.random() * 5,
+      cooldown: 1 + Math.random() * 2,
+      id: Math.random(),
+      facingAngle: orbitAngle + Math.PI / 2,
+      defendingBase: st,
+      orbitAngle,
+      orbitRadius: BASE_DEFENSE_ORBIT_RADIUS
+    });
+  }
+}
+
+const PIRATE_BASE_AGGRO_RADIUS = 300;
+const PIRATE_BASE_HIT_RADIUS = 54;
+
+function onPirateBaseDeath(st) {
+  if (st.dead) return;
+  st.dead = true;
+  for (let k = 0; k < 50; k++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 20 + Math.random() * 40;
+    floatingItems.push({
+      x: st.x,
+      y: st.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      item: 'scrap',
+      quantity: 1
+    });
+  }
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 15 + Math.random() * 30;
+  floatingItems.push({
+    x: st.x,
+    y: st.y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    item: 'warp key',
+    quantity: 1
+  });
+  if (st._mesh && structureContainer) structureContainer.remove(st._mesh);
+  st._mesh = null;
+}
+
 function updatePirates(dt) {
+  // Aggro: player entering radius 300 around any living pirate base
+  for (const st of structures) {
+    if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
+    const d = Math.sqrt((ship.x - st.x) ** 2 + (ship.y - st.y) ** 2);
+    if (d < PIRATE_BASE_AGGRO_RADIUS) st.aggroed = true;
+  }
+
   // Debug mode: spawn immediately every 5s; normal: wait 2 min before spawns start
   const canSpawn = levelIsDebug || levelElapsedTime >= 120;
   if (canSpawn) {
@@ -680,122 +772,127 @@ function updatePirates(dt) {
       if (levelIsDebug) {
         spawnPirateGroup(6, 10);
         pirateSpawnTimer = 5;
-      } else if (levelElapsedTime < 300) {
+      } else if (levelElapsedTime < 360) {
+        // Level 1: 2-6 min — groups of 1-2 every 70-120 s
         spawnPirateGroup(1, 2);
-        pirateSpawnTimer = 45 + Math.random() * 25; // 45-70 s
+        pirateSpawnTimer = 70 + Math.random() * 50;
       } else {
+        // Level 1: after 6 min — groups of 2-4 every 60-100 s
         spawnPirateGroup(2, 4);
-        pirateSpawnTimer = 40 + Math.random() * 20; // 40-60 s
+        pirateSpawnTimer = 60 + Math.random() * 40;
       }
     }
   }
 
+  const STRUCTURE_SIZE_COLL = 54;
   for (let i = pirates.length - 1; i >= 0; i--) {
     const p = pirates[i];
-    
-    // AI Target
+    let inDefenseMode = false;
+    if (p.defendingBase) {
+      const base = p.defendingBase;
+      if (base.health <= 0 || base.dead || base.aggroed) {
+        // treat as normal pirate
+      } else {
+        inDefenseMode = true;
+        p.orbitAngle += dt * BASE_DEFENSE_ORBIT_SPEED;
+        p.x = base.x + Math.cos(p.orbitAngle) * (p.orbitRadius || BASE_DEFENSE_ORBIT_RADIUS);
+        p.y = base.y + Math.sin(p.orbitAngle) * (p.orbitRadius || BASE_DEFENSE_ORBIT_RADIUS);
+        p.vx = 0;
+        p.vy = 0;
+        p.facingAngle = p.orbitAngle + Math.PI / 2;
+      }
+    }
+
     const dx = ship.x - p.x;
     const dy = ship.y - p.y;
     const distToPlayer = Math.sqrt(dx*dx + dy*dy);
     const dirToPlayer = distToPlayer > 0 ? {x: dx/distToPlayer, y: dy/distToPlayer} : {x:0, y:0};
 
-    p.stateTimer -= dt;
-    if (p.stateTimer <= 0) {
-       p.state = Math.random() < 0.6 ? 'chase' : 'circle';
-       p.stateTimer = 2 + Math.random() * 4;
+    if (!inDefenseMode) {
+      // AI Target / Behavior
+      p.stateTimer -= dt;
+      if (p.stateTimer <= 0) {
+         p.state = Math.random() < 0.6 ? 'chase' : 'circle';
+         p.stateTimer = 2 + Math.random() * 4;
+      }
+
+      let ax = 0;
+      let ay = 0;
+      if (p.state === 'chase') {
+          ax += dirToPlayer.x * PIRATE_ACCEL;
+          ay += dirToPlayer.y * PIRATE_ACCEL;
+      } else {
+          const cw = (p.id > 0.5) ? 1 : -1;
+          ax += -dirToPlayer.y * cw * PIRATE_ACCEL;
+          ay += dirToPlayer.x * cw * PIRATE_ACCEL;
+      }
+
+      const lookAhead = 150;
+      const lookAheadObstacle = 50;
+      for (const ast of asteroids) {
+          const adx = ast.x - p.x;
+          const ady = ast.y - p.y;
+          const adist = Math.sqrt(adx*adx + ady*ady);
+          if (adist < ast.radius + lookAheadObstacle) {
+              ax -= (adx / adist) * 400;
+              ay -= (ady / adist) * 400;
+          }
+      }
+      for (const st of structures) {
+         if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+         if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
+         const sdx = st.x - p.x;
+         const sdy = st.y - p.y;
+         const sdist = Math.sqrt(sdx*sdx + sdy*sdy);
+         if (sdist < STRUCTURE_SIZE_COLL + lookAheadObstacle) {
+             ax -= (sdx / sdist) * 400;
+             ay -= (sdy / sdist) * 400;
+         }
+      }
+      const PLAYER_AVOID_RADIUS = 20;
+      const pdx = ship.x - p.x;
+      const pdy = ship.y - p.y;
+      const pdist = Math.sqrt(pdx*pdx + pdy*pdy);
+      if (pdist > 0 && pdist < PLAYER_AVOID_RADIUS + lookAhead) {
+          ax -= (pdx / pdist) * 400;
+          ay -= (pdy / pdist) * 400;
+      }
+      for (const other of pirates) {
+          if (other === p) continue;
+          const odx = other.x - p.x;
+          const ody = other.y - p.y;
+          const odist = Math.sqrt(odx*odx + ody*ody);
+          if (odist < 40) {
+              ax -= (odx / odist) * 200;
+              ay -= (ody / odist) * 200;
+          }
+      }
+
+      p.vx += ax * dt;
+      p.vy += ay * dt;
+
+      const thrustMag = Math.sqrt(ax * ax + ay * ay);
+      if (thrustMag > 10) {
+        const targetAngle = Math.atan2(ay, ax);
+        let angleDiff = targetAngle - p.facingAngle;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        p.facingAngle += angleDiff * Math.min(1, 3 * dt);
+      }
+
+      p.vx *= Math.max(0, 1 - PIRATE_FRICTION * dt);
+      p.vy *= Math.max(0, 1 - PIRATE_FRICTION * dt);
+
+      const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+      if (speed > PIRATE_MAX_SPEED) {
+          const scale = PIRATE_MAX_SPEED / speed;
+          p.vx *= scale;
+          p.vy *= scale;
+      }
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
     }
-
-    // Forces
-    let ax = 0;
-    let ay = 0;
-
-    // 1. Behavior
-    if (p.state === 'chase') {
-        ax += dirToPlayer.x * PIRATE_ACCEL;
-        ay += dirToPlayer.y * PIRATE_ACCEL;
-    } else {
-        // Circle
-        const cw = (p.id > 0.5) ? 1 : -1;
-        ax += -dirToPlayer.y * cw * PIRATE_ACCEL;
-        ay += dirToPlayer.x * cw * PIRATE_ACCEL;
-    }
-
-    // 2. Avoidance (Asteroids & Structures) – half look-ahead vs player
-    const lookAhead = 150;
-    const lookAheadObstacle = 50;
-    for (const ast of asteroids) {
-        const adx = ast.x - p.x;
-        const ady = ast.y - p.y;
-        const adist = Math.sqrt(adx*adx + ady*ady);
-        if (adist < ast.radius + lookAheadObstacle) {
-            ax -= (adx / adist) * 400; 
-            ay -= (ady / adist) * 400;
-        }
-    }
-    // Avoid Structures
-    const STRUCTURE_SIZE_COLL = 54;
-    for (const st of structures) {
-       if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
-       const sdx = st.x - p.x;
-       const sdy = st.y - p.y;
-       const sdist = Math.sqrt(sdx*sdx + sdy*sdy);
-       if (sdist < STRUCTURE_SIZE_COLL + lookAheadObstacle) {
-           ax -= (sdx / sdist) * 400;
-           ay -= (sdy / sdist) * 400;
-       }
-    }
-    // Avoid player (treat as obstacle so they don't ram)
-    const PLAYER_AVOID_RADIUS = 20;
-    const pdx = ship.x - p.x;
-    const pdy = ship.y - p.y;
-    const pdist = Math.sqrt(pdx*pdx + pdy*pdy);
-    if (pdist > 0 && pdist < PLAYER_AVOID_RADIUS + lookAhead) {
-        ax -= (pdx / pdist) * 400;
-        ay -= (pdy / pdist) * 400;
-    }
-
-    // 3. Separation (from other pirates)
-    for (const other of pirates) {
-        if (other === p) continue;
-        const odx = other.x - p.x;
-        const ody = other.y - p.y;
-        const odist = Math.sqrt(odx*odx + ody*ody);
-        if (odist < 40) {
-            ax -= (odx / odist) * 200;
-            ay -= (ody / odist) * 200;
-        }
-    }
-
-    // Apply Accel
-    p.vx += ax * dt;
-    p.vy += ay * dt;
-
-    // Update facing angle based on thrust direction (not velocity)
-    const thrustMag = Math.sqrt(ax * ax + ay * ay);
-    if (thrustMag > 10) {
-      const targetAngle = Math.atan2(ay, ax);
-      // Smoothly rotate toward thrust direction
-      let angleDiff = targetAngle - p.facingAngle;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      p.facingAngle += angleDiff * Math.min(1, 3 * dt); // Turn rate
-    }
-
-    // Friction
-    p.vx *= Math.max(0, 1 - PIRATE_FRICTION * dt);
-    p.vy *= Math.max(0, 1 - PIRATE_FRICTION * dt);
-
-    // Speed Cap
-    const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
-    if (speed > PIRATE_MAX_SPEED) {
-        const scale = PIRATE_MAX_SPEED / speed;
-        p.vx *= scale;
-        p.vy *= scale;
-    }
-
-    // Move
-    p.x += p.vx * dt;
-    p.y += p.vy * dt;
 
     // Physics Collisions (Bounce) – pirates do not damage asteroids
     // Asteroids
@@ -820,6 +917,7 @@ function updatePirates(dt) {
     // Structures
     for (const st of structures) {
         if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+        if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
         const cdx = p.x - st.x;
         const cdy = p.y - st.y;
         const cdist = Math.sqrt(cdx*cdx + cdy*cdy);
@@ -838,7 +936,8 @@ function updatePirates(dt) {
         }
     }
 
-    // Firing
+    // Firing (defense-mode pirates do not shoot)
+    if (!inDefenseMode) {
     p.cooldown -= dt;
     if (p.cooldown <= 0 && distToPlayer < 700) {
          p.cooldown = 1.0 + Math.random() * 2.0;
@@ -865,10 +964,26 @@ function updatePirates(dt) {
              owner: 'pirate'
          });
     }
+    }
 
-    // Death
+    // Death: drop 3-5 scrap only if not fromBaseSpawn
     if (p.health <= 0) {
         spawnSparks(p.x, p.y, 15);
+        if (!p.fromBaseSpawn) {
+          const scrapCount = 3 + Math.floor(Math.random() * 3);
+          for (let k = 0; k < scrapCount; k++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 20 + Math.random() * 40;
+            floatingItems.push({
+              x: p.x,
+              y: p.y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              item: 'scrap',
+              quantity: 1
+            });
+          }
+        }
         pirates.splice(i, 1);
     }
   }
@@ -945,6 +1060,7 @@ function update(dt) {
   const STRUCTURE_SIZE_COLL = 54;
   for (const st of structures) {
     if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+    if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1019,9 +1135,23 @@ function update(dt) {
              }
         }
 
+        const hitBase = laserHitPirateBase(ship.x, ship.y, dir.x, dir.y, 1500);
+        const baseDist = hitBase ? hitBase.distance : 1500;
+
         let target = null;
         let hitDist = 1500;
-        if (hit && hitPirate) {
+        if (hit && hitPirate && hitBase) {
+            if (hit.distance <= pirateDist && hit.distance <= baseDist) {
+                target = hit.asteroid;
+                hitDist = hit.distance;
+            } else if (pirateDist <= baseDist) {
+                target = hitPirate;
+                hitDist = pirateDist;
+            } else {
+                target = hitBase.structure;
+                hitDist = baseDist;
+            }
+        } else if (hit && hitPirate) {
             if (hit.distance < pirateDist) {
                 target = hit.asteroid;
                 hitDist = hit.distance;
@@ -1029,16 +1159,40 @@ function update(dt) {
                 target = hitPirate;
                 hitDist = pirateDist;
             }
+        } else if (hit && hitBase) {
+            if (hit.distance < baseDist) {
+                target = hit.asteroid;
+                hitDist = hit.distance;
+            } else {
+                target = hitBase.structure;
+                hitDist = baseDist;
+            }
+        } else if (hitPirate && hitBase) {
+            if (pirateDist < baseDist) {
+                target = hitPirate;
+                hitDist = pirateDist;
+            } else {
+                target = hitBase.structure;
+                hitDist = baseDist;
+            }
         } else if (hit) {
             target = hit.asteroid;
             hitDist = hit.distance;
         } else if (hitPirate) {
             target = hitPirate;
             hitDist = pirateDist;
+        } else if (hitBase) {
+            target = hitBase.structure;
+            hitDist = baseDist;
         }
 
         if (target) {
           target.health -= laserStats.dps * dt;
+          if (target.defendingBase) target.defendingBase.aggroed = true;
+          if (target.type === 'piratebase') {
+            target.aggroed = true;
+            if (target.health <= 0) onPirateBaseDeath(target);
+          }
           const hitX = ship.x + dir.x * hitDist;
           const hitY = ship.y + dir.y * hitDist;
           sparkCarry += 60 * dt;
@@ -1078,8 +1232,42 @@ function update(dt) {
 
   updatePirates(dt);
 
+  // Pirate base: spawn 4 pirates every 30s when aggroed (orthogonal directions)
+  const BASE_SPAWN_OFFSET = 80;
+  const BASE_SPAWN_INTERVAL = 30;
+  for (const st of structures) {
+    if (st.type !== 'piratebase' || st.dead || st.health <= 0 || !st.aggroed) continue;
+    st.spawnTimer -= dt;
+    if (st.spawnTimer <= 0) {
+      st.spawnTimer = BASE_SPAWN_INTERVAL;
+      const offsets = [
+        [BASE_SPAWN_OFFSET, 0],
+        [-BASE_SPAWN_OFFSET, 0],
+        [0, BASE_SPAWN_OFFSET],
+        [0, -BASE_SPAWN_OFFSET]
+      ];
+      for (const [ox, oy] of offsets) {
+        const angle = Math.atan2(ship.y - (st.y + oy), ship.x - (st.x + ox));
+        pirates.push({
+          x: st.x + ox,
+          y: st.y + oy,
+          vx: 0,
+          vy: 0,
+          health: PIRATE_HEALTH,
+          maxHealth: PIRATE_HEALTH,
+          state: 'chase',
+          stateTimer: Math.random() * 5,
+          cooldown: 1 + Math.random() * 2,
+          id: Math.random(),
+          facingAngle: angle,
+          fromBaseSpawn: true
+        });
+      }
+    }
+  }
+
   // Bullets (movement + bullet-asteroid collision)
-  const BULLET_DAMAGE = 2;            // base damage per pellet (e.g. structures, player hit by pirates)
+  const BULLET_DAMAGE = 4;            // pirate bullet damage to player
   const BULLET_DAMAGE_PIRATE = 3;    // light blaster damage per pellet to pirates
   const BULLET_DAMAGE_ASTEROID = 0.25; // pellets deal only 0.25 to asteroids
   const VIEWPORT_HALF_W = WIDTH / 2;
@@ -1108,6 +1296,24 @@ function update(dt) {
         }
       }
 
+      // Check Pirate Base (player bullets only)
+      if (!remove && b.owner === 'player') {
+        for (const st of structures) {
+          if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
+          const dx = b.x - st.x;
+          const dy = b.y - st.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < PIRATE_BASE_HIT_RADIUS) {
+            st.health -= BULLET_DAMAGE;
+            st.aggroed = true;
+            remove = true;
+            spawnSparks(b.x, b.y, 4);
+            if (st.health <= 0) onPirateBaseDeath(st);
+            break;
+          }
+        }
+      }
+
       // Check Pirates (Player bullets)
       if (!remove && b.owner === 'player') {
         for (const p of pirates) {
@@ -1116,6 +1322,7 @@ function update(dt) {
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < SHIP_COLLISION_RADIUS + 4) {
                 p.health -= BULLET_DAMAGE_PIRATE;
+                if (p.defendingBase) p.defendingBase.aggroed = true;
                 remove = true;
                 spawnSparks(b.x, b.y, 2);
                 break;
@@ -1228,6 +1435,7 @@ function update(dt) {
     }
     for (const st of structures) {
       if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+      if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
       const dx = item.x - st.x;
       const dy = item.y - st.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -1421,11 +1629,13 @@ function render(dt = 1 / 60) {
                     (item.item === 'aurite' ? '#FFD700' : 
                     (item.item === 'diamite' ? '#C0C0C0' : 
                     (item.item === 'platinite' ? '#E5E4E2' : 
-                    '#aa8844'))))))));
+                    (item.item === 'scrap' ? '#888888' : 
+                    (item.item === 'warp key' ? '#B8860B' : 
+                    '#aa8844'))))))))));
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : '#ccaa66'))));
+    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : (item.item === 'scrap' ? '#aaaaaa' : (item.item === 'warp key' ? '#DAA520' : '#ccaa66'))))));
     ctx.lineWidth = 2;
     ctx.stroke();
     // Item icon: image for fuel/energy/oxygen, else letter fallback
@@ -1439,7 +1649,9 @@ function render(dt = 1 / 60) {
                    (item.item === 'aurite' ? 'A' : 
                    (item.item === 'diamite' ? 'D' : 
                    (item.item === 'platinite' ? 'P' : 
-                   (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))));
+                   (item.item === 'scrap' ? 'S' : 
+                   (item.item === 'warp key' ? 'K' : 
+                   (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))));
       ctx.fillStyle = '#fff';
       ctx.font = '10px Oxanium';
       ctx.textAlign = 'center';
@@ -1465,9 +1677,10 @@ function render(dt = 1 / 60) {
   const SHOP_DASHED_EXTRA = 80;
   const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', warpgate: '#6644aa', piratebase: '#884422' };
   for (const st of structures) {
+    if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
     const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'piratebase';
     const r = is3D ? STRUCTURE_RADIUS_3D : STRUCTURE_SIZE;
-    const cullR = st.type === 'warpgate' ? STRUCTURE_RADIUS_3D + WARP_GATE_DASHED_EXTRA_3D : (st.type === 'shop' ? STRUCTURE_RADIUS_3D + SHOP_DASHED_EXTRA_3D : r);
+    const cullR = st.type === 'warpgate' ? STRUCTURE_RADIUS_3D + WARP_GATE_DASHED_EXTRA_3D : (st.type === 'shop' ? STRUCTURE_RADIUS_3D + SHOP_DASHED_EXTRA_3D : (st.type === 'piratebase' ? PIRATE_BASE_AGGRO_RADIUS : r));
     const { x, y } = worldToScreen(st.x, st.y);
     if (x + cullR < 0 || x - cullR > WIDTH || y + cullR < 0 || y - cullR > HEIGHT) continue;
     ctx.strokeStyle = '#888';
@@ -1485,6 +1698,23 @@ function render(dt = 1 / 60) {
         ctx.arc(x, y, STRUCTURE_RADIUS_3D + SHOP_DASHED_EXTRA_3D, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+      } else if (st.type === 'piratebase') {
+        ctx.strokeStyle = STRUCTURE_STYLES.piratebase;
+        ctx.setLineDash([10, 10]);
+        ctx.beginPath();
+        ctx.arc(x, y, PIRATE_BASE_AGGRO_RADIUS, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Health bar when damaged
+        if (st.health < st.maxHealth) {
+          const barW = 90;
+          const barH = 6;
+          const pct = Math.max(0, st.health / st.maxHealth);
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(x - barW/2, y - STRUCTURE_RADIUS_3D - 20, barW, barH);
+          ctx.fillStyle = '#ff3333';
+          ctx.fillRect(x - barW/2, y - STRUCTURE_RADIUS_3D - 20, barW * pct, barH);
+        }
       }
     } else {
       ctx.beginPath();
@@ -1633,6 +1863,11 @@ function render(dt = 1 / 60) {
             laserLength = Math.max(0, tHit - 4);
           }
         }
+      }
+      // Check pirate bases: ray-circle intersection (radius 54)
+      const baseHit = laserHitPirateBase(ship.x, ship.y, dir.x, dir.y, laserLength);
+      if (baseHit) {
+        laserLength = Math.min(laserLength, Math.max(0, baseHit.distance - 10));
       }
     }
     const x1 = cx + dir.x * SHIP_SIZE;
@@ -1806,7 +2041,7 @@ function canAcceptFloatingItem(item) {
 
 // Shop: buy/sell 5x3 grid (15 slots)
 const ITEM_BUY_PRICE = { 'small energy cell': 150, 'medium energy cell': 550, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 1000, 'medium mining laser': 1500 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel tank': 20, aurite: 25, diamite: 50, platinite: 75, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
+const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel tank': 20, aurite: 25, diamite: 50, platinite: 75, scrap: 25, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
@@ -1860,6 +2095,8 @@ function getItemLabel(it) {
   if (it.item === 'aurite') return 'A';
   if (it.item === 'diamite') return 'D';
   if (it.item === 'platinite') return 'P';
+  if (it.item === 'scrap') return 'S';
+  if (it.item === 'warp key') return 'K';
   return (it.item && it.item.charAt(0).toUpperCase()) || '';
 }
 
@@ -2108,13 +2345,25 @@ function loadLevel(levelData) {
     ...ast,
     health: ast.health ?? ast.radius // health defaults to radius if not specified
   }));
-  structures = (levelData.structures || []).map(s => ({
-    x: Number(s.x) || 0,
-    y: Number(s.y) || 0,
-    type: String(s.type || 'shop')
-  }));
+  structures = (levelData.structures || []).map(s => {
+    const st = {
+      x: Number(s.x) || 0,
+      y: Number(s.y) || 0,
+      type: String(s.type || 'shop')
+    };
+    if (st.type === 'piratebase') {
+      st.health = 100;
+      st.maxHealth = 100;
+      st.aggroed = false;
+      st.spawnTimer = 0;
+    }
+    return st;
+  });
   floatingItems.length = 0; // Clear floating items on level load
   pirates.length = 0; // Clear pirates on level load
+  for (const st of structures) {
+    if (st.type === 'piratebase') spawnBaseDefensePirates(st);
+  }
   levelElapsedTime = 0;
   levelIsDebug = levelData.debug === true;
   pirateSpawnTimer = levelIsDebug ? 5 : 0; // Debug: first spawn at 5s; normal: first spawn at 2 min
