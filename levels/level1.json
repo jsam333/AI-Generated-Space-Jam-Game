@@ -376,8 +376,8 @@
         },
         {
           "item": "fuel tank",
-          "fuel": 10,
-          "maxFuel": 10,
+          "fuel": 5,
+          "maxFuel": 5,
           "quantity": 3
         }
       ],
@@ -433,9 +433,25 @@
   ],
   "spawnSettings": {
     "initialDelay": 120,
-    "waveIntervalMin": 60,
-    "waveIntervalMax": 100,
-    "waveSizeMin": 2,
-    "waveSizeMax": 4
+    "waveIntervalMin": 80,
+    "waveIntervalMax": 120,
+    "waveSizeMin": 1,
+    "waveSizeMax": 2,
+    "tiers": [
+      {
+        "startTime": 300,
+        "waveIntervalMin": 70,
+        "waveIntervalMax": 110,
+        "waveSizeMin": 2,
+        "waveSizeMax": 4
+      },
+      {
+        "startTime": 600,
+        "waveIntervalMin": 60,
+        "waveIntervalMax": 100,
+        "waveSizeMin": 3,
+        "waveSizeMax": 6
+      }
+    ]
   }
 }

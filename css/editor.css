@@ -276,3 +276,34 @@ body {
 .add-btn:hover {
   background: #4a8ed5;
 }
+
+.spawn-tier {
+  border: 1px solid #555;
+  background: #2a2a2a;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 4px;
+}
+
+.spawn-tier h4 {
+  margin: 0 0 10px 0;
+  font-size: 13px;
+  color: #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.spawn-tier .delete-tier-btn {
+  background: #d54a4a;
+  color: white;
+  border: none;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.spawn-tier .delete-tier-btn:hover {
+  background: #e56a6a;
+}

@@ -899,10 +899,12 @@ document.getElementById('level-settings-btn').addEventListener('click', () => {
       waveIntervalMin: 60,
       waveIntervalMax: 100,
       waveSizeMin: 2,
-      waveSizeMax: 4
+      waveSizeMax: 4,
+      tiers: []
     };
   }
   const s = state.level.spawnSettings;
+  if (!s.tiers) s.tiers = [];
   
   const title = document.createElement('h4');
   title.textContent = 'Global Spawn Settings';
@@ -910,11 +912,78 @@ document.getElementById('level-settings-btn').addEventListener('click', () => {
   title.style.marginBottom = '10px';
   content.appendChild(title);
 
+  // Initial Phase (Base Settings)
+  const baseTitle = document.createElement('h5');
+  baseTitle.textContent = 'Initial Phase (Start)';
+  baseTitle.style.color = '#aaa';
+  baseTitle.style.margin = '10px 0 5px 0';
+  content.appendChild(baseTitle);
+
   addPropInput(content, 'Initial Delay (s)', s.initialDelay, (v) => { s.initialDelay = parseInt(v); saveLevel(); });
   addPropInput(content, 'Min Wave Interval (s)', s.waveIntervalMin, (v) => { s.waveIntervalMin = parseInt(v); saveLevel(); });
   addPropInput(content, 'Max Wave Interval (s)', s.waveIntervalMax, (v) => { s.waveIntervalMax = parseInt(v); saveLevel(); });
   addPropInput(content, 'Min Wave Size', s.waveSizeMin, (v) => { s.waveSizeMin = parseInt(v); saveLevel(); });
   addPropInput(content, 'Max Wave Size', s.waveSizeMax, (v) => { s.waveSizeMax = parseInt(v); saveLevel(); });
+
+  // Tiers
+  const tiersTitle = document.createElement('h5');
+  tiersTitle.textContent = 'Progressive Tiers';
+  tiersTitle.style.color = '#aaa';
+  tiersTitle.style.margin = '15px 0 5px 0';
+  content.appendChild(tiersTitle);
+
+  const tiersContainer = document.createElement('div');
+  content.appendChild(tiersContainer);
+
+  function renderTiers() {
+    tiersContainer.innerHTML = '';
+    s.tiers.sort((a, b) => a.startTime - b.startTime);
+    
+    s.tiers.forEach((tier, index) => {
+      const tierBox = document.createElement('div');
+      tierBox.className = 'spawn-tier';
+      
+      const tierHeader = document.createElement('h4');
+      tierHeader.innerHTML = `<span>Phase ${index + 1}</span>`;
+      
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delete-tier-btn';
+      delBtn.textContent = 'Delete';
+      delBtn.onclick = () => {
+        s.tiers.splice(index, 1);
+        saveLevel();
+        renderTiers();
+      };
+      tierHeader.appendChild(delBtn);
+      tierBox.appendChild(tierHeader);
+
+      addPropInput(tierBox, 'Start Time (s)', tier.startTime, (v) => { tier.startTime = parseInt(v); saveLevel(); });
+      addPropInput(tierBox, 'Min Interval (s)', tier.waveIntervalMin, (v) => { tier.waveIntervalMin = parseInt(v); saveLevel(); });
+      addPropInput(tierBox, 'Max Interval (s)', tier.waveIntervalMax, (v) => { tier.waveIntervalMax = parseInt(v); saveLevel(); });
+      addPropInput(tierBox, 'Min Size', tier.waveSizeMin, (v) => { tier.waveSizeMin = parseInt(v); saveLevel(); });
+      addPropInput(tierBox, 'Max Size', tier.waveSizeMax, (v) => { tier.waveSizeMax = parseInt(v); saveLevel(); });
+
+      tiersContainer.appendChild(tierBox);
+    });
+  }
+  renderTiers();
+
+  const addTierBtn = document.createElement('button');
+  addTierBtn.className = 'add-btn';
+  addTierBtn.textContent = '+ Add Phase';
+  addTierBtn.style.width = '100%';
+  addTierBtn.onclick = () => {
+    s.tiers.push({
+      startTime: 300, // Default 5 mins
+      waveIntervalMin: 45,
+      waveIntervalMax: 80,
+      waveSizeMin: 3,
+      waveSizeMax: 6
+    });
+    saveLevel();
+    renderTiers();
+  };
+  content.appendChild(addTierBtn);
 });
 
 document.getElementById('close-properties').addEventListener('click', () => {

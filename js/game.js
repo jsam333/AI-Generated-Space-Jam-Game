@@ -16,6 +16,7 @@ let mediumAsteroidModels = [null, null];
 // Large asteroid 3D model (radius 100+)
 let largeAsteroidModel = null;
 let oreModel = null;
+let scrapModel = null;
 let asteroidContainer = null;
 let structureModels = { warpgate: null, shop: null, piratebase: null };
 let structureContainer = null;
@@ -112,7 +113,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 5000
+  credits: 0
 };
 const OXYGEN_DEPLETION_RATE = 1 / 25; // 1 per 25 seconds
 const FUEL_DEPLETION_RATE = 1 / 3; // 1 per 3 seconds while right-clicking
@@ -132,7 +133,7 @@ const MINING_LASER_STATS = {
   'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.5 }  // 1.5s heat, 3s cool, 10 DPS, 50% faster energy
 };
 const BLASTER_ENERGY_PER_SHOT = 0.2;
-const BLASTER_HEAT_PER_SHOT = 0.05;
+const BLASTER_HEAT_PER_SHOT = 0.1;
 const BLASTER_COOL_RATE = 1 / 3;
 const BLASTER_FIRE_RATE = 10;  // pellets per second
 let selectedSlot = 0;
@@ -167,9 +168,10 @@ let prevAimAngle = 0;
 let shipTilt = 0;
 let shipTiltInitialized = false;
 
-let gamePaused = false;
+let gamePaused = true;
 let warpMenuOpen = false;
 let shopMenuOpen = false;
+let startScreenOpen = true;
 let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
 let interactPromptTarget = null; // Current structure showing prompt
 let tutorialTextTimer = 0; // Time remaining for tutorial text (seconds)
@@ -177,6 +179,29 @@ let tutorialTextTimerStarted = false; // True after player thrusts for the first
 let tutorialTextWorldX = 0; // World X position of tutorial text
 let tutorialTextWorldY = 0; // World Y position of tutorial text
 let activeShopStructure = null;
+
+// Start screen overlay (click to start). Keep rendering/asset loading running behind it.
+const startOverlayEl = document.getElementById('start-menu-overlay');
+if (startOverlayEl) {
+  startOverlayEl.style.display = 'flex';
+  startOverlayEl.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startOverlayEl.style.display = 'none';
+    startScreenOpen = false;
+    // Unpause unless another menu is open (shouldn't be at boot)
+    gamePaused = warpMenuOpen || shopMenuOpen;
+    // Clear latched inputs so the click doesn't immediately fire/thrust
+    leftMouseDown = false;
+    rightMouseDown = false;
+    ctrlBrake = false;
+    if (canvas && canvas.focus) canvas.focus();
+  });
+} else {
+  // If markup is missing for some reason, don't block the game.
+  startScreenOpen = false;
+  gamePaused = false;
+}
 
 // Bullets
 const bullets = [];
@@ -644,6 +669,22 @@ function initShip3D() {
     buildOreIconDataUrls();
     console.log('[ship3d] Loaded ore.glb');
   }, undefined, (err) => console.error('[ship3d] Failed to load ore.glb', err));
+
+  loader.load(new URL('assets/scrap.glb', window.location.href).toString(), (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = 1 / maxDim;
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    model.rotation.x = -Math.PI / 2;
+    model.rotation.y = Math.PI; // flip 180
+    scrapModel = model;
+    buildScrapIconDataUrl();
+    console.log('[ship3d] Loaded scrap.glb');
+  }, undefined, (err) => console.error('[ship3d] Failed to load scrap.glb', err));
 }
 
 function buildOreIconDataUrls() {
@@ -664,6 +705,7 @@ function buildOreIconDataUrls() {
   dir.position.set(0.5, 0.5, 1);
   scene.add(dir);
   for (const itemKey of FLOATING_ORE_ITEMS) {
+    if (itemKey === 'scrap') continue;
     const clone = oreModel.clone(true);
     applyFloatingOreMaterial(clone, itemKey);
     clone.position.set(0, 0, 0);
@@ -677,6 +719,37 @@ function buildOreIconDataUrls() {
     } catch (e) { /* security / CORS */ }
     scene.remove(clone);
   }
+  renderer.dispose();
+}
+
+function buildScrapIconDataUrl() {
+  if (!scrapModel || typeof THREE === 'undefined') return;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setSize(size, size);
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10);
+  camera.position.set(0, 0, 1.4);
+  camera.lookAt(0, 0, 0);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir.position.set(0.5, 0.5, 1);
+  scene.add(dir);
+  const clone = scrapModel.clone(true);
+  applyFloatingOreMaterial(clone, 'scrap');
+  clone.position.set(0, 0, 0);
+  clone.rotation.x = -Math.PI / 2;
+  clone.rotation.y = Math.PI;
+  clone.rotation.z = 0;
+  scene.add(clone);
+  renderer.render(scene, camera);
+  try {
+    ORE_ICON_DATA_URLS['scrap'] = canvas.toDataURL('image/png');
+  } catch (e) { /* security / CORS */ }
   renderer.dispose();
 }
 
@@ -891,10 +964,25 @@ function updatePirates(dt) {
         spawnPirateGroup(6, 10);
         pirateSpawnTimer = 5;
       } else {
-        const minWave = levelSpawnSettings.waveSizeMin;
-        const maxWave = levelSpawnSettings.waveSizeMax;
-        const minInt = levelSpawnSettings.waveIntervalMin;
-        const maxInt = levelSpawnSettings.waveIntervalMax;
+        // Determine active tier based on elapsed time
+        let activeTier = null;
+        if (levelSpawnSettings.tiers && levelSpawnSettings.tiers.length > 0) {
+          // Find the tier with the highest startTime that is <= current time
+          // Tiers should be sorted by startTime, but we'll iterate to be safe
+          let bestStart = -1;
+          for (const tier of levelSpawnSettings.tiers) {
+            if (levelElapsedTime >= tier.startTime && tier.startTime > bestStart) {
+              bestStart = tier.startTime;
+              activeTier = tier;
+            }
+          }
+        }
+
+        // Use active tier settings or fall back to base settings
+        const minWave = activeTier ? activeTier.waveSizeMin : levelSpawnSettings.waveSizeMin;
+        const maxWave = activeTier ? activeTier.waveSizeMax : levelSpawnSettings.waveSizeMax;
+        const minInt = activeTier ? activeTier.waveIntervalMin : levelSpawnSettings.waveIntervalMin;
+        const maxInt = activeTier ? activeTier.waveIntervalMax : levelSpawnSettings.waveIntervalMax;
         
         spawnPirateGroup(minWave, maxWave);
         pirateSpawnTimer = minInt + Math.random() * (maxInt - minInt);
@@ -1243,11 +1331,16 @@ function update(dt) {
       const dy = mouseY - HEIGHT / 2;
       const dir = normalize(dx, dy);
       if (dir.x !== 0 || dir.y !== 0) {
-        const hit = laserHitAsteroid(ship.x, ship.y, dir.x, dir.y, 1500);
+        // Cap laser at screen edge (world units; 1:1 with screen pixels, ship at center)
+        let maxLaserDist = 1500;
+        if (Math.abs(dir.x) > 1e-6) maxLaserDist = Math.min(maxLaserDist, (WIDTH / 2) / Math.abs(dir.x));
+        if (Math.abs(dir.y) > 1e-6) maxLaserDist = Math.min(maxLaserDist, (HEIGHT / 2) / Math.abs(dir.y));
+
+        const hit = laserHitAsteroid(ship.x, ship.y, dir.x, dir.y, maxLaserDist);
         
         // Check Pirates for laser hit
         let hitPirate = null;
-        let pirateDist = 1500;
+        let pirateDist = maxLaserDist;
         for (const p of pirates) {
              const fx = p.x - ship.x;
              const fy = p.y - ship.y;
@@ -1267,11 +1360,11 @@ function update(dt) {
              }
         }
 
-        const hitBase = laserHitPirateBase(ship.x, ship.y, dir.x, dir.y, 1500);
-        const baseDist = hitBase ? hitBase.distance : 1500;
+        const hitBase = laserHitPirateBase(ship.x, ship.y, dir.x, dir.y, maxLaserDist);
+        const baseDist = hitBase ? hitBase.distance : maxLaserDist;
 
         let target = null;
-        let hitDist = 1500;
+        let hitDist = maxLaserDist;
         if (hit && hitPirate && hitBase) {
             if (hit.distance <= pirateDist && hit.distance <= baseDist) {
                 target = hit.asteroid;
@@ -1595,11 +1688,13 @@ function update(dt) {
 
   // Create/update 3D mesh for ore-type floating items
   const FLOATING_ORE_SCALE = 15; // 40% smaller than before (was 25)
-  if (floatingOreContainer && oreModel) {
+  if (floatingOreContainer && (oreModel || scrapModel)) {
     for (const item of floatingItems) {
       if (!FLOATING_ORE_ITEMS.includes(item.item)) continue;
+      const src = (item.item === 'scrap' && scrapModel) ? scrapModel : oreModel;
+      if (!src) continue;
       if (!item._mesh) {
-        const clone = oreModel.clone(true);
+        const clone = src.clone(true);
         applyFloatingOreMaterial(clone, item.item);
         clone.scale.setScalar(FLOATING_ORE_SCALE);
         item._mesh = clone;
@@ -2023,11 +2118,15 @@ function render(dt = 1 / 60) {
     const dx = mouseX - cx;
     const dy = mouseY - cy;
     const dir = normalize(dx, dy);
-    let laserLength = 1500;
+    // Cap at screen edge (world units; 1:1 with screen, ship at center)
+    let maxLaserDist = 1500;
+    if (Math.abs(dir.x) > 1e-6) maxLaserDist = Math.min(maxLaserDist, (WIDTH / 2) / Math.abs(dir.x));
+    if (Math.abs(dir.y) > 1e-6) maxLaserDist = Math.min(maxLaserDist, (HEIGHT / 2) / Math.abs(dir.y));
+    let laserLength = maxLaserDist;
     
     // Check for asteroid or pirate hit and shorten laser (stop before surface)
     if (dir.x !== 0 || dir.y !== 0) {
-      const hit = laserHitAsteroid(ship.x, ship.y, dir.x, dir.y, 1500);
+      const hit = laserHitAsteroid(ship.x, ship.y, dir.x, dir.y, maxLaserDist);
       if (hit) {
         laserLength = Math.min(laserLength, Math.max(0, hit.distance - 10));
       }
@@ -2210,6 +2309,8 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 canvas.addEventListener('mousedown', (e) => {
+  if (startScreenOpen) return;
+  if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.button === 0) {
     leftMouseDown = true;
@@ -2219,6 +2320,8 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mouseup', (e) => {
+  if (startScreenOpen) return;
+  if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.button === 0) {
     leftMouseDown = false;
@@ -2235,6 +2338,8 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (startScreenOpen) return;
+  if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.deltaY > 0) {
     selectedSlot = (selectedSlot + 1) % 9;
@@ -2301,7 +2406,7 @@ function canAcceptFloatingItem(item) {
 
 // Shop: buy/sell 5x3 grid (15 slots)
 const ITEM_BUY_PRICE = { 'small energy cell': 150, 'medium energy cell': 550, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 1000, 'medium mining laser': 1500 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 20, 'fuel tank': 20, aurite: 30, diamite: 40, platinite: 60, scrap: 25, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
+const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 20, 'fuel tank': 20, aurite: 30, diamite: 40, platinite: 60, scrap: 40, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
@@ -2591,6 +2696,16 @@ function returnSellAreaToHotbar() {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (startScreenOpen) return;
+  if (warpMenuOpen) return;
+  if (shopMenuOpen) {
+    // Allow E to close shop, ignore other gameplay inputs while paused in menu
+    if (e.code === 'KeyE') {
+      e.preventDefault();
+      closeShopMenu();
+    }
+    return;
+  }
   if (e.key === 'Control') ctrlBrake = true;
   // Hotbar slot selection (1-9)
   if (e.key >= '1' && e.key <= '9') {
@@ -2598,11 +2713,11 @@ window.addEventListener('keydown', (e) => {
   }
   // Key in E position (KeyE): close shop, or open warp gate/shop menu when inside
   if (e.code === 'KeyE') {
-    if (shopMenuOpen) {
+    if (!warpMenuOpen && !gamePaused && isShipInWarpGate()) {
       e.preventDefault();
-      closeShopMenu();
-    } else if (!warpMenuOpen && !gamePaused && isShipInWarpGate()) {
-      e.preventDefault();
+      leftMouseDown = false;
+      rightMouseDown = false;
+      ctrlBrake = false;
       gamePaused = true;
       warpMenuOpen = true;
       const overlay = document.getElementById('warp-menu-overlay');
@@ -2613,12 +2728,18 @@ window.addEventListener('keydown', (e) => {
       const shopSt = isShipInShop();
       if (shopSt) {
         e.preventDefault();
+        leftMouseDown = false;
+        rightMouseDown = false;
+        ctrlBrake = false;
         openShopMenu(shopSt);
       }
     }
   }
 });
 window.addEventListener('keyup', (e) => {
+  if (startScreenOpen) return;
+  if (warpMenuOpen) return;
+  if (shopMenuOpen) return;
   if (e.key === 'Control') ctrlBrake = false;
 });
 
@@ -2650,6 +2771,7 @@ function loadLevel(levelData) {
   
   if (levelData.spawnSettings) {
     levelSpawnSettings = levelData.spawnSettings;
+    if (!levelSpawnSettings.tiers) levelSpawnSettings.tiers = [];
   } else {
     // Default
     levelSpawnSettings = {
@@ -2657,7 +2779,8 @@ function loadLevel(levelData) {
       waveIntervalMin: 60,
       waveIntervalMax: 100,
       waveSizeMin: 2,
-      waveSizeMax: 4
+      waveSizeMax: 4,
+      tiers: []
     };
   }
 
@@ -2869,6 +2992,9 @@ levelInput.addEventListener('change', (e) => {
 
 // Press L to load a level file
 window.addEventListener('keydown', (e) => {
+  if (startScreenOpen) return;
+  if (warpMenuOpen) return;
+  if (shopMenuOpen) return;
   if (e.key === 'l' || e.key === 'L') {
     levelInput.click();
   }
@@ -3426,7 +3552,7 @@ function gameLoop(now) {
   lastTime = now;
 
   if (!gamePaused) update(dt);
-  render(dt);
+  render(gamePaused ? 0 : dt);
   updateHUD(); // Sync HUD every frame (or could optimize to only when changed)
 
   requestAnimationFrame(gameLoop);
