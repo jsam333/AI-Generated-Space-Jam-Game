@@ -629,7 +629,7 @@ function initShip3D() {
           metalness: 0.2,
           emissive: isPirateBase ? 0x882222 : 0x333333,
           emissiveMap: oldMat.map || null,
-          emissiveIntensity: isPirateBase ? 0.05 : 50.0
+          emissiveIntensity: isPirateBase ? 0.08 : 50.0
         });
         child.material = newMat;
       }
@@ -704,17 +704,18 @@ function initShip3D() {
     model.rotation.x = -Math.PI / 2;
     model.rotation.y = Math.PI; // flip 180 if needed, we'll align with rotation
     
-    // Apply reddish emissive material
+    // Apply reddish emissive material (texture map shapes glow like asteroids)
     model.traverse((child) => {
       if (child.isMesh && child.material) {
         const oldMat = child.material;
         const newMat = new THREE.MeshStandardMaterial({
-          color: oldMat.color ? oldMat.color.clone() : 0xcc4444,
+          color: oldMat.color ? oldMat.color.clone() : 0xee9999,
           map: oldMat.map || null,
           roughness: 0.7,
           metalness: 0.3,
-          emissive: 0x882222, 
-          emissiveIntensity: 0.05
+          emissive: 0xcc7777,
+          emissiveMap: oldMat.map || null,
+          emissiveIntensity: 0.2
         });
         child.material = newMat;
       }
