@@ -19,6 +19,8 @@ let oreModel = null;
 let scrapModel = null;
 let asteroidContainer = null;
 let structureModels = { warpgate: null, shop: null, piratebase: null };
+let pirateModel = null;
+let pirateContainer = null;
 let structureContainer = null;
 let floatingOreContainer = null;
 let levelSeed = 0;
@@ -485,6 +487,8 @@ function initShip3D() {
   shipScene.add(asteroidContainer);
   structureContainer = new THREE.Group();
   shipScene.add(structureContainer);
+  pirateContainer = new THREE.Group();
+  shipScene.add(pirateContainer);
   floatingOreContainer = new THREE.Group();
   shipScene.add(floatingOreContainer);
   const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -613,7 +617,8 @@ function initShip3D() {
     console.log('[ship3d] Loaded large-asteroid1.glb');
   }, undefined, (err) => console.error('[ship3d] Failed to load large-asteroid1.glb', err));
 
-  function setupStructureModel(model) {
+  function setupStructureModel(model, structureType) {
+    const isPirateBase = structureType === 'piratebase';
     model.traverse((child) => {
       if (child.isMesh && child.material) {
         const oldMat = child.material;
@@ -622,9 +627,9 @@ function initShip3D() {
           map: oldMat.map || null,
           roughness: 0.8,
           metalness: 0.2,
-          emissive: 0x333333,
+          emissive: isPirateBase ? 0x882222 : 0x333333,
           emissiveMap: oldMat.map || null,
-          emissiveIntensity: 50.0
+          emissiveIntensity: isPirateBase ? 0.05 : 50.0
         });
         child.material = newMat;
       }
@@ -647,7 +652,7 @@ function initShip3D() {
   STRUCTURE_FILES.forEach(({ type, file }) => {
     loader.load(new URL('assets/' + file, window.location.href).toString(), (gltf) => {
       const model = gltf.scene;
-      setupStructureModel(model);
+      setupStructureModel(model, type);
       structureModels[type] = model;
       console.log('[ship3d] Loaded ' + file);
       refreshStructureMeshes();
@@ -685,6 +690,39 @@ function initShip3D() {
     buildScrapIconDataUrl();
     console.log('[ship3d] Loaded scrap.glb');
   }, undefined, (err) => console.error('[ship3d] Failed to load scrap.glb', err));
+
+  loader.load(new URL('assets/pirate.glb', window.location.href).toString(), (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = (SHIP_SIZE * 2) / maxDim * 1.1; 
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    // Convert common glTF orientation (Y-up, Z-forward) into our top-down XY view.
+    model.rotation.x = -Math.PI / 2;
+    model.rotation.y = Math.PI; // flip 180 if needed, we'll align with rotation
+    
+    // Apply reddish emissive material
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const oldMat = child.material;
+        const newMat = new THREE.MeshStandardMaterial({
+          color: oldMat.color ? oldMat.color.clone() : 0xcc4444,
+          map: oldMat.map || null,
+          roughness: 0.7,
+          metalness: 0.3,
+          emissive: 0x882222, 
+          emissiveIntensity: 0.05
+        });
+        child.material = newMat;
+      }
+    });
+    
+    pirateModel = model;
+    console.log('[ship3d] Loaded pirate.glb');
+  }, undefined, (err) => console.error('[ship3d] Failed to load pirate.glb', err));
 }
 
 function buildOreIconDataUrls() {
@@ -882,7 +920,9 @@ function spawnPirateGroup(minCount, maxCount) {
       stateTimer: Math.random() * 5,
       cooldown: 1 + Math.random() * 2,
       id: Math.random(),
-      facingAngle: angle // Face toward player initially
+      facingAngle: angle, // Face toward player initially
+      prevFacingAngle: angle,
+      tilt: 0
     });
   }
 }
@@ -906,6 +946,8 @@ function spawnBaseDefensePirates(st) {
       cooldown: 1 + Math.random() * 2,
       id: Math.random(),
       facingAngle: orbitAngle + Math.PI / 2,
+      prevFacingAngle: orbitAngle + Math.PI / 2,
+      tilt: 0,
       defendingBase: st,
       orbitAngle,
       orbitRadius: BASE_DEFENSE_ORBIT_RADIUS
@@ -1172,6 +1214,17 @@ function updatePirates(dt) {
     }
     }
 
+    // Update tilt (bank when turning)
+    let deltaAngle = p.facingAngle - (p.prevFacingAngle !== undefined ? p.prevFacingAngle : p.facingAngle);
+    while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+    while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+    p.prevFacingAngle = p.facingAngle;
+    
+    const TILT_SENSITIVITY = 8;
+    const TILT_DECAY = 4;
+    p.tilt = (p.tilt || 0) + deltaAngle * TILT_SENSITIVITY - (p.tilt || 0) * TILT_DECAY * dt;
+    p.tilt = Math.max(-0.5, Math.min(0.5, p.tilt));
+
     // Death: drop 3-5 scrap only if not fromBaseSpawn
     if (p.health <= 0) {
         spawnSparks(p.x, p.y, 15);
@@ -1190,6 +1243,7 @@ function updatePirates(dt) {
             });
           }
         }
+        if (p._mesh && pirateContainer) pirateContainer.remove(p._mesh);
         pirates.splice(i, 1);
     }
   }
@@ -1484,6 +1538,8 @@ function update(dt) {
           cooldown: 1 + Math.random() * 2,
           id: Math.random(),
           facingAngle: angle,
+          prevFacingAngle: angle,
+          tilt: 0,
           fromBaseSpawn: true
         });
       }
@@ -1851,27 +1907,6 @@ function render(dt = 1 / 60) {
       const { x, y } = worldToScreen(p.x, p.y);
       if (x < -30 || x > WIDTH+30 || y < -30 || y > HEIGHT+30) continue;
       
-      // Use stored facing angle (thrust direction, not velocity)
-      const angle = p.facingAngle;
-      
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle + Math.PI/2); // +90° because triangle points "up" at angle 0
-      
-      ctx.fillStyle = '#ff4444';
-      ctx.strokeStyle = '#882222';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      const s = SHIP_SIZE + 2;
-      ctx.moveTo(0, -s);
-      ctx.lineTo(s*0.7, s);
-      ctx.lineTo(0, s*0.5);
-      ctx.lineTo(-s*0.7, s);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-      
       // Health Bar
       if (p.health < p.maxHealth) {
           const barW = 32;
@@ -2063,6 +2098,22 @@ function render(dt = 1 / 60) {
     if (st._mesh) {
       const yOff = st.type === 'shop' ? 4 : 0;
       st._mesh.position.set(st.x - ship.x, -(st.y - ship.y) + yOff, 0);
+    }
+  }
+
+  // Update 3D pirate positions
+  for (const p of pirates) {
+    if (!p._mesh && pirateModel && pirateContainer) {
+        const clone = pirateModel.clone(true);
+        pirateContainer.add(clone);
+        p._mesh = clone;
+    }
+    if (p._mesh) {
+        p._mesh.position.set(p.x - ship.x, -(p.y - ship.y), 0);
+        p._mesh.rotation.x = -Math.PI / 2;
+        p._mesh.rotation.y = p.facingAngle + Math.PI / 2;
+        p._mesh.rotation.z = p.tilt || 0;
+        p._mesh.visible = true;
     }
   }
 
@@ -3339,32 +3390,44 @@ function endDrag(clientX, clientY) {
       const dy = mouseY - HEIGHT / 2;
       const dir = normalize(dx, dy);
       if (dir.x !== 0 || dir.y !== 0) {
-        const jettSpeed = 240;
-        const floatItem = {
-          x: ship.x + dir.x * 20,
-          y: ship.y + dir.y * 20,
-          vx: dir.x * jettSpeed + ship.vx * 0.3,
-          vy: dir.y * jettSpeed + ship.vy * 0.3,
-          item: it.item,
-          quantity: it.quantity || 1
-        };
-        if (it.energy != null) {
-          floatItem.energy = it.energy;
-          floatItem.maxEnergy = it.maxEnergy;
+        const jettSpeed = 340;
+        const totalQty = it.quantity || 1;
+        const baseAngle = Math.atan2(dir.y, dir.x);
+        
+        for (let i = 0; i < totalQty; i++) {
+            // Small spread: +/- 0.25 rad (~14 deg) for burst effect
+            const spread = (Math.random() - 0.5) * 0.5; 
+            const angle = baseAngle + spread;
+            const speedVar = 0.8 + Math.random() * 0.4; // +/- 20% speed variation
+            const jVx = Math.cos(angle) * jettSpeed * speedVar;
+            const jVy = Math.sin(angle) * jettSpeed * speedVar;
+
+            const floatItem = {
+              x: ship.x + Math.cos(angle) * 20,
+              y: ship.y + Math.sin(angle) * 20,
+              vx: jVx + ship.vx * 0.3,
+              vy: jVy + ship.vy * 0.3,
+              item: it.item,
+              quantity: 1
+            };
+            if (it.energy != null) {
+              floatItem.energy = it.energy;
+              floatItem.maxEnergy = it.maxEnergy;
+            }
+            if (it.fuel != null) {
+              floatItem.fuel = it.fuel;
+              floatItem.maxFuel = it.maxFuel;
+            }
+            if (it.oxygen != null) {
+              floatItem.oxygen = it.oxygen;
+              floatItem.maxOxygen = it.maxOxygen;
+            }
+            if (it.heat != null) {
+              floatItem.heat = it.heat;
+              floatItem.overheated = !!it.overheated;
+            }
+            floatingItems.push(floatItem);
         }
-        if (it.fuel != null) {
-          floatItem.fuel = it.fuel;
-          floatItem.maxFuel = it.maxFuel;
-        }
-        if (it.oxygen != null) {
-          floatItem.oxygen = it.oxygen;
-          floatItem.maxOxygen = it.maxOxygen;
-        }
-        if (it.heat != null) {
-          floatItem.heat = it.heat;
-          floatItem.overheated = !!it.overheated;
-        }
-        floatingItems.push(floatItem);
         hotbar[from] = null;
         updateHUD();
       }
