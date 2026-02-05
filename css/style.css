@@ -125,6 +125,60 @@ textarea {
   letter-spacing: 0.5px;
 }
 
+#death-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: grayscale(1) blur(2px);
+  -webkit-backdrop-filter: grayscale(1) blur(2px);
+  z-index: 30;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+#death-menu {
+  background: rgba(20, 20, 20, 0.92);
+  border: 1px solid #777;
+  border-radius: 10px;
+  padding: 22px 26px;
+  text-align: center;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#death-menu .death-title {
+  color: #fff;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+#death-menu .death-subtitle {
+  color: #ccc;
+  font-size: 14px;
+}
+
+#death-menu button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #2f2f2f;
+  border: 1px solid #666;
+  color: #eee;
+  cursor: pointer;
+}
+
+#death-menu button:hover {
+  background: #444;
+}
+
 #warp-menu-overlay {
   position: absolute;
   left: 0;
@@ -223,6 +277,39 @@ textarea {
 }
 
 #shop-item-tooltip .tooltip-usage {
+  color: #aaa;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+#hotbar-item-tooltip {
+  position: absolute;
+  background: rgba(20, 20, 20, 0.65);
+  border: 1px solid rgba(136, 136, 136, 0.7);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 12px;
+  color: #fff;
+  z-index: 100;
+  pointer-events: none;
+  max-width: 220px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+#hotbar-item-tooltip .tooltip-name {
+  font-weight: bold;
+  font-size: 13px;
+  color: #ffcc44;
+  margin-bottom: 4px;
+}
+
+#hotbar-item-tooltip .tooltip-price {
+  color: #88ff88;
+  margin-bottom: 6px;
+}
+
+#hotbar-item-tooltip .tooltip-usage {
   color: #aaa;
   font-size: 11px;
   line-height: 1.4;

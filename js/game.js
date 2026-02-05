@@ -174,6 +174,7 @@ let gamePaused = true;
 let warpMenuOpen = false;
 let shopMenuOpen = false;
 let startScreenOpen = true;
+let deathScreenOpen = false;
 let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
 let interactPromptTarget = null; // Current structure showing prompt
 let tutorialTextTimer = 0; // Time remaining for tutorial text (seconds)
@@ -203,6 +204,18 @@ if (startOverlayEl) {
   // If markup is missing for some reason, don't block the game.
   startScreenOpen = false;
   gamePaused = false;
+}
+
+// Death screen overlay (shown when HP reaches 0)
+const deathOverlayEl = document.getElementById('death-menu-overlay');
+const deathRestartBtn = document.getElementById('death-restart-btn');
+if (deathRestartBtn) {
+  deathRestartBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Hard reset: reload page to reset all runtime state
+    window.location.reload();
+  });
 }
 
 // Bullets
@@ -713,9 +726,9 @@ function initShip3D() {
           map: oldMat.map || null,
           roughness: 0.7,
           metalness: 0.3,
-          emissive: 0xcc7777,
+          emissive: 0xffffff,
           emissiveMap: oldMat.map || null,
-          emissiveIntensity: 0.2
+          emissiveIntensity: 1.5
         });
         child.material = newMat;
       }
@@ -1862,6 +1875,20 @@ function update(dt) {
       }
     }
   }
+
+  // Death: show overlay + pause game (one-shot)
+  if (!deathScreenOpen && player.health <= 0) {
+    deathScreenOpen = true;
+    gamePaused = true;
+    // Clear latched inputs so nothing keeps firing/thrusting
+    leftMouseDown = false;
+    rightMouseDown = false;
+    ctrlBrake = false;
+    // Cancel any inventory drag state
+    inventoryDrag = null;
+    try { setDragGhostVisible(false); } catch (e) {}
+    if (deathOverlayEl) deathOverlayEl.style.display = 'flex';
+  }
 }
 
 function render(dt = 1 / 60) {
@@ -2361,7 +2388,7 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 canvas.addEventListener('mousedown', (e) => {
-  if (startScreenOpen) return;
+  if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.button === 0) {
@@ -2372,7 +2399,7 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mouseup', (e) => {
-  if (startScreenOpen) return;
+  if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.button === 0) {
@@ -2390,7 +2417,7 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  if (startScreenOpen) return;
+  if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.deltaY > 0) {
@@ -2458,7 +2485,7 @@ function canAcceptFloatingItem(item) {
 
 // Shop: buy/sell 5x3 grid (15 slots)
 const ITEM_BUY_PRICE = { 'small energy cell': 150, 'medium energy cell': 550, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 1000, 'medium mining laser': 1500 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 20, 'fuel tank': 20, aurite: 30, diamite: 40, platinite: 60, scrap: 40, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
+const ITEM_SELL_PRICE = { cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60, scrap: 40, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
@@ -2588,19 +2615,10 @@ function getItemSellPrice(item) {
     const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
     return Math.max(ENERGY_CELL_MIN_SELL, Math.round(MEDIUM_ENERGY_CELL_FULL_SELL * chargeRatio));
   }
-  // Fuel cell: 2 when full, 1 when >0
-  if (item.item === 'fuel tank' && item.fuel != null && item.maxFuel != null) {
-    const chargeRatio = item.maxFuel > 0 ? item.fuel / item.maxFuel : 0;
-    if (chargeRatio > 0.5) return 2;
-    if (chargeRatio > 0) return 1;
-    return 0;
-  }
-  // Oxygen canister: 10 when full, 5 when >0
-  if (item.item === 'oxygen canister' && item.oxygen != null && item.maxOxygen != null) {
-    const chargeRatio = item.maxOxygen > 0 ? item.oxygen / item.maxOxygen : 0;
-    if (chargeRatio > 0.5) return 10;
-    if (chargeRatio > 0) return 5;
-    return 0;
+  // Fuel tank and oxygen canister: always sell for half of purchase price
+  if (item.item === 'fuel tank' || item.item === 'oxygen canister') {
+    const buy = ITEM_BUY_PRICE[item.item];
+    return buy != null ? Math.floor(buy / 2) : 0;
   }
   // Static prices for other items
   const price = ITEM_SELL_PRICE[item.item];
@@ -2748,7 +2766,7 @@ function returnSellAreaToHotbar() {
 }
 
 window.addEventListener('keydown', (e) => {
-  if (startScreenOpen) return;
+  if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) {
     // Allow E to close shop, ignore other gameplay inputs while paused in menu
@@ -2789,7 +2807,7 @@ window.addEventListener('keydown', (e) => {
   }
 });
 window.addEventListener('keyup', (e) => {
-  if (startScreenOpen) return;
+  if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.key === 'Control') ctrlBrake = false;
@@ -3044,7 +3062,7 @@ levelInput.addEventListener('change', (e) => {
 
 // Press L to load a level file
 window.addEventListener('keydown', (e) => {
-  if (startScreenOpen) return;
+  if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
   if (e.key === 'l' || e.key === 'L') {
@@ -3225,6 +3243,39 @@ document.querySelectorAll('.shop-sell-slot').forEach(el => {
     }
   });
   el.addEventListener('mouseleave', hideShopTooltip);
+});
+
+function showHotbarTooltip(it, slotEl) {
+  const tooltip = document.getElementById('hotbar-item-tooltip');
+  if (!tooltip || !it || !it.item) return;
+  const name = ITEM_DISPLAY_NAMES[it.item] || it.item;
+  const usage = ITEM_USAGE[it.item] || '';
+  const sellPrice = getItemSellPrice(it);
+  const priceHtml = sellPrice > 0 ? `<div class="tooltip-price">Sell: ${sellPrice} cr</div>` : '';
+  tooltip.innerHTML = `<div class="tooltip-name">${name}</div>${priceHtml}<div class="tooltip-usage">${usage}</div>`;
+  tooltip.style.display = 'block';
+  const rect = slotEl.getBoundingClientRect();
+  const overlay = document.getElementById('hud-overlay');
+  const overlayRect = overlay ? overlay.getBoundingClientRect() : { left: 0, top: 0, width: 360 };
+  const tooltipW = 220;
+  const left = rect.left - overlayRect.left + rect.width / 2 - tooltipW / 2;
+  const top = rect.top - overlayRect.top - tooltip.offsetHeight - 8;
+  tooltip.style.left = Math.max(8, Math.min(left, (overlayRect.width || 360) - tooltipW - 8)) + 'px';
+  tooltip.style.top = top + 'px';
+}
+
+function hideHotbarTooltip() {
+  const tooltip = document.getElementById('hotbar-item-tooltip');
+  if (tooltip) tooltip.style.display = 'none';
+}
+
+document.querySelectorAll('#hotbar .slot').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    const slotIndex = parseInt(el.dataset.slot, 10);
+    const it = hotbar[slotIndex];
+    if (it) showHotbarTooltip(it, el);
+  });
+  el.addEventListener('mouseleave', hideHotbarTooltip);
 });
 
 // Inventory drag state (unified for HUD and Shop)
