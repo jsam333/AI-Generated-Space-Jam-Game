@@ -31,7 +31,7 @@ const ASTEROID_COLORS = {
   cuprite: { fill: '#665544', stroke: '#998877' },
   hematite: { fill: '#8B4513', stroke: '#A0522D' },
   aurite: { fill: '#B8860B', stroke: '#FFD700' },
-  diamite: { fill: '#A9A9A9', stroke: '#C0C0C0' },
+  diamite: { fill: '#787878', stroke: '#909090' },
   platinite: { fill: '#D3D3D3', stroke: '#E5E4E2' }
 };
 
@@ -826,6 +826,7 @@ document.getElementById('export-level').addEventListener('click', () => {
       // Ensure we save all properties, not just x/y/type
       return { ...s };
     }),
+    spawnSettings: state.level.spawnSettings || undefined,
   };
   const json = JSON.stringify(levelData, null, 2);
   const blob = new Blob([json], { type: 'application/json' });

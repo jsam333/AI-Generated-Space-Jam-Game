@@ -430,5 +430,12 @@
       ],
       "prices": {}
     }
-  ]
+  ],
+  "spawnSettings": {
+    "initialDelay": 120,
+    "waveIntervalMin": 60,
+    "waveIntervalMax": 100,
+    "waveSizeMin": 2,
+    "waveSizeMax": 4
+  }
 }

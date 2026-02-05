@@ -15,9 +15,11 @@ let smallAsteroidModels = [null, null, null];
 let mediumAsteroidModels = [null, null];
 // Large asteroid 3D model (radius 100+)
 let largeAsteroidModel = null;
+let oreModel = null;
 let asteroidContainer = null;
 let structureModels = { warpgate: null, shop: null, piratebase: null };
 let structureContainer = null;
+let floatingOreContainer = null;
 let levelSeed = 0;
 
 // Pirate Globals
@@ -67,11 +69,20 @@ ITEM_IMAGES['fuel tank'].src = 'assets/fuel-can.png';
 ITEM_IMAGES['small energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['medium energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['oxygen canister'].src = 'assets/oxygen-can.png';
+const laserImg = new Image();
+laserImg.src = 'assets/laser.png';
+ITEM_IMAGES['mining laser'] = laserImg;
+ITEM_IMAGES['medium mining laser'] = laserImg;
+const blasterImg = new Image();
+blasterImg.src = 'assets/blaster.png';
+ITEM_IMAGES['light blaster'] = blasterImg;
 
 function getItemImagePath(itemName) {
   if (itemName === 'fuel tank') return 'assets/fuel-can.png';
   if (itemName === 'small energy cell' || itemName === 'medium energy cell') return 'assets/energy-cell.png';
   if (itemName === 'oxygen canister') return 'assets/oxygen-can.png';
+  if (itemName === 'mining laser' || itemName === 'medium mining laser') return 'assets/laser.png';
+  if (itemName === 'light blaster') return 'assets/blaster.png';
   return null;
 }
 
@@ -443,6 +454,8 @@ function initShip3D() {
   shipScene.add(asteroidContainer);
   structureContainer = new THREE.Group();
   shipScene.add(structureContainer);
+  floatingOreContainer = new THREE.Group();
+  shipScene.add(floatingOreContainer);
   const light = new THREE.DirectionalLight(0xffffff, 1);
   light.position.set(20, 20, 50);
   shipScene.add(light);
@@ -609,6 +622,56 @@ function initShip3D() {
       refreshStructureMeshes();
     }, undefined, (err) => console.error('[ship3d] Failed to load ' + file, err));
   });
+
+  loader.load(new URL('assets/ore.glb', window.location.href).toString(), (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = 1 / maxDim;
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    model.rotation.x = -Math.PI / 2;
+    model.rotation.y = Math.PI; // flip 180
+    oreModel = model;
+    buildOreIconDataUrls();
+    console.log('[ship3d] Loaded ore.glb');
+  }, undefined, (err) => console.error('[ship3d] Failed to load ore.glb', err));
+}
+
+function buildOreIconDataUrls() {
+  if (!oreModel || typeof THREE === 'undefined') return;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setSize(size, size);
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10);
+  camera.position.set(0, 0, 1.4);
+  camera.lookAt(0, 0, 0);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  dir.position.set(0.5, 0.5, 1);
+  scene.add(dir);
+  for (const itemKey of FLOATING_ORE_ITEMS) {
+    const clone = oreModel.clone(true);
+    applyFloatingOreMaterial(clone, itemKey);
+    clone.position.set(0, 0, 0);
+    clone.rotation.x = -Math.PI / 2;
+    clone.rotation.y = Math.PI;
+    clone.rotation.z = 0;
+    scene.add(clone);
+    renderer.render(scene, camera);
+    try {
+      ORE_ICON_DATA_URLS[itemKey] = canvas.toDataURL('image/png');
+    } catch (e) { /* security / CORS */ }
+    scene.remove(clone);
+  }
+  renderer.dispose();
 }
 
 function refreshAsteroidMeshes() {
@@ -637,16 +700,61 @@ function refreshAsteroidMeshes() {
     ast._spinAxis = spinAxis;
     ast._spinDirection = spinDirection;
     const clone = src.clone(true);
-    clone.rotation[['x', 'y', 'z'][spinAxis]] = ast._initialSpinPhase;
+    if (ast.oreType && ast.oreType !== 'cuprite') applyOreEmissiveMaterial(clone, ast.oreType);
+    // Compute scale from unrotated model so same radius => same visual size (hitbox match)
     const box = new THREE.Box3().setFromObject(clone);
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const sizeMult = ast.radius >= 100 ? 1.3 : 1.2;
+    const sizeMult = 1.05;
     const scale = ((ast.radius * 2) / maxDim) * sizeMult;
     clone.scale.setScalar(scale);
+    clone.rotation[['x', 'y', 'z'][spinAxis]] = ast._initialSpinPhase;
     ast._mesh = clone;
     asteroidContainer.add(clone);
   }
+}
+
+// Non-cuprite asteroids: emissive glow in ore color, intensity 0.06
+const ORE_EMISSIVE_COLOR = { hematite: 0xA0522D, aurite: 0xFFD700, diamite: 0x909090, platinite: 0xE5E4E2 };
+const ORE_EMISSIVE_INTENSITY = 0.06;
+function applyOreEmissiveMaterial(mesh, oreType) {
+  const emissiveColor = ORE_EMISSIVE_COLOR[oreType] ?? 0x888888;
+  mesh.traverse((child) => {
+    if (child.isMesh && child.material) {
+      const oldMat = child.material;
+      child.material = new THREE.MeshStandardMaterial({
+        color: oldMat.color ? oldMat.color.clone() : 0x888888,
+        map: oldMat.map || null,
+        roughness: oldMat.roughness ?? 0.8,
+        metalness: oldMat.metalness ?? 0.2,
+        emissive: emissiveColor,
+        emissiveIntensity: ORE_EMISSIVE_INTENSITY
+      });
+    }
+  });
+}
+
+// Floating ore drops: self-lit like asteroids with ore-colored emissive tint
+const FLOATING_ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'];
+const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A };
+const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
+
+function applyFloatingOreMaterial(mesh, itemKey) {
+  const emissiveColor = FLOATING_ORE_EMISSIVE[itemKey] ?? 0x888888;
+  mesh.traverse((child) => {
+    if (child.isMesh && child.material) {
+      const oldMat = child.material;
+      child.material = new THREE.MeshStandardMaterial({
+        color: oldMat.color ? oldMat.color.clone() : 0x888888,
+        map: oldMat.map || null,
+        roughness: oldMat.roughness ?? 0.8,
+        metalness: oldMat.metalness ?? 0.2,
+        emissive: emissiveColor,
+        emissiveMap: oldMat.map || null,
+        emissiveIntensity: 5.0
+      });
+    }
+  });
 }
 
 function refreshStructureMeshes() {
@@ -853,7 +961,7 @@ function updatePirates(dt) {
              ay -= (sdy / sdist) * 400;
          }
       }
-      const PLAYER_AVOID_RADIUS = 20;
+      const PLAYER_AVOID_RADIUS = 5;
       const pdx = ship.x - p.x;
       const pdy = ship.y - p.y;
       const pdist = Math.sqrt(pdx*pdx + pdy*pdy);
@@ -1056,6 +1164,9 @@ function update(dt) {
         // Asteroid takes half the damage the player takes
         const currentHealth = ast.health ?? ast.radius;
         ast.health = Math.max(0, currentHealth - damage / 2);
+        const impactX = ship.x * 0.9 + ast.x * 0.1;
+        const impactY = ship.y * 0.9 + ast.y * 0.1;
+        spawnSparks(impactX, impactY, Math.max(2, Math.round(damage)));
       }
     }
   }
@@ -1083,6 +1194,16 @@ function update(dt) {
         ship.vy += ny * bounce;
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
+        const impactX = ship.x * 0.9 + st.x * 0.1;
+        const impactY = ship.y * 0.9 + st.y * 0.1;
+        spawnSparks(impactX, impactY, Math.max(2, Math.round(damage)));
+        // Pirate base takes half the damage the player takes (same as asteroids)
+        if (st.type === 'piratebase') {
+          st.aggroed = true;
+          const currentHealth = st.health ?? 100;
+          st.health = Math.max(0, currentHealth - damage / 2);
+          if (st.health <= 0) onPirateBaseDeath(st);
+        }
       }
     }
   }
@@ -1465,6 +1586,30 @@ function update(dt) {
     }
   }
 
+  // Create/update 3D mesh for ore-type floating items
+  const FLOATING_ORE_SCALE = 15; // 40% smaller than before (was 25)
+  if (floatingOreContainer && oreModel) {
+    for (const item of floatingItems) {
+      if (!FLOATING_ORE_ITEMS.includes(item.item)) continue;
+      if (!item._mesh) {
+        const clone = oreModel.clone(true);
+        applyFloatingOreMaterial(clone, item.item);
+        clone.scale.setScalar(FLOATING_ORE_SCALE);
+        item._mesh = clone;
+        floatingOreContainer.add(clone);
+        // Random spin: axis, direction, speed (faster than asteroids)
+        item._spinAxis = Math.floor(Math.random() * 3); // 0=x, 1=y, 2=z
+        item._spinDirection = Math.random() < 0.5 ? -1 : 1;
+        item._spinSpeed = 0.5 + Math.random() * 0.4; // 0.5–0.9 (faster than asteroids ~0.2–0.4)
+      }
+      item._mesh.position.set(item.x - ship.x, -(item.y - ship.y), 0);
+      const spin = (item._spinSpeed ?? 0.6) * (item._spinDirection ?? 1) * dt;
+      if (item._spinAxis === 0) item._mesh.rotation.x += spin;
+      else if (item._spinAxis === 1) item._mesh.rotation.y += spin;
+      else item._mesh.rotation.z += spin;
+    }
+  }
+
   // Pickup floating items only when within ship collision radius
   for (let i = floatingItems.length - 1; i >= 0; i--) {
     const item = floatingItems[i];
@@ -1482,7 +1627,10 @@ function update(dt) {
             break;
           }
         }
-        if (added) floatingItems.splice(i, 1);
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems.splice(i, 1);
+        }
       } else if (item.fuel != null) {
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
@@ -1492,7 +1640,10 @@ function update(dt) {
             break;
           }
         }
-        if (added) floatingItems.splice(i, 1);
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems.splice(i, 1);
+        }
       } else if (item.oxygen != null && item.item === 'oxygen canister') {
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
@@ -1502,7 +1653,10 @@ function update(dt) {
             break;
           }
         }
-        if (added) floatingItems.splice(i, 1);
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems.splice(i, 1);
+        }
       } else if (item.item === 'mining laser' && item.heat != null) {
         // Mining laser: restore heat/overheated
         let added = false;
@@ -1513,7 +1667,10 @@ function update(dt) {
             break;
           }
         }
-        if (added) floatingItems.splice(i, 1);
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems.splice(i, 1);
+        }
       } else if (item.item === 'medium mining laser' && item.heat != null) {
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
@@ -1523,7 +1680,10 @@ function update(dt) {
             break;
           }
         }
-        if (added) floatingItems.splice(i, 1);
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems.splice(i, 1);
+        }
       } else if (item.item === 'light blaster' && item.heat != null) {
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
@@ -1533,8 +1693,12 @@ function update(dt) {
             break;
           }
         }
-        if (added) floatingItems.splice(i, 1);
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems.splice(i, 1);
+        }
       } else if (addToInventory(item.item, item.quantity)) {
+        if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
         floatingItems.splice(i, 1);
       }
     }
@@ -1568,7 +1732,7 @@ function render(dt = 1 / 60) {
     
     if (ast.oreType === 'hematite') { fill = '#8B4513'; stroke = '#A0522D'; }
     else if (ast.oreType === 'aurite') { fill = '#B8860B'; stroke = '#FFD700'; }
-    else if (ast.oreType === 'diamite') { fill = '#A9A9A9'; stroke = '#C0C0C0'; }
+    else if (ast.oreType === 'diamite') { fill = '#787878'; stroke = '#909090'; }
     else if (ast.oreType === 'platinite') { fill = '#D3D3D3'; stroke = '#E5E4E2'; }
     
     ctx.fillStyle = fill;
@@ -1618,27 +1782,38 @@ function render(dt = 1 / 60) {
       }
   }
 
-  // Floating items in space
+  // Floating items in space — thin white glow for ore-type (3D) pellets
   for (const item of floatingItems) {
+    if (!FLOATING_ORE_ITEMS.includes(item.item)) continue;
+    const { x, y } = worldToScreen(item.x, item.y);
+    if (x < -30 || x > WIDTH + 30 || y < -30 || y > HEIGHT + 30) continue;
+    const r = 14;
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+    gradient.addColorStop(0, 'rgba(255,255,255,0.35)');
+    gradient.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  for (const item of floatingItems) {
+    if (FLOATING_ORE_ITEMS.includes(item.item)) continue; // ore-type items rendered as 3D only
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
-    // Draw small glowing circle - energy green, fuel orange, oxygen blue, laser orange, ore default
-    ctx.fillStyle = item.energy != null ? '#448844' : 
-                    (item.fuel != null ? '#886622' : 
-                    (item.oxygen != null ? '#446688' : 
-                    (item.item === 'light blaster' ? '#6644aa' : 
-                    (item.heat != null ? '#884422' : 
-                    (item.item === 'hematite' ? '#8B4513' : 
-                    (item.item === 'aurite' ? '#FFD700' : 
-                    (item.item === 'diamite' ? '#C0C0C0' : 
-                    (item.item === 'platinite' ? '#E5E4E2' : 
-                    (item.item === 'scrap' ? '#888888' : 
-                    (item.item === 'warp key' ? '#B8860B' : 
-                    '#aa8844'))))))))));
+    // Draw small glowing circle - same fill/stroke as ore type
+    const oreFill = { cuprite: '#665544', hematite: '#8B4513', aurite: '#B8860B', diamite: '#787878', platinite: '#D3D3D3', scrap: '#888888', 'warp key': '#B8860B' };
+    const oreStroke = { cuprite: '#998877', hematite: '#A0522D', aurite: '#FFD700', diamite: '#909090', platinite: '#E5E4E2', scrap: '#aaaaaa', 'warp key': '#DAA520' };
+    ctx.fillStyle = item.energy != null ? '#448844' :
+                    (item.fuel != null ? '#886622' :
+                    (item.oxygen != null ? '#446688' :
+                    (item.item === 'light blaster' ? '#6644aa' :
+                    (item.heat != null ? '#884422' :
+                    (oreFill[item.item] || '#aa8844')))));
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : (item.item === 'scrap' ? '#aaaaaa' : (item.item === 'warp key' ? '#DAA520' : '#ccaa66'))))));
+    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : (oreStroke[item.item] || '#ccaa66')))));
     ctx.lineWidth = 2;
     ctx.stroke();
     // Item icon: image for fuel/energy/oxygen, else letter fallback
@@ -2044,7 +2219,7 @@ function canAcceptFloatingItem(item) {
 
 // Shop: buy/sell 5x3 grid (15 slots)
 const ITEM_BUY_PRICE = { 'small energy cell': 150, 'medium energy cell': 550, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 1000, 'medium mining laser': 1500 };
-const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 15, 'fuel tank': 20, aurite: 25, diamite: 50, platinite: 75, scrap: 25, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
+const ITEM_SELL_PRICE = { cuprite: 10, 'oxygen canister': 10, hematite: 20, 'fuel tank': 20, aurite: 30, diamite: 40, platinite: 60, scrap: 25, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
@@ -2094,7 +2269,10 @@ function getSlotHTML(it) {
   let html = '';
   if (it) {
     const imgPath = getItemImagePath(it.item);
-    if (imgPath) {
+    const oreIconUrl = FLOATING_ORE_ITEMS.includes(it.item) ? ORE_ICON_DATA_URLS[it.item] : null;
+    if (oreIconUrl) {
+      html += `<div class="slot-icon slot-icon-ore-wrap"><img src="${oreIconUrl}" class="slot-icon-ore-bg" alt=""><span class="slot-icon-ore-letter">${getItemLabel(it)}</span></div>`;
+    } else if (imgPath) {
       html += `<img src="${imgPath}" class="slot-icon slot-icon-img" alt="">`;
     } else {
       html += `<span class="slot-icon">${getItemLabel(it)}</span>`;
@@ -2390,10 +2568,16 @@ function loadLevel(levelData) {
     };
   }
 
-  asteroids = (levelData.asteroids || []).map(ast => ({
-    ...ast,
-    health: ast.health ?? ast.radius // health defaults to radius if not specified
-  }));
+  // Health multipliers by ore type
+  const oreHealthMult = { cuprite: 1, hematite: 3, aurite: 5, diamite: 8, platinite: 12 };
+  asteroids = (levelData.asteroids || []).map(ast => {
+    const baseHealth = ast.radius;
+    const mult = oreHealthMult[ast.oreType] || 1;
+    return {
+      ...ast,
+      health: ast.health ?? (baseHealth * mult)
+    };
+  });
   structures = (levelData.structures || []).map(s => {
     // Preserve all properties from editor
     const st = { ...s };
@@ -2412,7 +2596,7 @@ function loadLevel(levelData) {
       st.health = hp;
       st.maxHealth = hp;
       st.aggroed = false;
-      st.spawnTimer = 0;
+      st.spawnTimer = st.spawnRate || 30; // Wait full spawn time before first wave
       // Default defense count if not set
       if (st.defenseCount === undefined) st.defenseCount = 8;
       // Default spawn rate if not set
@@ -2437,6 +2621,7 @@ function loadLevel(levelData) {
 
     return st;
   });
+  if (floatingOreContainer) while (floatingOreContainer.children.length) floatingOreContainer.remove(floatingOreContainer.children[0]);
   floatingItems.length = 0; // Clear floating items on level load
   pirates.length = 0; // Clear pirates on level load
   for (const st of structures) {
