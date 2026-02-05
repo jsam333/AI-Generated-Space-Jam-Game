@@ -148,3 +148,131 @@ body {
   border-color: #4a8ed5;
   color: #fff;
 }
+
+#properties-panel {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 300px;
+  background: rgba(30, 30, 35, 0.95);
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 30px);
+  overflow-y: auto;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+  margin-bottom: 5px;
+}
+
+.panel-header h3 {
+  font-size: 14px;
+  color: #eee;
+  text-transform: uppercase;
+}
+
+#close-properties {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+#close-properties:hover {
+  color: #fff;
+}
+
+.prop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.prop-group label {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.prop-group input, .prop-group select {
+  padding: 6px;
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.prop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #222;
+  padding: 5px;
+  border-radius: 3px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.prop-list-item {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  background: #333;
+  padding: 4px;
+  border-radius: 2px;
+  transition: border-top 0.1s;
+}
+
+.prop-list-item .drag-handle {
+  cursor: grab;
+  color: #666;
+  font-size: 14px;
+  user-select: none;
+}
+
+.prop-list-item .drag-handle:hover {
+  color: #999;
+}
+
+.prop-list-item[draggable="true"]:active .drag-handle {
+  cursor: grabbing;
+}
+
+.prop-list-item input {
+  width: 60px;
+}
+
+.prop-list-item button {
+  background: #a33;
+  border: none;
+  color: #fff;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.add-btn {
+  background: #3a6ea5;
+  border: none;
+  color: #fff;
+  padding: 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.add-btn:hover {
+  background: #4a8ed5;
+}

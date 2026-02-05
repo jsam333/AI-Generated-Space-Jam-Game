@@ -159,6 +159,7 @@ let shipTiltInitialized = false;
 let gamePaused = false;
 let warpMenuOpen = false;
 let shopMenuOpen = false;
+let activeShopStructure = null;
 
 // Bullets
 const bullets = [];
@@ -703,8 +704,9 @@ const BASE_DEFENSE_ORBIT_RADIUS = 100;
 const BASE_DEFENSE_ORBIT_SPEED = 0.3;
 
 function spawnBaseDefensePirates(st) {
-  for (let i = 0; i < 8; i++) {
-    const orbitAngle = (i / 8) * Math.PI * 2;
+  const count = st.defenseCount !== undefined ? st.defenseCount : 8;
+  for (let i = 0; i < count; i++) {
+    const orbitAngle = (i / count) * Math.PI * 2;
     pirates.push({
       x: st.x + Math.cos(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
       y: st.y + Math.sin(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
@@ -730,28 +732,27 @@ const PIRATE_BASE_HIT_RADIUS = 54;
 function onPirateBaseDeath(st) {
   if (st.dead) return;
   st.dead = true;
-  for (let k = 0; k < 50; k++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 20 + Math.random() * 40;
-    floatingItems.push({
-      x: st.x,
-      y: st.y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      item: 'scrap',
-      quantity: 1
-    });
+  
+  const drops = st.drops || [
+    { item: 'scrap', quantity: 50 },
+    { item: 'warp key', quantity: 1 }
+  ];
+
+  for (const drop of drops) {
+    for (let k = 0; k < drop.quantity; k++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 20 + Math.random() * 40;
+      floatingItems.push({
+        x: st.x,
+        y: st.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        item: drop.item,
+        quantity: 1
+      });
+    }
   }
-  const angle = Math.random() * Math.PI * 2;
-  const speed = 15 + Math.random() * 30;
-  floatingItems.push({
-    x: st.x,
-    y: st.y,
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    item: 'warp key',
-    quantity: 1
-  });
+
   if (st._mesh && structureContainer) structureContainer.remove(st._mesh);
   st._mesh = null;
 }
@@ -764,22 +765,25 @@ function updatePirates(dt) {
     if (d < PIRATE_BASE_AGGRO_RADIUS) st.aggroed = true;
   }
 
-  // Debug mode: spawn immediately every 5s; normal: wait 2 min before spawns start
-  const canSpawn = levelIsDebug || levelElapsedTime >= 120;
+  // Spawning logic using level settings
+  // Delay initial spawn
+  const canSpawn = levelIsDebug || levelElapsedTime >= levelSpawnSettings.initialDelay;
+  
   if (canSpawn) {
     pirateSpawnTimer -= dt;
     if (pirateSpawnTimer <= 0) {
+      // Calculate next spawn
       if (levelIsDebug) {
         spawnPirateGroup(6, 10);
         pirateSpawnTimer = 5;
-      } else if (levelElapsedTime < 360) {
-        // Level 1: 2-6 min — groups of 1-2 every 70-120 s
-        spawnPirateGroup(1, 2);
-        pirateSpawnTimer = 70 + Math.random() * 50;
       } else {
-        // Level 1: after 6 min — groups of 2-4 every 60-100 s
-        spawnPirateGroup(2, 4);
-        pirateSpawnTimer = 60 + Math.random() * 40;
+        const minWave = levelSpawnSettings.waveSizeMin;
+        const maxWave = levelSpawnSettings.waveSizeMax;
+        const minInt = levelSpawnSettings.waveIntervalMin;
+        const maxInt = levelSpawnSettings.waveIntervalMax;
+        
+        spawnPirateGroup(minWave, maxWave);
+        pirateSpawnTimer = minInt + Math.random() * (maxInt - minInt);
       }
     }
   }
@@ -1234,12 +1238,11 @@ function update(dt) {
 
   // Pirate base: spawn 4 pirates every 30s when aggroed (orthogonal directions)
   const BASE_SPAWN_OFFSET = 80;
-  const BASE_SPAWN_INTERVAL = 30;
   for (const st of structures) {
     if (st.type !== 'piratebase' || st.dead || st.health <= 0 || !st.aggroed) continue;
     st.spawnTimer -= dt;
     if (st.spawnTimer <= 0) {
-      st.spawnTimer = BASE_SPAWN_INTERVAL;
+      st.spawnTimer = st.spawnRate || 30; // Use instance spawn rate
       const offsets = [
         [BASE_SPAWN_OFFSET, 0],
         [-BASE_SPAWN_OFFSET, 0],
@@ -1990,9 +1993,9 @@ function isShipInWarpGate() {
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < interactRadius) return true;
+    if (dist < interactRadius) return st;
   }
-  return false;
+  return null;
 }
 
 function isShipInShop() {
@@ -2002,9 +2005,9 @@ function isShipInShop() {
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < interactRadius) return true;
+    if (dist < interactRadius) return st;
   }
-  return false;
+  return null;
 }
 
 function hasCuprite() {
@@ -2046,20 +2049,7 @@ const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
 function initShopBuySlots() {
-  // Slot 0: light blaster; 1: medium mining laser; 2-7: small energy cell; 8-9: medium energy cell; 10-12: fuel; 13-14: oxygen
-  shopBuySlots[0] = { item: 'light blaster', heat: 0, overheated: false };
-  shopBuySlots[1] = { item: 'medium mining laser', heat: 0, overheated: false };
-  for (let i = 2; i < 8; i++) {
-    shopBuySlots[i] = { item: 'small energy cell', energy: 10, maxEnergy: 10 };
-  }
-  shopBuySlots[8] = { item: 'medium energy cell', energy: 30, maxEnergy: 30 };
-  shopBuySlots[9] = { item: 'medium energy cell', energy: 30, maxEnergy: 30 };
-  for (let i = 10; i < 13; i++) {
-    shopBuySlots[i] = { item: 'fuel tank', fuel: 10, maxFuel: 10 };
-  }
-  for (let i = 13; i < 15; i++) {
-    shopBuySlots[i] = { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
-  }
+  // Global init removed, handled per shop instance
 }
 
 function getShopItemPayload(itemKey) {
@@ -2189,6 +2179,15 @@ function getItemSellPrice(item) {
   return price != null ? price : 0;
 }
 
+function getItemBuyPrice(itemKey) {
+  // Check for custom shop price override first
+  if (activeShopStructure && activeShopStructure.prices && activeShopStructure.prices[itemKey] !== undefined) {
+    return activeShopStructure.prices[itemKey];
+  }
+  // Fall back to default price
+  return ITEM_BUY_PRICE[itemKey] || 0;
+}
+
 function getSellTotal() {
   let total = 0;
   for (const slot of shopSellSlots) {
@@ -2214,9 +2213,7 @@ function syncShopBuyArea() {
     el.innerHTML = getSlotHTML(it);
   }
   
-  // Build price list (unchanged)
-  const priceList = document.getElementById('shop-price-list');
-  if (priceList) {
+    // Build price list - only items in this shop, sorted by price
     const itemNames = { 
       'small energy cell': 'Small Energy Cell',
       'medium energy cell': 'Medium Energy Cell', 
@@ -2228,16 +2225,30 @@ function syncShopBuyArea() {
       hematite: 'Hematite',
       aurite: 'Aurite',
       diamite: 'Diamite',
-      platinite: 'Platinite'
+      platinite: 'Platinite',
+      'scrap': 'Scrap',
+      'warp key': 'Warp Key'
     };
     let html = '';
-    const sortedPrices = Object.entries(ITEM_BUY_PRICE).sort((a, b) => a[1] - b[1]);
-    for (const [itemKey, price] of sortedPrices) {
+    
+    // Only include items that are in this shop's inventory
+    const shopItems = new Set();
+    if (activeShopStructure && activeShopStructure.inventory) {
+      activeShopStructure.inventory.forEach(i => shopItems.add(i.item));
+    }
+    
+    // Sort by price (ascending)
+    const sortedItems = Array.from(shopItems)
+      .map(itemKey => ({ itemKey, price: getItemBuyPrice(itemKey) }))
+      .filter(x => x.price > 0)
+      .sort((a, b) => a.price - b.price);
+    
+    for (const { itemKey, price } of sortedItems) {
       const label = itemNames[itemKey] || itemKey;
       html += `<div class="price-row"><span class="price-label">${label}</span><span class="price-value">${price} cr</span></div>`;
     }
-    priceList.innerHTML = html;
-  }
+    const priceList = document.getElementById('shop-price-list');
+    if (priceList) priceList.innerHTML = html;
 }
 
 
@@ -2327,9 +2338,12 @@ window.addEventListener('keydown', (e) => {
       if (overlay) overlay.style.display = 'flex';
       const payBtn = document.getElementById('warp-pay-btn');
       if (payBtn) payBtn.disabled = player.credits < 3000;
-    } else if (!warpMenuOpen && !gamePaused && isShipInShop()) {
-      e.preventDefault();
-      openShopMenu();
+    } else if (!warpMenuOpen && !gamePaused) {
+      const shopSt = isShipInShop();
+      if (shopSt) {
+        e.preventDefault();
+        openShopMenu(shopSt);
+      }
     }
   }
 });
@@ -2337,26 +2351,90 @@ window.addEventListener('keyup', (e) => {
   if (e.key === 'Control') ctrlBrake = false;
 });
 
+// Default shop inventory generator
+function generateDefaultShopInventory() {
+  const inv = [];
+  inv.push({ item: 'light blaster', heat: 0, overheated: false });
+  inv.push({ item: 'medium mining laser', heat: 0, overheated: false });
+  for (let i = 0; i < 6; i++) inv.push({ item: 'small energy cell', energy: 10, maxEnergy: 10 });
+  inv.push({ item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+  inv.push({ item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+  for (let i = 0; i < 3; i++) inv.push({ item: 'fuel tank', fuel: 10, maxFuel: 10 });
+  for (let i = 0; i < 2; i++) inv.push({ item: 'oxygen canister', oxygen: 10, maxOxygen: 10 });
+  return inv;
+}
+
+let levelSpawnSettings = {
+  initialDelay: 120,
+  waveIntervalMin: 60,
+  waveIntervalMax: 100,
+  waveSizeMin: 2,
+  waveSizeMax: 4
+};
+
 // Load level from JSON file
 function loadLevel(levelData) {
   levelWidth = levelData.width || 10000;
   levelHeight = levelData.height || 10000;
+  
+  if (levelData.spawnSettings) {
+    levelSpawnSettings = levelData.spawnSettings;
+  } else {
+    // Default
+    levelSpawnSettings = {
+      initialDelay: 120,
+      waveIntervalMin: 60,
+      waveIntervalMax: 100,
+      waveSizeMin: 2,
+      waveSizeMax: 4
+    };
+  }
+
   asteroids = (levelData.asteroids || []).map(ast => ({
     ...ast,
     health: ast.health ?? ast.radius // health defaults to radius if not specified
   }));
   structures = (levelData.structures || []).map(s => {
-    const st = {
-      x: Number(s.x) || 0,
-      y: Number(s.y) || 0,
-      type: String(s.type || 'shop')
-    };
+    // Preserve all properties from editor
+    const st = { ...s };
+    st.x = Number(s.x) || 0;
+    st.y = Number(s.y) || 0;
+    st.type = String(s.type || 'shop');
+
+    if (st.type === 'shop') {
+      if (!st.inventory) st.inventory = generateDefaultShopInventory();
+      if (!st.prices) st.prices = {};
+    }
+    
     if (st.type === 'piratebase') {
-      st.health = 150;
-      st.maxHealth = 150;
+      // Use config health or default 150
+      const hp = st.health || 150;
+      st.health = hp;
+      st.maxHealth = hp;
       st.aggroed = false;
       st.spawnTimer = 0;
+      // Default defense count if not set
+      if (st.defenseCount === undefined) st.defenseCount = 8;
+      // Default spawn rate if not set
+      if (st.spawnRate === undefined) st.spawnRate = 30;
+      // Default drops if not set
+      if (!st.drops) st.drops = []; // Will fallback to default in onPirateBaseDeath if empty? No, better to pre-fill or handle empty logic. 
+      // Actually, existing logic hardcoded drops. If st.drops is empty, we might want to default it?
+      // Editor saves empty array if nothing added. 
+      // Let's populate default drops if it's missing entirely (undefined), but respect empty array if user cleared it.
+      if (s.drops === undefined) {
+        st.drops = [
+          { item: 'scrap', quantity: 50 }, // Approximation of previous random logic, handled in death function
+          { item: 'warp key', quantity: 1 }
+        ];
+      }
     }
+    
+    if (st.type === 'warpgate') {
+        if (st.warpCost === undefined) st.warpCost = 3000;
+        if (st.warpDestination === undefined) st.warpDestination = 'level2'; // Default
+    }
+
     return st;
   });
   floatingItems.length = 0; // Clear floating items on level load
@@ -2367,6 +2445,7 @@ function loadLevel(levelData) {
   levelElapsedTime = 0;
   levelIsDebug = levelData.debug === true;
   pirateSpawnTimer = levelIsDebug ? 5 : 0; // Debug: first spawn at 5s; normal: first spawn at 2 min
+  
   // Regenerate stars: same density as a 3000x3000 level, using level seed for reproducibility
   levelSeed = typeof levelData.seed === 'number' ? levelData.seed >>> 0 : 0;
   const rng = createSeededRandom(levelSeed);
@@ -2518,7 +2597,30 @@ function closeWarpMenu() {
   if (overlay) overlay.style.display = 'none';
 }
 
-function openShopMenu() {
+function openShopMenu(shopStructure) {
+  if (shopMenuOpen) return;
+  
+  activeShopStructure = shopStructure;
+  
+  // Populate buy slots from structure inventory - expand by quantity
+  shopBuySlots.fill(null);
+  if (shopStructure && shopStructure.inventory) {
+    let slotIndex = 0;
+    for (const invItem of shopStructure.inventory) {
+      const qty = invItem.quantity || 1;
+      for (let q = 0; q < qty && slotIndex < shopBuySlots.length; q++) {
+        const item = { ...invItem };
+        delete item.quantity; // Remove quantity from individual slot item
+        // Ensure containers are at full capacity with correct values
+        if (item.item === 'small energy cell') { item.energy = 10; item.maxEnergy = 10; }
+        else if (item.item === 'medium energy cell') { item.energy = 30; item.maxEnergy = 30; }
+        else if (item.maxFuel !== undefined) item.fuel = item.maxFuel;
+        else if (item.maxOxygen !== undefined) item.oxygen = item.maxOxygen;
+        shopBuySlots[slotIndex++] = item;
+      }
+    }
+  }
+
   gamePaused = true;
   shopMenuOpen = true;
   for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
@@ -2529,12 +2631,17 @@ function openShopMenu() {
   if (overlay) overlay.style.display = 'flex';
   const ghost = document.getElementById('shop-drag-ghost');
   if (ghost) ghost.style.display = 'none';
+  
+  const creditsEl = document.getElementById('shop-credits-display');
+  if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
 }
 
 function closeShopMenu() {
   returnSellAreaToHotbar();
   shopMenuOpen = false;
   gamePaused = warpMenuOpen || shopMenuOpen;
+  inventoryDrag = null;
+  activeShopStructure = null;
   const overlay = document.getElementById('shop-menu-overlay');
   if (overlay) overlay.style.display = 'none';
   const ghost = document.getElementById('shop-drag-ghost');
@@ -2621,7 +2728,7 @@ function beginDragFromHotbar(slotIndex, clientX, clientY) {
 function beginDragFromBuy(buyIndex, clientX, clientY) {
   const it = shopBuySlots[buyIndex];
   if (!it) return;
-  const price = ITEM_BUY_PRICE[it.item] || 0;
+  const price = getItemBuyPrice(it.item);
   inventoryDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
   setDragGhostContent(it, getItemLabel(it), qty);
@@ -2658,26 +2765,68 @@ function endDrag(clientX, clientY) {
     targetSlotEl = under.closest('.slot') || under.closest('.shop-buy-slot') || under.closest('.shop-sell-slot');
   }
 
-  // Handle drop on O2 bar: oxygen canister adds 10 O2
+  // Handle drop on O2 bar: oxygen canister adds O2
   if (isOverO2Bar && drag.kind === 'hotbar') {
     const from = drag.fromSlot;
     const it = hotbar[from];
     if (it && it.item === 'oxygen canister') {
-      player.oxygen = Math.min(player.maxOxygen, player.oxygen + 10);
+      const addAmount = it.oxygen !== undefined ? it.oxygen : 10;
+      player.oxygen = Math.min(player.maxOxygen, player.oxygen + addAmount);
       hotbar[from] = null;
       updateHUD();
       return;
     }
   }
 
-  // Handle drop on fuel bar: fuel tank adds 10 fuel
+  // Handle drop on fuel bar: fuel tank adds fuel
   if (isOverFuelBar && drag.kind === 'hotbar') {
     const from = drag.fromSlot;
     const it = hotbar[from];
     if (it && it.item === 'fuel tank') {
-      player.fuel = Math.min(player.maxFuel, player.fuel + 10);
+      const addAmount = it.fuel !== undefined ? it.fuel : 10;
+      player.fuel = Math.min(player.maxFuel, player.fuel + addAmount);
       hotbar[from] = null;
       updateHUD();
+      return;
+    }
+  }
+
+  // Handle drop on O2 bar from buy slot: buy and use instantly
+  if (isOverO2Bar && drag.kind === 'buy') {
+    const from = drag.fromBuySlot;
+    const it = shopBuySlots[from];
+    if (it && it.item === 'oxygen canister') {
+      const price = drag.price;
+      if (player.credits >= price) {
+        player.credits -= price;
+        const addAmount = it.oxygen !== undefined ? it.oxygen : 10;
+        player.oxygen = Math.min(player.maxOxygen, player.oxygen + addAmount);
+        shopBuySlots[from] = null;
+        syncShopBuyArea();
+        updateHUD();
+        const creditsEl = document.getElementById('shop-credits-display');
+        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+      }
+      return;
+    }
+  }
+
+  // Handle drop on fuel bar from buy slot: buy and use instantly
+  if (isOverFuelBar && drag.kind === 'buy') {
+    const from = drag.fromBuySlot;
+    const it = shopBuySlots[from];
+    if (it && it.item === 'fuel tank') {
+      const price = drag.price;
+      if (player.credits >= price) {
+        player.credits -= price;
+        const addAmount = it.fuel !== undefined ? it.fuel : 10;
+        player.fuel = Math.min(player.maxFuel, player.fuel + addAmount);
+        shopBuySlots[from] = null;
+        syncShopBuyArea();
+        updateHUD();
+        const creditsEl = document.getElementById('shop-credits-display');
+        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+      }
       return;
     }
   }
@@ -2852,27 +3001,25 @@ window.addEventListener('mousemove', (e) => {
     setDragGhostPos(e.clientX, e.clientY);
     const fuelBarEl = document.getElementById('fuel-bar-drop-zone');
     const oxygenBarEl = document.getElementById('oxygen-bar-drop-zone');
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    
+    let it = null;
     if (inventoryDrag.kind === 'hotbar') {
-      const it = hotbar[inventoryDrag.fromSlot];
-      const under = document.elementFromPoint(e.clientX, e.clientY);
-      if (fuelBarEl) {
-        if (it && it.item === 'fuel tank' && under && under.closest('#fuel-bar-drop-zone')) {
-          fuelBarEl.classList.add('highlight');
-        } else {
-          fuelBarEl.classList.remove('highlight');
-        }
-      }
-      if (oxygenBarEl) {
-        if (it && it.item === 'oxygen canister' && under && under.closest('#oxygen-bar-drop-zone')) {
-          oxygenBarEl.classList.add('highlight');
-        } else {
-          oxygenBarEl.classList.remove('highlight');
-        }
-      }
-    } else {
-      if (fuelBarEl) fuelBarEl.classList.remove('highlight');
-      if (oxygenBarEl) oxygenBarEl.classList.remove('highlight');
+      it = hotbar[inventoryDrag.fromSlot];
+    } else if (inventoryDrag.kind === 'buy') {
+      it = shopBuySlots[inventoryDrag.fromBuySlot];
     }
+    
+    const isOverFuel = under && under.closest('#fuel-bar-drop-zone');
+    const isOverO2 = under && under.closest('#oxygen-bar-drop-zone');
+    
+    // Highlight fuel bar
+    const showFuelHighlight = it && it.item === 'fuel tank' && isOverFuel;
+    if (fuelBarEl) fuelBarEl.classList.toggle('highlight', showFuelHighlight);
+    
+    // Highlight O2 bar
+    const showO2Highlight = it && it.item === 'oxygen canister' && isOverO2;
+    if (oxygenBarEl) oxygenBarEl.classList.toggle('highlight', showO2Highlight);
   }
 });
 

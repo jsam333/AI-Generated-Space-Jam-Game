@@ -69,7 +69,8 @@ const state = {
   tool: {
     selected: 'asteroid_cuprite',
     asteroidSize: 40
-  }
+  },
+  selectedObject: null
 };
 
 // --- Core Functions ---
@@ -80,7 +81,8 @@ function saveLevel() {
     height: state.level.height,
     seed: state.level.seed,
     asteroids: state.level.asteroids,
-    structures: state.level.structures
+    structures: state.level.structures,
+    spawnSettings: state.level.spawnSettings
   };
   localStorage.setItem(CONSTANTS.STORAGE_KEY, JSON.stringify(levelData));
 }
@@ -95,6 +97,13 @@ function loadLevel() {
     state.level.seed = levelData.seed != null ? (levelData.seed >>> 0) : CONSTANTS.DEFAULT_SEED;
     state.level.asteroids = levelData.asteroids || [];
     state.level.structures = levelData.structures || [];
+    state.level.spawnSettings = levelData.spawnSettings || {
+      initialDelay: 120,
+      waveIntervalMin: 60,
+      waveIntervalMax: 100,
+      waveSizeMin: 2,
+      waveSizeMax: 4
+    };
     
     // Update UI inputs
     document.getElementById('level-width').value = state.level.width;
@@ -257,6 +266,23 @@ function drawOverlay() {
   } else if (STRUCTURE_STYLES[state.tool.selected]) {
     drawStructure(ctx, world.x, world.y, state.tool.selected, true);
   }
+
+  // Draw selection highlight
+  if (state.selectedObject) {
+    const sel = state.selectedObject;
+    const s = worldToScreen(sel.x, sel.y);
+    let r = 20;
+    if (sel.radius) r = sel.radius * state.camera.zoom + 10;
+    else r = CONSTANTS.STRUCTURE_SIZE * state.camera.zoom + 10;
+    
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 }
 
 function drawUI() {
@@ -288,6 +314,364 @@ function handleMouseMove(e) {
   }
 
   render();
+}
+
+function handleSelectObject(world) {
+  let bestDist = Infinity;
+  let bestObj = null;
+
+  // Check structures first (priority)
+  const structHalfW = CONSTANTS.STRUCTURE_SIZE;
+  const structHalfH = CONSTANTS.STRUCTURE_SIZE * 0.6;
+  for (const st of state.level.structures) {
+    const dx = st.x - world.x;
+    const dy = st.y - world.y;
+    if (Math.abs(dx) < structHalfW && Math.abs(dy) < structHalfH) {
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < bestDist) {
+        bestDist = d;
+        bestObj = st;
+      }
+    }
+  }
+
+  // Check asteroids
+  if (!bestObj) {
+    for (const ast of state.level.asteroids) {
+      const dx = ast.x - world.x;
+      const dy = ast.y - world.y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < ast.radius) {
+        if (d < bestDist) {
+          bestDist = d;
+          bestObj = ast;
+        }
+      }
+    }
+  }
+
+  state.selectedObject = bestObj;
+  updatePropertiesPanel();
+  render();
+}
+
+function updatePropertiesPanel() {
+  const panel = document.getElementById('properties-panel');
+  const content = document.getElementById('properties-content');
+  
+  if (!state.selectedObject) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'flex';
+  content.innerHTML = '';
+  const obj = state.selectedObject;
+
+  // Common properties
+  addPropInput(content, 'X', obj.x, (v) => { obj.x = parseInt(v); render(); saveLevel(); });
+  addPropInput(content, 'Y', obj.y, (v) => { obj.y = parseInt(v); render(); saveLevel(); });
+
+  if (obj.radius) { // Asteroid
+    addPropInput(content, 'Radius', obj.radius, (v) => { obj.radius = parseInt(v); render(); saveLevel(); });
+    // Ore Type
+    const oreDiv = document.createElement('div');
+    oreDiv.className = 'prop-group';
+    oreDiv.innerHTML = `<label>Ore Type</label>`;
+    const select = document.createElement('select');
+    ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite'].forEach(type => {
+      const opt = document.createElement('option');
+      opt.value = type;
+      opt.textContent = type;
+      opt.selected = obj.oreType === type;
+      select.appendChild(opt);
+    });
+    select.onchange = (e) => { obj.oreType = e.target.value; render(); saveLevel(); };
+    oreDiv.appendChild(select);
+    content.appendChild(oreDiv);
+  } else { // Structure
+    const typeDiv = document.createElement('div');
+    typeDiv.className = 'prop-group';
+    typeDiv.innerHTML = `<label>Type: ${obj.type}</label>`;
+    content.appendChild(typeDiv);
+
+    if (obj.type === 'shop') {
+      renderShopProperties(content, obj);
+    } else if (obj.type === 'piratebase') {
+      renderPirateBaseProperties(content, obj);
+    } else if (obj.type === 'warpgate') {
+      renderWarpGateProperties(content, obj);
+    }
+  }
+}
+
+function addPropInput(parent, label, value, onChange) {
+  const div = document.createElement('div');
+  div.className = 'prop-group';
+  div.innerHTML = `<label>${label}</label>`;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.value = value;
+  input.oninput = (e) => onChange(e.target.value);
+  div.appendChild(input);
+  parent.appendChild(div);
+}
+
+function renderShopProperties(parent, obj) {
+  if (!obj.inventory) obj.inventory = [];
+  if (!obj.prices) obj.prices = {};
+
+  // Inventory
+  const invDiv = document.createElement('div');
+  invDiv.className = 'prop-group';
+  invDiv.innerHTML = `<label>Inventory</label>`;
+  const invList = document.createElement('div');
+  invList.className = 'prop-list';
+  
+  let draggedIdx = null;
+  
+  const renderInvList = () => {
+    invList.innerHTML = '';
+    obj.inventory.forEach((item, idx) => {
+      const itemRow = document.createElement('div');
+      itemRow.className = 'prop-list-item';
+      itemRow.draggable = true;
+      itemRow.dataset.idx = idx;
+      
+      // Drag handle
+      const dragHandle = document.createElement('span');
+      dragHandle.className = 'drag-handle';
+      dragHandle.textContent = '≡';
+      dragHandle.style.cssText = 'cursor:grab;margin-right:5px;color:#888;';
+      
+      const itemLabel = document.createElement('span');
+      itemLabel.style.cssText = 'font-size:10px;flex:1;';
+      itemLabel.textContent = item.item;
+      
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'number';
+      qtyInput.min = '1';
+      qtyInput.placeholder = 'Qty';
+      qtyInput.value = item.quantity || 1;
+      qtyInput.onchange = (e) => {
+        item.quantity = Math.max(1, parseInt(e.target.value) || 1);
+        saveLevel();
+      };
+      
+      const delBtn = document.createElement('button');
+      delBtn.textContent = '×';
+      delBtn.onclick = () => {
+        obj.inventory.splice(idx, 1);
+        renderInvList();
+        saveLevel();
+      };
+      
+      // Drag events
+      itemRow.ondragstart = (e) => {
+        draggedIdx = idx;
+        itemRow.style.opacity = '0.5';
+        e.dataTransfer.effectAllowed = 'move';
+      };
+      itemRow.ondragend = () => {
+        itemRow.style.opacity = '1';
+        draggedIdx = null;
+        // Remove all drag-over styling
+        invList.querySelectorAll('.prop-list-item').forEach(el => el.style.borderTop = '');
+      };
+      itemRow.ondragover = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const targetIdx = parseInt(itemRow.dataset.idx);
+        if (draggedIdx !== null && targetIdx !== draggedIdx) {
+          itemRow.style.borderTop = '2px solid #6699bb';
+        }
+      };
+      itemRow.ondragleave = () => {
+        itemRow.style.borderTop = '';
+      };
+      itemRow.ondrop = (e) => {
+        e.preventDefault();
+        const targetIdx = parseInt(itemRow.dataset.idx);
+        if (draggedIdx !== null && targetIdx !== draggedIdx) {
+          // Reorder array
+          const [moved] = obj.inventory.splice(draggedIdx, 1);
+          obj.inventory.splice(targetIdx, 0, moved);
+          saveLevel();
+          renderInvList();
+        }
+      };
+      
+      itemRow.appendChild(dragHandle);
+      itemRow.appendChild(itemLabel);
+      itemRow.appendChild(qtyInput);
+      itemRow.appendChild(delBtn);
+      invList.appendChild(itemRow);
+    });
+  };
+  renderInvList();
+  
+  // Add item
+  const addItemDiv = document.createElement('div');
+  addItemDiv.style.display = 'flex';
+  addItemDiv.style.gap = '5px';
+  const itemSelect = document.createElement('select');
+  ['small energy cell', 'medium energy cell', 'fuel tank', 'oxygen canister', 'light blaster', 'medium mining laser'].forEach(i => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i;
+    itemSelect.appendChild(opt);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-btn';
+  addBtn.textContent = 'Add Item';
+  addBtn.onclick = () => {
+    // Default objects based on type - all items have quantity (count in shop)
+    const name = itemSelect.value;
+    let newItem = { item: name, quantity: 1 };
+    // Set full capacity for containers
+    if (name === 'small energy cell') { newItem.energy = 10; newItem.maxEnergy = 10; }
+    else if (name === 'medium energy cell') { newItem.energy = 30; newItem.maxEnergy = 30; }
+    else if (name.includes('fuel')) { newItem.fuel = 10; newItem.maxFuel = 10; }
+    else if (name.includes('oxygen')) { newItem.oxygen = 10; newItem.maxOxygen = 10; }
+    else if (name.includes('laser') || name.includes('blaster')) { newItem.heat = 0; newItem.overheated = false; }
+    
+    obj.inventory.push(newItem);
+    renderInvList();
+    saveLevel();
+  };
+  
+  addItemDiv.appendChild(itemSelect);
+  addItemDiv.appendChild(addBtn);
+  
+  invDiv.appendChild(invList);
+  invDiv.appendChild(addItemDiv);
+  parent.appendChild(invDiv);
+
+  // Prices override
+  const priceDiv = document.createElement('div');
+  priceDiv.className = 'prop-group';
+  priceDiv.innerHTML = `<label>Price Overrides</label>`;
+  const priceList = document.createElement('div');
+  priceList.className = 'prop-list';
+  
+  const renderPriceList = () => {
+    priceList.innerHTML = '';
+    Object.keys(obj.prices).forEach(key => {
+      const row = document.createElement('div');
+      row.className = 'prop-list-item';
+      row.innerHTML = `<span style="font-size:10px;flex:1;">${key}</span>`;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = obj.prices[key];
+      input.onchange = (e) => { obj.prices[key] = parseInt(e.target.value); saveLevel(); };
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.onclick = () => { delete obj.prices[key]; renderPriceList(); saveLevel(); };
+      row.appendChild(input);
+      row.appendChild(del);
+      priceList.appendChild(row);
+    });
+  };
+  renderPriceList();
+
+  const addPriceDiv = document.createElement('div');
+  addPriceDiv.style.display = 'flex';
+  addPriceDiv.style.gap = '5px';
+  const priceSelect = document.createElement('select');
+  // Add common items to price override list
+  ['small energy cell', 'medium energy cell', 'fuel tank', 'oxygen canister', 'light blaster', 'medium mining laser', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'].forEach(i => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i;
+    priceSelect.appendChild(opt);
+  });
+  const addPriceBtn = document.createElement('button');
+  addPriceBtn.className = 'add-btn';
+  addPriceBtn.textContent = 'Add Price';
+  addPriceBtn.onclick = () => {
+    obj.prices[priceSelect.value] = 100;
+    renderPriceList();
+    saveLevel();
+  };
+  addPriceDiv.appendChild(priceSelect);
+  addPriceDiv.appendChild(addPriceBtn);
+
+  priceDiv.appendChild(priceList);
+  priceDiv.appendChild(addPriceDiv);
+  parent.appendChild(priceDiv);
+}
+
+function renderPirateBaseProperties(parent, obj) {
+  addPropInput(parent, 'Health', obj.health || 150, (v) => { obj.health = parseInt(v); saveLevel(); });
+  addPropInput(parent, 'Defense Count', obj.defenseCount || 8, (v) => { obj.defenseCount = parseInt(v); saveLevel(); });
+  addPropInput(parent, 'Spawn Rate (s)', obj.spawnRate || 30, (v) => { obj.spawnRate = parseInt(v); saveLevel(); });
+  
+  // Drops
+  if (!obj.drops) obj.drops = [];
+  const dropsDiv = document.createElement('div');
+  dropsDiv.className = 'prop-group';
+  dropsDiv.innerHTML = `<label>Drops</label>`;
+  const dropsList = document.createElement('div');
+  dropsList.className = 'prop-list';
+  
+  const renderDrops = () => {
+    dropsList.innerHTML = '';
+    obj.drops.forEach((d, idx) => {
+      const row = document.createElement('div');
+      row.className = 'prop-list-item';
+      row.innerHTML = `<span style="font-size:10px;flex:1;">${d.item}</span>`;
+      const qInput = document.createElement('input');
+      qInput.type = 'number';
+      qInput.value = d.quantity || 1;
+      qInput.onchange = (e) => { d.quantity = parseInt(e.target.value); saveLevel(); };
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.onclick = () => { obj.drops.splice(idx, 1); renderDrops(); saveLevel(); };
+      row.appendChild(qInput);
+      row.appendChild(del);
+      dropsList.appendChild(row);
+    });
+  };
+  renderDrops();
+
+  const addDropDiv = document.createElement('div');
+  addDropDiv.style.display = 'flex';
+  addDropDiv.style.gap = '5px';
+  const dropSelect = document.createElement('select');
+  ['scrap', 'warp key', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'fuel tank'].forEach(i => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i;
+    dropSelect.appendChild(opt);
+  });
+  const addDropBtn = document.createElement('button');
+  addDropBtn.className = 'add-btn';
+  addDropBtn.textContent = 'Add Drop';
+  addDropBtn.onclick = () => {
+    obj.drops.push({ item: dropSelect.value, quantity: 1 });
+    renderDrops();
+    saveLevel();
+  };
+  addDropDiv.appendChild(dropSelect);
+  addDropDiv.appendChild(addDropBtn);
+
+  dropsDiv.appendChild(dropsList);
+  dropsDiv.appendChild(addDropDiv);
+  parent.appendChild(dropsDiv);
+}
+
+function renderWarpGateProperties(parent, obj) {
+  addPropInput(parent, 'Warp Cost', obj.warpCost || 3000, (v) => { obj.warpCost = parseInt(v); saveLevel(); });
+  
+  const destDiv = document.createElement('div');
+  destDiv.className = 'prop-group';
+  destDiv.innerHTML = `<label>Destination Level</label>`;
+  const destInput = document.createElement('input');
+  destInput.type = 'text'; // or number
+  destInput.value = obj.warpDestination || 'level2';
+  destInput.onchange = (e) => { obj.warpDestination = e.target.value; saveLevel(); };
+  destDiv.appendChild(destInput);
+  parent.appendChild(destDiv);
 }
 
 function handlePlaceObject(world) {
@@ -347,7 +731,11 @@ function handleMouseDown(e) {
   
   if (e.button === 0) { // Left click
     const world = screenToWorld(state.mouse.x, state.mouse.y);
-    handlePlaceObject(world);
+    if (state.tool.selected === 'select') {
+      handleSelectObject(world);
+    } else {
+      handlePlaceObject(world);
+    }
     render();
   } else if (e.button === 2) { // Right click
     const world = screenToWorld(state.mouse.x, state.mouse.y);
@@ -434,7 +822,10 @@ document.getElementById('export-level').addEventListener('click', () => {
     height: state.level.height,
     seed: state.level.seed,
     asteroids: state.level.asteroids,
-    structures: state.level.structures.map(s => ({ x: s.x, y: s.y, type: s.type }))
+    structures: state.level.structures.map(s => {
+      // Ensure we save all properties, not just x/y/type
+      return { ...s };
+    }),
   };
   const json = JSON.stringify(levelData, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -469,6 +860,13 @@ document.getElementById('import-file').addEventListener('change', (e) => {
       state.level.seed = levelData.seed != null ? (levelData.seed >>> 0) : CONSTANTS.DEFAULT_SEED;
       state.level.asteroids = levelData.asteroids || [];
       state.level.structures = levelData.structures || [];
+      state.level.spawnSettings = levelData.spawnSettings || {
+        initialDelay: 120,
+        waveIntervalMin: 60,
+        waveIntervalMax: 100,
+        waveSizeMin: 2,
+        waveSizeMax: 4
+      };
       
       document.getElementById('level-width').value = state.level.width;
       document.getElementById('level-height').value = state.level.height;
@@ -481,6 +879,47 @@ document.getElementById('import-file').addEventListener('change', (e) => {
   };
   reader.readAsText(file);
   e.target.value = '';
+});
+
+document.getElementById('level-settings-btn').addEventListener('click', () => {
+  state.selectedObject = null; // Deselect object
+  render(); // Clear highlight
+  
+  const panel = document.getElementById('properties-panel');
+  const content = document.getElementById('properties-content');
+  
+  panel.style.display = 'flex';
+  content.innerHTML = '';
+  
+  // Render Spawn Settings
+  if (!state.level.spawnSettings) {
+    state.level.spawnSettings = {
+      initialDelay: 120,
+      waveIntervalMin: 60,
+      waveIntervalMax: 100,
+      waveSizeMin: 2,
+      waveSizeMax: 4
+    };
+  }
+  const s = state.level.spawnSettings;
+  
+  const title = document.createElement('h4');
+  title.textContent = 'Global Spawn Settings';
+  title.style.color = '#fff';
+  title.style.marginBottom = '10px';
+  content.appendChild(title);
+
+  addPropInput(content, 'Initial Delay (s)', s.initialDelay, (v) => { s.initialDelay = parseInt(v); saveLevel(); });
+  addPropInput(content, 'Min Wave Interval (s)', s.waveIntervalMin, (v) => { s.waveIntervalMin = parseInt(v); saveLevel(); });
+  addPropInput(content, 'Max Wave Interval (s)', s.waveIntervalMax, (v) => { s.waveIntervalMax = parseInt(v); saveLevel(); });
+  addPropInput(content, 'Min Wave Size', s.waveSizeMin, (v) => { s.waveSizeMin = parseInt(v); saveLevel(); });
+  addPropInput(content, 'Max Wave Size', s.waveSizeMax, (v) => { s.waveSizeMax = parseInt(v); saveLevel(); });
+});
+
+document.getElementById('close-properties').addEventListener('click', () => {
+  document.getElementById('properties-panel').style.display = 'none';
+  state.selectedObject = null;
+  render();
 });
 
 // Window events

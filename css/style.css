@@ -50,7 +50,8 @@ textarea {
   width: 1200px;
   height: 900px;
   pointer-events: none;
-  z-index: 3;
+  /* Above shop/warp blur overlays; below hotbar/drop zones */
+  z-index: 14;
 }
 
 #game-ui {

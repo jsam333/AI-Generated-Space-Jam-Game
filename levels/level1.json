@@ -360,17 +360,75 @@
     {
       "x": 835.4214164795902,
       "y": 1072.5004671021766,
-      "type": "shop"
+      "type": "shop",
+      "inventory": [
+        {
+          "item": "light blaster",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "small energy cell",
+          "energy": 5,
+          "maxEnergy": 5,
+          "quantity": 7
+        },
+        {
+          "item": "fuel tank",
+          "fuel": 5,
+          "maxFuel": 5,
+          "quantity": 3
+        }
+      ],
+      "prices": {}
     },
     {
       "x": -514.7628738611028,
       "y": -1078.8865712431332,
-      "type": "piratebase"
+      "type": "piratebase",
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 50
+        },
+        {
+          "item": "warp key",
+          "quantity": 1
+        }
+      ]
     },
     {
       "x": 730,
       "y": -453.33333333333337,
-      "type": "shop"
+      "type": "shop",
+      "inventory": [
+        {
+          "item": "medium mining laser",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3,
+          "energy": 10,
+          "maxEnergy": 10
+        },
+        {
+          "item": "medium energy cell",
+          "quantity": 2,
+          "energy": 30,
+          "maxEnergy": 30
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 2,
+          "oxygen": 10,
+          "maxOxygen": 10
+        }
+      ],
+      "prices": {}
     }
   ]
 }
