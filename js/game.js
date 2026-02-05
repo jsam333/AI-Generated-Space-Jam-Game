@@ -703,8 +703,8 @@ const BASE_DEFENSE_ORBIT_RADIUS = 100;
 const BASE_DEFENSE_ORBIT_SPEED = 0.3;
 
 function spawnBaseDefensePirates(st) {
-  for (let i = 0; i < 12; i++) {
-    const orbitAngle = (i / 12) * Math.PI * 2;
+  for (let i = 0; i < 8; i++) {
+    const orbitAngle = (i / 8) * Math.PI * 2;
     pirates.push({
       x: st.x + Math.cos(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
       y: st.y + Math.sin(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
@@ -1268,7 +1268,7 @@ function update(dt) {
 
   // Bullets (movement + bullet-asteroid collision)
   const BULLET_DAMAGE = 4;            // pirate bullet damage to player
-  const BULLET_DAMAGE_PIRATE = 3;    // light blaster damage per pellet to pirates
+  const BULLET_DAMAGE_PIRATE = 2.5;  // light blaster damage per pellet to pirates
   const BULLET_DAMAGE_ASTEROID = 0.25; // pellets deal only 0.25 to asteroids
   const VIEWPORT_HALF_W = WIDTH / 2;
   const VIEWPORT_HALF_H = HEIGHT / 2;
@@ -1304,7 +1304,7 @@ function update(dt) {
           const dy = b.y - st.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < PIRATE_BASE_HIT_RADIUS) {
-            st.health -= BULLET_DAMAGE;
+            st.health -= BULLET_DAMAGE_PIRATE;
             st.aggroed = true;
             remove = true;
             spawnSparks(b.x, b.y, 4);
@@ -2352,8 +2352,8 @@ function loadLevel(levelData) {
       type: String(s.type || 'shop')
     };
     if (st.type === 'piratebase') {
-      st.health = 100;
-      st.maxHealth = 100;
+      st.health = 150;
+      st.maxHealth = 150;
       st.aggroed = false;
       st.spawnTimer = 0;
     }
