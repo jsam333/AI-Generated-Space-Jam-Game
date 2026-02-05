@@ -376,8 +376,8 @@
         },
         {
           "item": "fuel tank",
-          "fuel": 5,
-          "maxFuel": 5,
+          "fuel": 10,
+          "maxFuel": 10,
           "quantity": 3
         }
       ],

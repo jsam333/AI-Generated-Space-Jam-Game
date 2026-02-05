@@ -112,7 +112,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 0
+  credits: 5000
 };
 const OXYGEN_DEPLETION_RATE = 1 / 25; // 1 per 25 seconds
 const FUEL_DEPLETION_RATE = 1 / 3; // 1 per 3 seconds while right-clicking
@@ -170,6 +170,12 @@ let shipTiltInitialized = false;
 let gamePaused = false;
 let warpMenuOpen = false;
 let shopMenuOpen = false;
+let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
+let interactPromptTarget = null; // Current structure showing prompt
+let tutorialTextTimer = 0; // Time remaining for tutorial text (seconds)
+let tutorialTextTimerStarted = false; // True after player thrusts for the first time
+let tutorialTextWorldX = 0; // World X position of tutorial text
+let tutorialTextWorldY = 0; // World Y position of tutorial text
 let activeShopStructure = null;
 
 // Bullets
@@ -1113,6 +1119,7 @@ function update(dt) {
       ship.vx += dir.x * ACCEL * dt;
       ship.vy += dir.y * ACCEL * dt;
       player.fuel = Math.max(0, player.fuel - FUEL_DEPLETION_RATE * dt);
+      tutorialTextTimerStarted = true; // Start tutorial fade timer on first thrust
     }
   }
 
@@ -2080,6 +2087,81 @@ function render(dt = 1 / 60) {
     ctx.stroke();
   }
 
+  // Interaction prompt for nearby interactable structures (shop, warpgate)
+  {
+    const interactRadius = 54 + 108;
+    let nearestInteractable = null;
+    let nearestDist = Infinity;
+    if (!shopMenuOpen) {
+      for (const st of structures) {
+        if (st.type !== 'shop' && st.type !== 'warpgate') continue;
+        const dx = ship.x - st.x;
+        const dy = ship.y - st.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < interactRadius && dist < nearestDist) {
+          nearestDist = dist;
+          nearestInteractable = st;
+        }
+      }
+    }
+    // Fade in/out
+    const fadeSpeed = 6; // per second
+    if (nearestInteractable) {
+      interactPromptTarget = nearestInteractable;
+      interactPromptAlpha = Math.min(1, interactPromptAlpha + fadeSpeed * dt);
+    } else {
+      interactPromptAlpha = Math.max(0, interactPromptAlpha - fadeSpeed * dt);
+    }
+    // Draw with alpha (above the 3D model)
+    if (interactPromptAlpha > 0 && interactPromptTarget) {
+      const { x, y } = worldToScreen(interactPromptTarget.x, interactPromptTarget.y);
+      const label = interactPromptTarget.type === 'shop' ? 'Shop' : 'Warp Gate';
+      const a = interactPromptAlpha;
+      const topY = y - 95; // Above 3D model (radius ~54 + padding)
+      ctx.font = 'bold 14px Oxanium';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = `rgba(0,0,0,${a})`;
+      ctx.fillText(label, x + 1, topY + 1);
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.fillText(label, x, topY);
+      ctx.font = '12px Oxanium';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = `rgba(0,0,0,${a})`;
+      ctx.fillText('Press E to interact', x + 1, topY + 4);
+      ctx.fillStyle = `rgba(170,170,170,${a})`;
+      ctx.fillText('Press E to interact', x, topY + 3);
+    }
+    if (interactPromptAlpha <= 0) interactPromptTarget = null;
+  }
+
+  // Tutorial text (visible until first thrust, then 10s + 1s fade)
+  if (tutorialTextTimer > 0 || !tutorialTextTimerStarted) {
+    if (tutorialTextTimerStarted) tutorialTextTimer -= dt;
+    const fadeStart = 1; // Start fading at 1 second remaining
+    const alpha = !tutorialTextTimerStarted ? 1 : (tutorialTextTimer > fadeStart ? 1 : Math.max(0, tutorialTextTimer / fadeStart));
+    if (alpha > 0) {
+      const { x, y } = worldToScreen(tutorialTextWorldX, tutorialTextWorldY);
+      const lines = [
+        'Left click to fire.',
+        'Right click to thrust.',
+        'Ctrl to brake.'
+      ];
+      ctx.font = '14px Oxanium';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const lineHeight = 20;
+      const startY = y - ((lines.length - 1) * lineHeight) / 2;
+      for (let i = 0; i < lines.length; i++) {
+        const ly = startY + i * lineHeight;
+        ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+        ctx.fillText(lines[i], x + 1, ly + 1);
+        ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+        ctx.fillText(lines[i], x, ly);
+      }
+    }
+  }
+
   // Player stats meters (bottom right) - bar height in pixels = max value in units
   if (uiCtx) {
     const meterWidth = 40;
@@ -2237,6 +2319,9 @@ function getShopItemPayload(itemKey) {
   if (itemKey === 'oxygen canister') {
     return { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
   }
+  if (itemKey === 'fuel tank') {
+    return { item: 'fuel tank', fuel: 10, maxFuel: 10 };
+  }
   if (itemKey === 'light blaster') {
     return { item: 'light blaster', heat: 0, overheated: false };
   }
@@ -2265,6 +2350,12 @@ function getItemLabel(it) {
   return (it.item && it.item.charAt(0).toUpperCase()) || '';
 }
 
+function getWeaponTierLetter(itemKey) {
+  if (itemKey === 'light blaster' || itemKey === 'mining laser') return 'L';
+  if (itemKey === 'medium mining laser') return 'M';
+  return null;
+}
+
 function getSlotHTML(it) {
   let html = '';
   if (it) {
@@ -2277,7 +2368,9 @@ function getSlotHTML(it) {
     } else {
       html += `<span class="slot-icon">${getItemLabel(it)}</span>`;
     }
-    
+    const tierLetter = getWeaponTierLetter(it.item);
+    if (tierLetter) html += `<span class="slot-tier">${tierLetter}</span>`;
+
     // Mining laser: heat bar (red)
     if (it.item === 'mining laser' && it.heat != null) {
       const fillH = Math.round(32 * it.heat);
@@ -2648,6 +2741,12 @@ function loadLevel(levelData) {
   }
   refreshAsteroidMeshes();
   refreshStructureMeshes();
+  
+  // Tutorial text: appears above player's starting position (timer starts on first thrust)
+  tutorialTextTimer = 11; // 10 seconds visible + 1 second fade
+  tutorialTextTimerStarted = false;
+  tutorialTextWorldX = ship.x;
+  tutorialTextWorldY = ship.y - 80; // Above the ship
 }
 
 // Level select: known levels (in levels folder) + levels loaded via file picker
@@ -2799,6 +2898,7 @@ function openShopMenu(shopStructure) {
         // Ensure containers are at full capacity with correct values
         if (item.item === 'small energy cell') { item.energy = 10; item.maxEnergy = 10; }
         else if (item.item === 'medium energy cell') { item.energy = 30; item.maxEnergy = 30; }
+        else if (item.item === 'fuel tank') { item.fuel = 10; item.maxFuel = 10; }
         else if (item.maxFuel !== undefined) item.fuel = item.maxFuel;
         else if (item.maxOxygen !== undefined) item.oxygen = item.maxOxygen;
         shopBuySlots[slotIndex++] = item;
@@ -2831,6 +2931,7 @@ function closeShopMenu() {
   if (overlay) overlay.style.display = 'none';
   const ghost = document.getElementById('shop-drag-ghost');
   if (ghost) ghost.style.display = 'none';
+  hideShopTooltip();
 }
 
 const warpMenuOverlay = document.getElementById('warp-menu-overlay');
@@ -2864,6 +2965,89 @@ if (shopSellBtn) {
     updateHUD();
   });
 }
+
+// Shop item tooltip
+const ITEM_USAGE = {
+  'small energy cell': 'Powers mining lasers and blasters.',
+  'medium energy cell': 'Powers mining lasers and blasters. Holds 3x more charge.',
+  'fuel tank': 'Drag to fuel bar to refill ship fuel.',
+  'oxygen canister': 'Drag to O2 bar to refill ship oxygen.',
+  'light blaster': 'Select and left-click to fire rapid projectiles at enemies.',
+  'mining laser': 'Select and left-click to mine asteroids for ore.',
+  'medium mining laser': 'Upgraded laser that mines faster.',
+  'cuprite': 'Common ore. Sell at shops for credits.',
+  'hematite': 'Uncommon ore. Worth more than cuprite.',
+  'aurite': 'Rare golden ore. Valuable at shops.',
+  'diamite': 'Precious ore. High value.',
+  'platinite': 'Extremely rare ore. Most valuable.',
+  'scrap': 'Salvaged material. Can be sold for credits.',
+  'warp key': 'Required to activate warp gates.'
+};
+
+const ITEM_DISPLAY_NAMES = {
+  'small energy cell': 'Small Energy Cell',
+  'medium energy cell': 'Medium Energy Cell',
+  'fuel tank': 'Fuel Tank',
+  'oxygen canister': 'Oxygen Canister',
+  'light blaster': 'Light Blaster',
+  'mining laser': 'Mining Laser',
+  'medium mining laser': 'Medium Mining Laser',
+  'cuprite': 'Cuprite',
+  'hematite': 'Hematite',
+  'aurite': 'Aurite',
+  'diamite': 'Diamite',
+  'platinite': 'Platinite',
+  'scrap': 'Scrap',
+  'warp key': 'Warp Key'
+};
+
+function showShopTooltip(itemKey, price, isBuy, slotEl) {
+  const tooltip = document.getElementById('shop-item-tooltip');
+  if (!tooltip || !itemKey) return;
+  const name = ITEM_DISPLAY_NAMES[itemKey] || itemKey;
+  const usage = ITEM_USAGE[itemKey] || '';
+  const priceText = isBuy ? `Buy: ${price} cr` : `Sell: ${price} cr`;
+  tooltip.innerHTML = `<div class="tooltip-name">${name}</div><div class="tooltip-price">${priceText}</div><div class="tooltip-usage">${usage}</div>`;
+  tooltip.style.display = 'block';
+  // Position above the slot
+  const rect = slotEl.getBoundingClientRect();
+  const overlay = document.getElementById('shop-menu-overlay');
+  const overlayRect = overlay ? overlay.getBoundingClientRect() : { left: 0, top: 0 };
+  const left = rect.left - overlayRect.left + rect.width / 2 - 110;
+  const top = rect.top - overlayRect.top - tooltip.offsetHeight - 8;
+  tooltip.style.left = Math.max(10, left) + 'px';
+  tooltip.style.top = Math.max(10, top) + 'px';
+}
+
+function hideShopTooltip() {
+  const tooltip = document.getElementById('shop-item-tooltip');
+  if (tooltip) tooltip.style.display = 'none';
+}
+
+// Add hover listeners for shop slots
+document.querySelectorAll('.shop-buy-slot').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    const idx = parseInt(el.dataset.buySlot, 10);
+    const it = shopBuySlots[idx];
+    if (it) {
+      const price = getItemBuyPrice(it.item);
+      showShopTooltip(it.item, price, true, el);
+    }
+  });
+  el.addEventListener('mouseleave', hideShopTooltip);
+});
+
+document.querySelectorAll('.shop-sell-slot').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    const idx = parseInt(el.dataset.sellSlot, 10);
+    const it = shopSellSlots[idx];
+    if (it) {
+      const price = getItemSellPrice(it);
+      showShopTooltip(it.item, price, false, el);
+    }
+  });
+  el.addEventListener('mouseleave', hideShopTooltip);
+});
 
 // Inventory drag state (unified for HUD and Shop)
 let inventoryDrag = null; // { kind: 'hotbar'|'buy'|'sell', fromSlot?: number, fromBuySlot?: number, fromSellSlot?: number, price?: number }
@@ -2903,6 +3087,7 @@ function setDragGhostPos(clientX, clientY) {
 function beginDragFromHotbar(slotIndex, clientX, clientY) {
   const it = hotbar[slotIndex];
   if (!it) return;
+  hideShopTooltip();
   inventoryDrag = { kind: 'hotbar', fromSlot: slotIndex };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
   setDragGhostContent(it, getItemLabel(it), qty);
@@ -2913,6 +3098,7 @@ function beginDragFromHotbar(slotIndex, clientX, clientY) {
 function beginDragFromBuy(buyIndex, clientX, clientY) {
   const it = shopBuySlots[buyIndex];
   if (!it) return;
+  hideShopTooltip();
   const price = getItemBuyPrice(it.item);
   inventoryDrag = { kind: 'buy', fromBuySlot: buyIndex, price };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
@@ -2924,6 +3110,7 @@ function beginDragFromBuy(buyIndex, clientX, clientY) {
 function beginDragFromSell(sellIndex, clientX, clientY) {
   const it = shopSellSlots[sellIndex];
   if (!it) return;
+  hideShopTooltip();
   inventoryDrag = { kind: 'sell', fromSellSlot: sellIndex };
   const qty = it.quantity != null ? String(it.quantity) : (it.energy != null ? String(Math.round(it.energy)) : (it.fuel != null ? String(Math.round(it.fuel)) : (it.oxygen != null ? String(Math.round(it.oxygen)) : (it.heat != null ? String(Math.round(it.heat * 100)) : ''))));
   setDragGhostContent(it, getItemLabel(it), qty);

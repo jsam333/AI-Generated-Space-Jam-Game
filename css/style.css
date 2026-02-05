@@ -162,6 +162,39 @@ textarea {
   cursor: default;
 }
 
+#shop-item-tooltip {
+  position: absolute;
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid #888;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 12px;
+  color: #fff;
+  z-index: 100;
+  pointer-events: none;
+  max-width: 220px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+#shop-item-tooltip .tooltip-name {
+  font-weight: bold;
+  font-size: 13px;
+  color: #ffcc44;
+  margin-bottom: 4px;
+}
+
+#shop-item-tooltip .tooltip-price {
+  color: #88ff88;
+  margin-bottom: 6px;
+}
+
+#shop-item-tooltip .tooltip-usage {
+  color: #aaa;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 #shop-menu {
   background: rgba(30, 30, 30, 0.95);
   padding: 20px;
@@ -342,6 +375,16 @@ textarea {
   right: 2px;
   font-size: 10px;
   color: #aaa;
+}
+
+.slot-tier {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #888;
+  pointer-events: none;
 }
 
 .slot-num {
