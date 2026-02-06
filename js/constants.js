@@ -106,3 +106,109 @@ export const ITEM_DISPLAY_NAMES = {
   'scrap': 'Scrap',
   'warp key': 'Warp Key'
 };
+
+// --- Collision constants ---
+export const BOUNCE_RESTITUTION = 0.3;
+export const MAX_COLLISION_DAMAGE = 20;
+export const DAMAGE_PER_SPEED = 0.1; // 200 units/sec impact => 20 damage
+
+// --- Floating item constants ---
+export const MAGNET_RADIUS = 80;
+export const MAGNET_STRENGTH = 600;
+export const FLOAT_DRAG = 2.0;
+export const FLOAT_STOP_SPEED = 0.05;
+export const FLOAT_ITEM_RADIUS = 10;
+export const FLOATING_ORE_SCALE = 15;
+
+// --- Particle constants ---
+export const PARTICLE_DRAG = 6;
+
+// --- Pirate combat constants ---
+export const PIRATE_FIRE_RANGE = 700;
+export const PIRATE_AIM_SPREAD = 60;
+export const PIRATE_TILT_SENSITIVITY = 8;
+export const PIRATE_TILT_DECAY = 4;
+
+// --- Interaction radius (structure radius + dashed ring) ---
+export const INTERACT_RADIUS = STRUCTURE_SIZE_COLL + SHOP_DASHED_EXTRA_3D; // 54 + 108
+
+// --- Item image paths (used for HUD, floating items, tooltips) ---
+export const ITEM_IMAGE_PATHS = {
+  'oxygen canister': 'assets/oxygen-can.png',
+  'large oxygen canister': 'assets/oxygen-can.png',
+  'fuel tank': 'assets/fuel-can.png',
+  'large fuel tank': 'assets/fuel-can.png',
+  'health pack': 'assets/oxygen-can.png',      // Reuse oxygen-can for now
+  'large health pack': 'assets/oxygen-can.png',
+  'small energy cell': 'assets/energy-cell.png',
+  'medium energy cell': 'assets/energy-cell.png',
+  'mining laser': 'assets/laser.png',
+  'medium mining laser': 'assets/laser.png',
+  'light blaster': 'assets/blaster.png'
+};
+
+// --- Item short labels (for HUD slot display) ---
+export const ITEM_LABELS = {
+  'mining laser': 'L',
+  'medium mining laser': 'M',
+  'light blaster': 'B',
+  'small energy cell': 'E',
+  'medium energy cell': 'M',
+  'oxygen canister': 'O',
+  'large oxygen canister': 'LO',
+  'fuel tank': 'F',
+  'large fuel tank': 'LF',
+  'health pack': 'H',
+  'large health pack': 'LH',
+  'cuprite': 'C',
+  'hematite': 'H',
+  'aurite': 'A',
+  'diamite': 'D',
+  'platinite': 'P',
+  'scrap': 'S',
+  'warp key': 'K'
+};
+
+// --- Item default payloads (used when buying/creating items) ---
+export const ITEM_DEFAULTS = {
+  'small energy cell':    { energy: 10, maxEnergy: 10 },
+  'medium energy cell':   { energy: 30, maxEnergy: 30 },
+  'oxygen canister':      { oxygen: 10, maxOxygen: 10 },
+  'large oxygen canister':{ oxygen: 30, maxOxygen: 30 },
+  'fuel tank':            { fuel: 10, maxFuel: 10 },
+  'large fuel tank':      { fuel: 30, maxFuel: 30 },
+  'health pack':          { health: 10 },
+  'large health pack':    { health: 30 },
+  'light blaster':        { heat: 0, overheated: false },
+  'medium mining laser':  { heat: 0, overheated: false }
+};
+
+// --- Shop prices ---
+export const ITEM_BUY_PRICE = {
+  'small energy cell': 150,
+  'medium energy cell': 550,
+  'oxygen canister': 500,
+  'fuel tank': 300,
+  'light blaster': 1000,
+  'medium mining laser': 1500,
+  'health pack': 400,
+  'large health pack': 1000,
+  'large fuel tank': 750,
+  'large oxygen canister': 1250
+};
+
+export const ITEM_SELL_PRICE = {
+  cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60,
+  scrap: 40, 'warp key': 500, 'mining laser': 300,
+  'light blaster': 500, 'medium mining laser': 750
+};
+
+// --- Collidable structure types ---
+const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'crafting', 'shipyard']);
+
+/** Returns true if a structure should participate in physics collision checks. */
+export function isCollidableStructure(st) {
+  if (!COLLIDABLE_TYPES.has(st.type)) return false;
+  if (st.type === 'piratebase' && (st.dead || st.health <= 0)) return false;
+  return true;
+}

@@ -1,4 +1,4 @@
-import { ORE_ITEMS, MAX_ORE_STACK } from './constants.js';
+import { ORE_ITEMS, MAX_ORE_STACK, ITEM_IMAGE_PATHS, ITEM_LABELS, ITEM_DEFAULTS } from './constants.js';
 
 export function normalize(x, y) {
   const len = Math.sqrt(x * x + y * y);
@@ -19,35 +19,58 @@ export function getMaxStack(itemName) {
   return ORE_ITEMS.includes(itemName) ? MAX_ORE_STACK : 1;
 }
 
+/** Get the icon image path for a given item name (or null if none). */
 export function getItemImagePath(itemName) {
-  if (itemName === 'oxygen canister' || itemName === 'large oxygen canister') return 'assets/oxygen-can.png';
-  if (itemName === 'fuel tank' || itemName === 'large fuel tank') return 'assets/fuel-can.png';
-  if (itemName === 'health pack' || itemName === 'large health pack') return 'assets/oxygen-can.png';
-  if (itemName === 'small energy cell' || itemName === 'medium energy cell') return 'assets/energy-cell.png';
-  if (itemName === 'mining laser' || itemName === 'medium mining laser') return 'assets/laser.png';
-  if (itemName === 'light blaster') return 'assets/blaster.png';
-  return null;
+  return ITEM_IMAGE_PATHS[itemName] || null;
 }
 
+/** Get the short HUD label for an inventory slot object (e.g. {item:'cuprite'}). */
 export function getItemLabel(it) {
   if (!it) return '';
-  if (it.item === 'mining laser') return 'L';
-  if (it.item === 'medium mining laser') return 'M';
-  if (it.item === 'light blaster') return 'B';
-  if (it.item === 'small energy cell') return 'E';
-  if (it.item === 'medium energy cell') return 'M';
-  if (it.item === 'oxygen canister') return 'O';
-  if (it.item === 'large oxygen canister') return 'LO';
-  if (it.item === 'fuel tank') return 'F';
-  if (it.item === 'large fuel tank') return 'LF';
-  if (it.item === 'health pack') return 'H';
-  if (it.item === 'large health pack') return 'LH';
-  if (it.item === 'cuprite') return 'C';
-  if (it.item === 'hematite') return 'H';
-  if (it.item === 'aurite') return 'A';
-  if (it.item === 'diamite') return 'D';
-  if (it.item === 'platinite') return 'P';
-  if (it.item === 'scrap') return 'S';
-  if (it.item === 'warp key') return 'K';
-  return (it.item && it.item.charAt(0).toUpperCase()) || '';
+  return ITEM_LABELS[it.item] || (it.item && it.item.charAt(0).toUpperCase()) || '';
+}
+
+/** Build a full item payload for a given item key (used when buying/spawning items). */
+export function getItemPayload(itemKey) {
+  const defaults = ITEM_DEFAULTS[itemKey];
+  return defaults ? { item: itemKey, ...defaults } : { item: itemKey };
+}
+
+// ---------------------------------------------------------------------------
+// Physics helpers – shared by ship, pirate, and floating-item collision code
+// ---------------------------------------------------------------------------
+
+/**
+ * Push `entity` out of `obstacle` if their circles overlap.
+ * Returns {nx, ny, overlap, dist} if overlapping, or null if no collision.
+ * Mutates entity.x / entity.y to resolve the overlap.
+ */
+export function pushOutOverlap(entity, obstacle, entityRadius, obstacleRadius) {
+  const dx = entity.x - obstacle.x;
+  const dy = entity.y - obstacle.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const minDist = entityRadius + obstacleRadius;
+  if (dist >= minDist || dist === 0) return null;
+  const nx = dx / dist;
+  const ny = dy / dist;
+  const overlap = minDist - dist;
+  entity.x += nx * overlap;
+  entity.y += ny * overlap;
+  return { nx, ny, overlap, dist };
+}
+
+/**
+ * Apply a bounce to `entity` along the collision normal (nx, ny).
+ * `restitution` controls how much velocity is reflected (0 = absorb, 1 = elastic).
+ * Returns the signed impact speed along the normal (negative means entity was
+ * moving into the obstacle). Only bounces if moving inward.
+ */
+export function bounceEntity(entity, nx, ny, restitution) {
+  const normalSpeed = entity.vx * nx + entity.vy * ny;
+  if (normalSpeed >= 0) return 0; // already moving away
+  const impactSpeed = -normalSpeed;
+  const bounce = impactSpeed * (1 + restitution);
+  entity.vx += nx * bounce;
+  entity.vy += ny * bounce;
+  return impactSpeed;
 }

@@ -1,5 +1,5 @@
-import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES } from './constants.js';
-import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel } from './utils.js';
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, isCollidableStructure } from './constants.js';
+import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
 
@@ -794,8 +794,7 @@ function refreshStructureMeshes() {
   const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0, crafting: 1.0, shipyard: 1.2 };
   while (structureContainer.children.length) structureContainer.remove(structureContainer.children[0]);
   for (const st of structures) {
-    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
-    if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
+    if (!isCollidableStructure(st)) continue;
     const src = structureModels[st.type] || structureModels['shop']; // Fallback to shop model
     if (!src) continue;
     const clone = src.clone(true);
@@ -942,7 +941,6 @@ function updatePirates(dt) {
     }
   }
 
-  const STRUCTURE_SIZE_COLL = 54;
   for (let i = pirates.length - 1; i >= 0; i--) {
     const p = pirates[i];
     let inDefenseMode = false;
@@ -997,8 +995,7 @@ function updatePirates(dt) {
           }
       }
       for (const st of structures) {
-         if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
-         if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
+         if (!isCollidableStructure(st)) continue;
          const sdx = st.x - p.x;
          const sdy = st.y - p.y;
          const sdist = Math.sqrt(sdx*sdx + sdy*sdy);
@@ -1074,8 +1071,7 @@ function updatePirates(dt) {
     }
     // Structures
     for (const st of structures) {
-        if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
-        if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
+        if (!isCollidableStructure(st)) continue;
         const cdx = p.x - st.x;
         const cdy = p.y - st.y;
         const cdist = Math.sqrt(cdx*cdx + cdy*cdy);
@@ -1192,71 +1188,31 @@ function update(dt) {
   ship.x += ship.vx * dt;
   ship.y += ship.vy * dt;
 
-  // Ship–asteroid collision: bounce and damage from perpendicular impact speed
-  const BOUNCE_RESTITUTION = 0.3;
-  const MAX_COLLISION_DAMAGE = 20;
-  const DAMAGE_PER_SPEED = 0.1; // 200 units/sec impact => 20 damage
+  // Ship–asteroid collision: bounce + damage
   for (const ast of asteroids) {
-    const dx = ship.x - ast.x;
-    const dy = ship.y - ast.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = SHIP_COLLISION_RADIUS + ast.radius;
-    if (dist < minDist && dist > 0) {
-      const nx = dx / dist;
-      const ny = dy / dist;
-      // Push ship out of overlap
-      const overlap = minDist - dist;
-      ship.x += nx * overlap;
-      ship.y += ny * overlap;
-      // Perpendicular impact speed (into asteroid is negative)
-      const normalSpeed = ship.vx * nx + ship.vy * ny;
-      if (normalSpeed < 0) {
-        // Ship is moving into asteroid
-        const impactSpeed = -normalSpeed; // positive value
-        // Bounce: cancel inward velocity and add small outward push
-        const bounce = impactSpeed * (1 + BOUNCE_RESTITUTION);
-        ship.vx += nx * bounce;
-        ship.vy += ny * bounce;
-        // Damage from impact speed, max 20
+    const hit = pushOutOverlap(ship, ast, SHIP_COLLISION_RADIUS, ast.radius);
+    if (hit) {
+      const impactSpeed = bounceEntity(ship, hit.nx, hit.ny, BOUNCE_RESTITUTION);
+      if (impactSpeed > 0) {
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
-        // Asteroid takes half the damage the player takes
         const currentHealth = ast.health ?? ast.radius;
         ast.health = Math.max(0, currentHealth - damage / 2);
-        const impactX = ship.x * 0.9 + ast.x * 0.1;
-        const impactY = ship.y * 0.9 + ast.y * 0.1;
-        spawnSparks(impactX, impactY, Math.max(2, Math.round(damage)));
+        spawnSparks(ship.x * 0.9 + ast.x * 0.1, ship.y * 0.9 + ast.y * 0.1, Math.max(2, Math.round(damage)));
       }
     }
   }
 
-  // Ship–warp gate and shop collision (radius 35% bigger than base 40)
-  const STRUCTURE_SIZE_COLL = 54;
+  // Ship–structure collision
   for (const st of structures) {
-    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
-    if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
-    const dx = ship.x - st.x;
-    const dy = ship.y - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = SHIP_COLLISION_RADIUS + STRUCTURE_SIZE_COLL;
-    if (dist < minDist && dist > 0) {
-      const nx = dx / dist;
-      const ny = dy / dist;
-      const overlap = minDist - dist;
-      ship.x += nx * overlap;
-      ship.y += ny * overlap;
-      const normalSpeed = ship.vx * nx + ship.vy * ny;
-      if (normalSpeed < 0) {
-        const impactSpeed = -normalSpeed;
-        const bounce = impactSpeed * (1 + BOUNCE_RESTITUTION);
-        ship.vx += nx * bounce;
-        ship.vy += ny * bounce;
+    if (!isCollidableStructure(st)) continue;
+    const hit = pushOutOverlap(ship, st, SHIP_COLLISION_RADIUS, STRUCTURE_SIZE_COLL);
+    if (hit) {
+      const impactSpeed = bounceEntity(ship, hit.nx, hit.ny, BOUNCE_RESTITUTION);
+      if (impactSpeed > 0) {
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
-        const impactX = ship.x * 0.9 + st.x * 0.1;
-        const impactY = ship.y * 0.9 + st.y * 0.1;
-        spawnSparks(impactX, impactY, Math.max(2, Math.round(damage)));
-        // Pirate base takes half the damage the player takes (same as asteroids)
+        spawnSparks(ship.x * 0.9 + st.x * 0.1, ship.y * 0.9 + st.y * 0.1, Math.max(2, Math.round(damage)));
         if (st.type === 'piratebase') {
           st.aggroed = true;
           const currentHealth = st.health ?? 100;
@@ -1536,7 +1492,6 @@ function update(dt) {
   }
 
   // Particles (sparks)
-  const PARTICLE_DRAG = 6; // per-second velocity decay
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
@@ -1584,10 +1539,6 @@ function update(dt) {
   }
 
   // Floating items: magnet + movement + drag
-  const MAGNET_RADIUS = 80;
-  const MAGNET_STRENGTH = 600; // acceleration (units/sec^2) near ship
-  const FLOAT_DRAG = 2.0; // velocity damping per second
-  const FLOAT_STOP_SPEED = 0.05;
   for (const item of floatingItems) {
     if (item.vx == null) item.vx = 0;
     if (item.vy == null) item.vy = 0;
@@ -1607,36 +1558,13 @@ function update(dt) {
     item.x += item.vx * dt;
     item.y += item.vy * dt;
 
-    // Collision with asteroids and warp gates: push out so items don't overlap
-    const FLOAT_ITEM_RADIUS = 10;
-    const STRUCTURE_SIZE_COLL = 54;
+    // Collision with asteroids and structures: push out so items don't overlap
     for (const ast of asteroids) {
-      const dx = item.x - ast.x;
-      const dy = item.y - ast.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const minDist = ast.radius + FLOAT_ITEM_RADIUS;
-      if (dist < minDist && dist > 0) {
-        const nx = dx / dist;
-        const ny = dy / dist;
-        const overlap = minDist - dist;
-        item.x += nx * overlap;
-        item.y += ny * overlap;
-      }
+      pushOutOverlap(item, ast, FLOAT_ITEM_RADIUS, ast.radius);
     }
     for (const st of structures) {
-      if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
-      if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
-      const dx = item.x - st.x;
-      const dy = item.y - st.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const minDist = STRUCTURE_SIZE_COLL + FLOAT_ITEM_RADIUS;
-      if (dist < minDist && dist > 0) {
-        const nx = dx / dist;
-        const ny = dy / dist;
-        const overlap = minDist - dist;
-        item.x += nx * overlap;
-        item.y += ny * overlap;
-      }
+      if (!isCollidableStructure(st)) continue;
+      pushOutOverlap(item, st, FLOAT_ITEM_RADIUS, STRUCTURE_SIZE_COLL);
     }
 
     // Apply drag (exponential decay)
@@ -1653,7 +1581,6 @@ function update(dt) {
   }
 
   // Create/update 3D mesh for ore-type floating items
-  const FLOATING_ORE_SCALE = 15; // 40% smaller than before (was 25)
   if (floatingOreContainer && (oreModel || scrapModel)) {
     for (const item of floatingItems) {
       if (!FLOATING_ORE_ITEMS.includes(item.item)) continue;
@@ -2163,7 +2090,6 @@ function render(dt = 1 / 60) {
 
   // Interaction prompt for nearby interactable structures (shop, warpgate)
   {
-    const interactRadius = 54 + 108;
     let nearestInteractable = null;
     let nearestDist = Infinity;
     if (!shopMenuOpen) {
@@ -2172,7 +2098,7 @@ function render(dt = 1 / 60) {
         const dx = ship.x - st.x;
         const dy = ship.y - st.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < interactRadius && dist < nearestDist) {
+        if (dist < INTERACT_RADIUS && dist < nearestDist) {
           nearestDist = dist;
           nearestInteractable = st;
         }
@@ -2293,25 +2219,23 @@ canvas.addEventListener('wheel', (e) => {
 });
 
 function isShipInWarpGate() {
-  const interactRadius = 54 + 108; // base 35% bigger
   for (const st of structures) {
     if (st.type !== 'warpgate') continue;
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < interactRadius) return st;
+    if (dist < INTERACT_RADIUS) return st;
   }
   return null;
 }
 
 function isShipInShop() {
-  const interactRadius = 54 + 108; // base 35% bigger
   for (const st of structures) {
     if (st.type !== 'shop') continue;
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < interactRadius) return st;
+    if (dist < INTERACT_RADIUS) return st;
   }
   return null;
 }
@@ -2349,19 +2273,6 @@ function canAcceptFloatingItem(item) {
 }
 
 // Shop: buy/sell 5x3 grid (15 slots)
-const ITEM_BUY_PRICE = { 
-  'small energy cell': 150, 
-  'medium energy cell': 550, 
-  'oxygen canister': 500, 
-  'fuel tank': 300, 
-  'light blaster': 1000, 
-  'medium mining laser': 1500,
-  'health pack': 400,
-  'large health pack': 1000,
-  'large fuel tank': 750,
-  'large oxygen canister': 1250
-};
-const ITEM_SELL_PRICE = { cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60, scrap: 40, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
 
@@ -2385,37 +2296,7 @@ function removeFromShopInventory(itemKey) {
 }
 
 function getShopItemPayload(itemKey) {
-  if (itemKey === 'small energy cell') {
-    return { item: 'small energy cell', energy: 10, maxEnergy: 10 };
-  }
-  if (itemKey === 'medium energy cell') {
-    return { item: 'medium energy cell', energy: 30, maxEnergy: 30 };
-  }
-  if (itemKey === 'oxygen canister') {
-    return { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
-  }
-  if (itemKey === 'large oxygen canister') {
-    return { item: 'large oxygen canister', oxygen: 30, maxOxygen: 30 };
-  }
-  if (itemKey === 'fuel tank') {
-    return { item: 'fuel tank', fuel: 10, maxFuel: 10 };
-  }
-  if (itemKey === 'large fuel tank') {
-    return { item: 'large fuel tank', fuel: 30, maxFuel: 30 };
-  }
-  if (itemKey === 'health pack') {
-    return { item: 'health pack', health: 10 };
-  }
-  if (itemKey === 'large health pack') {
-    return { item: 'large health pack', health: 30 };
-  }
-  if (itemKey === 'light blaster') {
-    return { item: 'light blaster', heat: 0, overheated: false };
-  }
-  if (itemKey === 'medium mining laser') {
-    return { item: 'medium mining laser', heat: 0, overheated: false };
-  }
-  return { item: itemKey };
+  return getItemPayload(itemKey);
 }
 
 

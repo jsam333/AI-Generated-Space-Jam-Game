@@ -1,5 +1,7 @@
 {
     "excluded_patterns": [
+        ".glb",
+        "assets",
         ".git",
         ".gitignore",
         "gradle",
