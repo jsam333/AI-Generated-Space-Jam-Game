@@ -37,6 +37,29 @@ export function getItemPayload(itemKey) {
 }
 
 // ---------------------------------------------------------------------------
+// Raycast helpers – shared by laser hit detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Test a ray (origin ox,oy  direction dx,dy  max length maxLen) against a
+ * single circle (cx, cy, radius).  Returns the entry distance along the ray
+ * if the ray hits, or -1 if it misses.
+ */
+export function raycastCircle(ox, oy, dx, dy, cx, cy, radius, maxLen) {
+  const fx = cx - ox;
+  const fy = cy - oy;
+  const t = fx * dx + fy * dy;
+  if (t < 0) return -1; // behind ray origin
+  const px = ox + dx * t;
+  const py = oy + dy * t;
+  const distSq = (cx - px) * (cx - px) + (cy - py) * (cy - py);
+  const radiusSq = radius * radius;
+  if (distSq >= radiusSq) return -1;
+  const hitDist = t - Math.sqrt(radiusSq - distSq);
+  return (hitDist > 0 && hitDist < maxLen) ? hitDist : -1;
+}
+
+// ---------------------------------------------------------------------------
 // Physics helpers – shared by ship, pirate, and floating-item collision code
 // ---------------------------------------------------------------------------
 

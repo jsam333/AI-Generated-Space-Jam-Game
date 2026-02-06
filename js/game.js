@@ -1,5 +1,5 @@
-import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, isCollidableStructure } from './constants.js';
-import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity } from './utils.js';
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure } from './constants.js';
+import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity, raycastCircle } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
 
@@ -228,62 +228,21 @@ function worldToScreen(wx, wy) {
 function laserHitAsteroid(ox, oy, dx, dy, maxLen) {
   let closest = null;
   let closestDist = maxLen;
-  
   for (const ast of asteroids) {
-    // Vector from ray origin to asteroid center
-    const fx = ast.x - ox;
-    const fy = ast.y - oy;
-    
-    // Project asteroid center onto ray
-    const t = fx * dx + fy * dy;
-    if (t < 0) continue; // Behind ray origin
-    
-    // Closest point on ray to asteroid center
-    const cx = ox + dx * t;
-    const cy = oy + dy * t;
-    
-    // Distance from closest point to asteroid center
-    const distSq = (ast.x - cx) * (ast.x - cx) + (ast.y - cy) * (ast.y - cy);
-    const radiusSq = ast.radius * ast.radius;
-    
-    if (distSq < radiusSq) {
-      // Ray hits asteroid - calculate entry distance
-      const offset = Math.sqrt(radiusSq - distSq);
-      const hitDist = t - offset;
-      
-      if (hitDist > 0 && hitDist < closestDist) {
-        closest = ast;
-        closestDist = hitDist;
-      }
-    }
+    const d = raycastCircle(ox, oy, dx, dy, ast.x, ast.y, ast.radius, closestDist);
+    if (d >= 0) { closest = ast; closestDist = d; }
   }
-  
   return closest ? { asteroid: closest, distance: closestDist } : null;
 }
 
-// Ray vs circle for pirate base (radius 54)
+// Ray vs circle for pirate base
 function laserHitPirateBase(ox, oy, dx, dy, maxLen) {
   let closest = null;
   let closestDist = maxLen;
-  const radius = 54;
-  const radiusSq = radius * radius;
   for (const st of structures) {
     if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
-    const fx = st.x - ox;
-    const fy = st.y - oy;
-    const t = fx * dx + fy * dy;
-    if (t < 0) continue;
-    const cx = ox + dx * t;
-    const cy = oy + dy * t;
-    const distSq = (st.x - cx) * (st.x - cx) + (st.y - cy) * (st.y - cy);
-    if (distSq < radiusSq) {
-      const offset = Math.sqrt(radiusSq - distSq);
-      const hitDist = t - offset;
-      if (hitDist > 0 && hitDist < closestDist) {
-        closest = st;
-        closestDist = hitDist;
-      }
-    }
+    const d = raycastCircle(ox, oy, dx, dy, st.x, st.y, PIRATE_BASE_HIT_RADIUS, closestDist);
+    if (d >= 0) { closest = st; closestDist = d; }
   }
   return closest ? { structure: closest, distance: closestDist } : null;
 }
@@ -1050,50 +1009,20 @@ function updatePirates(dt) {
     }
 
     // Physics Collisions (Bounce) – pirates do not damage asteroids
-    // Asteroids
     for (const ast of asteroids) {
-        const cdx = p.x - ast.x;
-        const cdy = p.y - ast.y;
-        const cdist = Math.sqrt(cdx*cdx + cdy*cdy);
-        const minDist = SHIP_COLLISION_RADIUS + ast.radius;
-        if (cdist < minDist) {
-            const nx = cdx/cdist;
-            const ny = cdy/cdist;
-            const overlap = minDist - cdist;
-            p.x += nx * overlap;
-            p.y += ny * overlap;
-            const impact = p.vx * nx + p.vy * ny;
-            if (impact < 0) {
-                p.vx -= 1.3 * impact * nx;
-                p.vy -= 1.3 * impact * ny;
-            }
-        }
+        const hit = pushOutOverlap(p, ast, SHIP_COLLISION_RADIUS, ast.radius);
+        if (hit) bounceEntity(p, hit.nx, hit.ny, BOUNCE_RESTITUTION);
     }
-    // Structures
     for (const st of structures) {
         if (!isCollidableStructure(st)) continue;
-        const cdx = p.x - st.x;
-        const cdy = p.y - st.y;
-        const cdist = Math.sqrt(cdx*cdx + cdy*cdy);
-        const minDist = SHIP_COLLISION_RADIUS + STRUCTURE_SIZE_COLL;
-        if (cdist < minDist) {
-            const nx = cdx/cdist;
-            const ny = cdy/cdist;
-            const overlap = minDist - cdist;
-            p.x += nx * overlap;
-            p.y += ny * overlap;
-            const impact = p.vx * nx + p.vy * ny;
-            if (impact < 0) {
-                p.vx -= 1.3 * impact * nx;
-                p.vy -= 1.3 * impact * ny;
-            }
-        }
+        const hit = pushOutOverlap(p, st, SHIP_COLLISION_RADIUS, STRUCTURE_SIZE_COLL);
+        if (hit) bounceEntity(p, hit.nx, hit.ny, BOUNCE_RESTITUTION);
     }
 
     // Firing (defense-mode pirates do not shoot)
     if (!inDefenseMode) {
     p.cooldown -= dt;
-    if (p.cooldown <= 0 && distToPlayer < 700) {
+    if (p.cooldown <= 0 && distToPlayer < PIRATE_FIRE_RANGE) {
          p.cooldown = 1.0 + Math.random() * 2.0;
          
          // Anticipate: use pirate bullet speed so lead matches travel time
@@ -1101,8 +1030,8 @@ function updatePirates(dt) {
          const predX = ship.x + ship.vx * timeToHit;
          const predY = ship.y + ship.vy * timeToHit;
          
-         const aimX = predX + (Math.random()-0.5) * 60;
-         const aimY = predY + (Math.random()-0.5) * 60;
+         const aimX = predX + (Math.random()-0.5) * PIRATE_AIM_SPREAD;
+         const aimY = predY + (Math.random()-0.5) * PIRATE_AIM_SPREAD;
          
          const fdx = aimX - p.x;
          const fdy = aimY - p.y;
@@ -1126,9 +1055,7 @@ function updatePirates(dt) {
     while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
     p.prevFacingAngle = p.facingAngle;
     
-    const TILT_SENSITIVITY = 8;
-    const TILT_DECAY = 4;
-    p.tilt = (p.tilt || 0) + deltaAngle * TILT_SENSITIVITY - (p.tilt || 0) * TILT_DECAY * dt;
+    p.tilt = (p.tilt || 0) + deltaAngle * PIRATE_TILT_SENSITIVITY - (p.tilt || 0) * PIRATE_TILT_DECAY * dt;
     p.tilt = Math.max(-0.5, Math.min(0.5, p.tilt));
 
     // Death: drop 3-5 scrap only if not fromBaseSpawn
@@ -1984,9 +1911,7 @@ function render(dt = 1 / 60) {
     while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
     while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
     prevAimAngle = aimAngle;
-    const TILT_SENSITIVITY = 8;
-    const TILT_DECAY = 4;
-    shipTilt += deltaAngle * TILT_SENSITIVITY - shipTilt * TILT_DECAY * dt;
+    shipTilt += deltaAngle * PIRATE_TILT_SENSITIVITY - shipTilt * PIRATE_TILT_DECAY * dt;
     shipTilt = Math.max(-0.5, Math.min(0.5, shipTilt));
     shipMesh.rotation.y = aimAngle + Math.PI / 2;
     shipMesh.rotation.z = shipTilt;
@@ -2321,18 +2246,8 @@ function getSlotHTML(it) {
     const tierLetter = getWeaponTierLetter(it.item);
     if (tierLetter) html += `<span class="slot-tier">${tierLetter}</span>`;
 
-    // Mining laser: heat bar (red)
-    if (it.item === 'mining laser' && it.heat != null) {
-      const fillH = Math.round(32 * it.heat);
-      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
-    }
-    // Medium mining laser: heat bar (red)
-    if (it.item === 'medium mining laser' && it.heat != null) {
-      const fillH = Math.round(32 * it.heat);
-      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
-    }
-    // Light blaster: heat bar (red)
-    if (it.item === 'light blaster' && it.heat != null) {
+    // Weapon heat bar (red)
+    if (HEAT_WEAPONS.includes(it.item) && it.heat != null) {
       const fillH = Math.round(32 * it.heat);
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:#cc2222;"></div></div>`;
     }
@@ -3303,105 +3218,44 @@ function endDrag(clientX, clientY) {
     targetSlotEl = under.closest('.slot') || under.closest('.shop-buy-slot') || under.closest('.shop-sell-slot');
   }
 
-  // Handle drop on O2 bar
-  if (isOverO2Bar && drag.kind === 'hotbar') {
-    const from = drag.fromSlot;
-    const it = hotbar[from];
-    if (it && (it.item === 'oxygen canister' || it.item === 'large oxygen canister')) {
-      const addAmount = it.oxygen !== undefined ? it.oxygen : 10;
-      player.oxygen = Math.min(player.maxOxygen, player.oxygen + addAmount);
-      hotbar[from] = null;
-      updateHUD();
-      return;
-    }
-  }
+  // Handle drops on resource bars (O2, fuel, health) — hotbar or buy slot
+  const barChecks = [
+    { isOver: isOverO2Bar,      barType: 'oxygen' },
+    { isOver: isOverFuelBar,    barType: 'fuel' },
+    { isOver: isOverHealthBar,  barType: 'health' }
+  ];
+  for (const { isOver, barType } of barChecks) {
+    if (!isOver) continue;
+    const cfg = RESOURCE_BAR_CONFIG[barType];
 
-  // Handle drop on fuel bar
-  if (isOverFuelBar && drag.kind === 'hotbar') {
-    const from = drag.fromSlot;
-    const it = hotbar[from];
-    if (it && (it.item === 'fuel tank' || it.item === 'large fuel tank')) {
-      const addAmount = it.fuel !== undefined ? it.fuel : 10;
-      player.fuel = Math.min(player.maxFuel, player.fuel + addAmount);
-      hotbar[from] = null;
-      updateHUD();
-      return;
-    }
-  }
-
-  // Handle drop on health bar
-  if (isOverHealthBar && drag.kind === 'hotbar') {
-    const from = drag.fromSlot;
-    const it = hotbar[from];
-    if (it && (it.item === 'health pack' || it.item === 'large health pack')) {
-      const addAmount = it.health !== undefined ? it.health : 10;
-      player.health = Math.min(player.maxHealth, player.health + addAmount);
-      hotbar[from] = null;
-      updateHUD();
-      return;
-    }
-  }
-
-  // Handle drop on O2 bar from buy slot
-  if (isOverO2Bar && drag.kind === 'buy') {
-    const from = drag.fromBuySlot;
-    const it = shopBuySlots[from];
-    if (it && (it.item === 'oxygen canister' || it.item === 'large oxygen canister')) {
-      const price = drag.price;
-      if (player.credits >= price) {
-        player.credits -= price;
-        const addAmount = it.oxygen !== undefined ? it.oxygen : 10;
-        player.oxygen = Math.min(player.maxOxygen, player.oxygen + addAmount);
-        removeFromShopInventory(it.item);
-        shopBuySlots[from] = null;
-        syncShopBuyArea();
+    if (drag.kind === 'hotbar') {
+      const it = hotbar[drag.fromSlot];
+      if (it && cfg.items.includes(it.item)) {
+        const addAmount = it[cfg.prop] !== undefined ? it[cfg.prop] : 10;
+        player[cfg.playerProp] = Math.min(player[cfg.maxProp], player[cfg.playerProp] + addAmount);
+        hotbar[drag.fromSlot] = null;
         updateHUD();
-        const creditsEl = document.getElementById('shop-credits-display');
-        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+        return;
       }
-      return;
     }
-  }
 
-  // Handle drop on fuel bar from buy slot
-  if (isOverFuelBar && drag.kind === 'buy') {
-    const from = drag.fromBuySlot;
-    const it = shopBuySlots[from];
-    if (it && (it.item === 'fuel tank' || it.item === 'large fuel tank')) {
-      const price = drag.price;
-      if (player.credits >= price) {
-        player.credits -= price;
-        const addAmount = it.fuel !== undefined ? it.fuel : 10;
-        player.fuel = Math.min(player.maxFuel, player.fuel + addAmount);
-        removeFromShopInventory(it.item);
-        shopBuySlots[from] = null;
-        syncShopBuyArea();
-        updateHUD();
-        const creditsEl = document.getElementById('shop-credits-display');
-        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+    if (drag.kind === 'buy') {
+      const it = shopBuySlots[drag.fromBuySlot];
+      if (it && cfg.items.includes(it.item)) {
+        const price = drag.price;
+        if (player.credits >= price) {
+          player.credits -= price;
+          const addAmount = it[cfg.prop] !== undefined ? it[cfg.prop] : 10;
+          player[cfg.playerProp] = Math.min(player[cfg.maxProp], player[cfg.playerProp] + addAmount);
+          removeFromShopInventory(it.item);
+          shopBuySlots[drag.fromBuySlot] = null;
+          syncShopBuyArea();
+          updateHUD();
+          const creditsEl = document.getElementById('shop-credits-display');
+          if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+        }
+        return;
       }
-      return;
-    }
-  }
-
-  // Handle drop on health bar from buy slot
-  if (isOverHealthBar && drag.kind === 'buy') {
-    const from = drag.fromBuySlot;
-    const it = shopBuySlots[from];
-    if (it && (it.item === 'health pack' || it.item === 'large health pack')) {
-      const price = drag.price;
-      if (player.credits >= price) {
-        player.credits -= price;
-        const addAmount = it.health !== undefined ? it.health : 10;
-        player.health = Math.min(player.maxHealth, player.health + addAmount);
-        removeFromShopInventory(it.item);
-        shopBuySlots[from] = null;
-        syncShopBuyArea();
-        updateHUD();
-        const creditsEl = document.getElementById('shop-credits-display');
-        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
-      }
-      return;
     }
   }
 

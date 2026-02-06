@@ -212,3 +212,13 @@ export function isCollidableStructure(st) {
   if (st.type === 'piratebase' && (st.dead || st.health <= 0)) return false;
   return true;
 }
+
+// --- Weapons that display a heat bar in HUD slots ---
+export const HEAT_WEAPONS = ['mining laser', 'medium mining laser', 'light blaster'];
+
+// --- Resource bar drop configuration (used by endDrag) ---
+export const RESOURCE_BAR_CONFIG = {
+  oxygen:  { items: ['oxygen canister', 'large oxygen canister'], prop: 'oxygen', playerProp: 'oxygen', maxProp: 'maxOxygen' },
+  fuel:    { items: ['fuel tank', 'large fuel tank'],             prop: 'fuel',   playerProp: 'fuel',   maxProp: 'maxFuel' },
+  health:  { items: ['health pack', 'large health pack'],         prop: 'health', playerProp: 'health', maxProp: 'maxHealth' }
+};
