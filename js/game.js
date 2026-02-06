@@ -1,3 +1,8 @@
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES } from './constants.js';
+import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel } from './utils.js';
+import { InputHandler } from './input.js';
+import { Inventory } from './inventory.js';
+
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -22,26 +27,14 @@ let levelSeed = 0;
 
 // Pirate Globals
 const pirates = [];
-const PIRATE_ACCEL = 150;
-const PIRATE_FRICTION = 0.15;
-const PIRATE_MAX_SPEED = 160;
 let levelElapsedTime = 0;
 // Pirate wave spawning is scheduled against levelElapsedTime (seconds since level load).
 // Keep an absolute "next wave at time T" so tier/phase changes don't reset the timer.
 let pirateNextWaveTime = 120; // default; overwritten by loadLevel()
 let levelIsDebug = false;
-const PIRATE_HEALTH = 20;
-const WIDTH = 1200;
-const HEIGHT = 900;
 
-const ACCEL = 150;
-const FRICTION = 0.15;
 // MAX_SPEED is now dynamic based on ship type
-let MAX_SPEED = 175; 
-const BRAKE_FRICTION = 1.5;
-const BULLET_SPEED = 500;
-const PIRATE_BULLET_SPEED = 250; // half of BULLET_SPEED; aim uses this for lead time
-const FIRE_COOLDOWN = 0.03;
+let MAX_SPEED = MAX_SPEED_DEFAULT;
 
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
@@ -76,25 +69,7 @@ const blasterImg = new Image();
 blasterImg.src = 'assets/blaster.png';
 ITEM_IMAGES['light blaster'] = blasterImg;
 
-function getItemImagePath(itemName) {
-  if (itemName === 'oxygen canister' || itemName === 'large oxygen canister') return 'assets/oxygen-can.png';
-  if (itemName === 'fuel tank' || itemName === 'large fuel tank') return 'assets/fuel-can.png';
-  if (itemName === 'health pack' || itemName === 'large health pack') return 'assets/oxygen-can.png';
-  if (itemName === 'small energy cell' || itemName === 'medium energy cell') return 'assets/energy-cell.png';
-  if (itemName === 'mining laser' || itemName === 'medium mining laser') return 'assets/laser.png';
-  if (itemName === 'light blaster') return 'assets/blaster.png';
-  return null;
-}
 
-// Seeded RNG for reproducible starfield per level (mulberry32)
-function createSeededRandom(seed) {
-  return function () {
-    let t = (seed += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // Ship (world coordinates, camera follows)
 const ship = {
@@ -114,53 +89,20 @@ const player = {
   maxOxygen: 30.0,
   credits: 0
 };
-const OXYGEN_DEPLETION_RATE = 1 / 25; // 1 per 25 seconds
-const FUEL_DEPLETION_RATE = 1 / 3; // 1 per 3 seconds while right-clicking
 
-// Inventory hotbar (9 slots, each can hold { item, quantity?, energy?, maxEnergy? } or null)
-const hotbar = [
-  { item: 'mining laser', heat: 0, overheated: false }, // heat 0-1, overheated locks until cooled to 0
-  { item: 'small energy cell', energy: 10, maxEnergy: 10 },
-  { item: 'small energy cell', energy: 10, maxEnergy: 10 },
-  null, null, null, null, null, null
-];
-const LASER_HEAT_RATE = 1;    // per second when firing (full in 1 sec)
-const LASER_COOL_RATE = 1 / 3; // per second when not firing (empty in 3 sec)
-const WEAPON_ENERGY_DRAIN = 1; // per second when firing (light laser)
-const MINING_LASER_STATS = {
-  'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 7, energyDrain: 1 },           // 1s heat, 3s cool, 7 DPS
-  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.5 }  // 1.5s heat, 3s cool, 10 DPS, 50% faster energy
-};
-const BLASTER_ENERGY_PER_SHOT = 0.2;
-const BLASTER_HEAT_PER_SHOT = 0.09;
-const BLASTER_COOL_RATE = 1 / 3;
-const BLASTER_FIRE_RATE = 10;  // pellets per second
+// Inventory
+const inventory = new Inventory();
+inventory.set(0, { item: 'mining laser', heat: 0, overheated: false });
+inventory.set(1, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+const hotbar = inventory.slots; // Alias for compatibility
+
 let selectedSlot = 0;
 let blasterFireAccum = 0;
 
-function getFirstChargedCell() {
-  for (let i = 0; i < hotbar.length; i++) {
-    const cell = hotbar[i];
-    if (cell && (cell.item === 'small energy cell' || cell.item === 'medium energy cell') && cell.energy != null && cell.energy > 0) return cell;
-  }
-  return null;
-}
-
-/** First energy cell with at least min energy (for blaster so we switch to next cell when current runs out). */
-function getFirstCellWithMinEnergy(min) {
-  for (let i = 0; i < hotbar.length; i++) {
-    const cell = hotbar[i];
-    if (cell && (cell.item === 'small energy cell' || cell.item === 'medium energy cell') && cell.energy != null && cell.energy >= min) return cell;
-  }
-  return null;
-}
-
-// Mouse state
-let mouseX = WIDTH / 2;
-let mouseY = HEIGHT / 2;
-let rightMouseDown = false;
-let leftMouseDown = false;
-let ctrlBrake = false;
+// Input
+const input = new InputHandler(canvas);
+// Aliases for compatibility where possible, but primitives must be replaced
 
 // Ship tilt (banks when turning, decays when resting)
 let prevAimAngle = 0;
@@ -197,9 +139,9 @@ if (startOverlayEl) {
     // Unpause unless another menu is open (shouldn't be at boot)
     gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
     // Clear latched inputs so the click doesn't immediately fire/thrust
-    leftMouseDown = false;
-    rightMouseDown = false;
-    ctrlBrake = false;
+    input.leftMouseDown = false;
+    input.rightMouseDown = false;
+    input.ctrlBrake = false;
     if (canvas && canvas.focus) canvas.focus();
   });
 } else {
@@ -257,44 +199,6 @@ function spawnSparks(x, y, count) {
 // Drag state for hotbar (Legacy canvas drag removed)
 
 
-const MAX_ORE_STACK = 10;
-const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap']; // items that stack up to MAX_ORE_STACK
-
-function getMaxStack(itemName) {
-  return ORE_ITEMS.includes(itemName) ? MAX_ORE_STACK : 1;
-}
-
-// Add item to inventory (find matching stack or first empty slot)
-function addToInventory(itemName, quantity) {
-  const maxStack = getMaxStack(itemName);
-
-  while (quantity > 0) {
-    // First try to stack with existing item (up to maxStack)
-    let added = false;
-    for (let i = 0; i < hotbar.length && quantity > 0; i++) {
-      if (hotbar[i] && hotbar[i].item === itemName && hotbar[i].quantity != null && hotbar[i].quantity < maxStack) {
-        const space = maxStack - hotbar[i].quantity;
-        const add = Math.min(quantity, space);
-        hotbar[i].quantity += add;
-        quantity -= add;
-        added = true;
-      }
-    }
-    if (quantity <= 0) return true;
-    // Otherwise find first empty slot
-    for (let i = 0; i < hotbar.length; i++) {
-      if (!hotbar[i]) {
-        const add = Math.min(quantity, maxStack);
-        hotbar[i] = { item: itemName, quantity: add };
-        quantity -= add;
-        added = true;
-        break;
-      }
-    }
-    if (!added) return false; // Inventory full, quantity left is lost
-  }
-  return true;
-}
 
 // Starfield
 const NUM_STARS = 2400;
@@ -312,11 +216,6 @@ function initStars() {
   }
 }
 
-function normalize(x, y) {
-  const len = Math.sqrt(x * x + y * y);
-  if (len === 0) return { x: 0, y: 0 };
-  return { x: x / len, y: y / len };
-}
 
 function worldToScreen(wx, wy) {
   return {
@@ -389,15 +288,11 @@ function laserHitPirateBase(ox, oy, dx, dy, maxLen) {
   return closest ? { structure: closest, distance: closestDist } : null;
 }
 
-const SHIP_SIZE = 10;
-const SHIP_COLLISION_RADIUS = 8;
-const SHIP_COLLECTION_RADIUS = 16;
-
 const SHOT_SPREAD = 8;
 
 function fireBullet() {
-  const dx = mouseX - WIDTH / 2;
-  const dy = mouseY - HEIGHT / 2;
+  const dx = input.mouseX - WIDTH / 2;
+  const dy = input.mouseY - HEIGHT / 2;
   const dir = normalize(dx, dy);
   if (dir.x === 0 && dir.y === 0) return;
   const perp = { x: -dir.y, y: dir.x };
@@ -415,8 +310,8 @@ function fireBullet() {
 }
 
 function fireBlasterPellet() {
-  const dx = mouseX - WIDTH / 2;
-  const dy = mouseY - HEIGHT / 2;
+  const dx = input.mouseX - WIDTH / 2;
+  const dy = input.mouseY - HEIGHT / 2;
   const dir = normalize(dx, dy);
   if (dir.x === 0 && dir.y === 0) return;
   bullets.push({
@@ -432,8 +327,8 @@ function fireBlasterPellet() {
 function drawShip2D() {
   const cx = WIDTH / 2;
   const cy = HEIGHT / 2;
-  const dx = mouseX - cx;
-  const dy = mouseY - cy;
+  const dx = input.mouseX - cx;
+  const dy = input.mouseY - cy;
   const dir = normalize(dx, dy);
   const angle = Math.atan2(dir.y, dir.x);
   ctx.save();
@@ -459,8 +354,8 @@ function drawCrosshairAndHeatBar() {
   if (shopMenuOpen) return;
   const armLen = 6;
   const centerGap = 2;
-  const crosshairX = Math.floor(mouseX) + 0.5;
-  const crosshairY = Math.floor(mouseY) + 0.5;
+  const crosshairX = Math.floor(input.mouseX) + 0.5;
+  const crosshairY = Math.floor(input.mouseY) + 0.5;
   const armW = 2;
   uiCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
   uiCtx.fillRect(crosshairX - armW / 2, crosshairY - armLen, armW, armLen - centerGap);
@@ -479,8 +374,8 @@ function drawCrosshairAndHeatBar() {
   if (hasHeatWeapon) {
     const barW = 16;
     const barH = 4;
-    const barY = mouseY + 8;
-    const barX = mouseX - barW / 2;
+    const barY = input.mouseY + 8;
+    const barX = input.mouseX - barW / 2;
     const isOverheated = equipped.overheated;
     uiCtx.fillStyle = isOverheated ? 'rgba(255, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.2)';
     uiCtx.fillRect(barX, barY, barW, barH);
@@ -944,8 +839,6 @@ function spawnPirateGroup(minCount, maxCount) {
   }
 }
 
-const BASE_DEFENSE_ORBIT_RADIUS = 100;
-const BASE_DEFENSE_ORBIT_SPEED = 0.3;
 
 function spawnBaseDefensePirates(st) {
   const count = st.defenseCount !== undefined ? st.defenseCount : 8;
@@ -972,8 +865,6 @@ function spawnBaseDefensePirates(st) {
   }
 }
 
-const PIRATE_BASE_AGGRO_RADIUS = 300;
-const PIRATE_BASE_HIT_RADIUS = 54;
 
 function onPirateBaseDeath(st) {
   if (st.dead) return;
@@ -1271,9 +1162,9 @@ function updatePirates(dt) {
 function update(dt) {
   levelElapsedTime += dt;
   // Ship movement (right-click) - only if there's a direction to move
-  if (rightMouseDown && player.fuel > 0) {
-    const dx = mouseX - WIDTH / 2;
-    const dy = mouseY - HEIGHT / 2;
+  if (input.rightMouseDown && player.fuel > 0) {
+    const dx = input.mouseX - WIDTH / 2;
+    const dy = input.mouseY - HEIGHT / 2;
     const dir = normalize(dx, dy);
     // Only apply thrust and consume fuel if there's a direction
     if (dir.x !== 0 || dir.y !== 0) {
@@ -1285,7 +1176,7 @@ function update(dt) {
   }
 
   // Friction (low when coasting, high when braking with Ctrl)
-  const friction = ctrlBrake ? BRAKE_FRICTION : FRICTION;
+  const friction = input.ctrlBrake ? BRAKE_FRICTION : FRICTION;
   ship.vx *= Math.max(0, 1 - friction * dt);
   ship.vy *= Math.max(0, 1 - friction * dt);
 
@@ -1385,7 +1276,7 @@ function update(dt) {
   }
 
   // Mining lasers (light + medium): unified logic via MINING_LASER_STATS
-  const hasEnergy = getFirstChargedCell() != null;
+  const hasEnergy = inventory.getFirstChargedCell() != null;
   const selectedItem = hotbar[selectedSlot];
   const miningLaser = selectedItem && MINING_LASER_STATS[selectedItem.item] ? selectedItem : null;
   const laserStats = miningLaser ? MINING_LASER_STATS[miningLaser.item] : null;
@@ -1395,13 +1286,13 @@ function update(dt) {
     if (miningLaser.heat <= 0) miningLaser.overheated = false;
 
     const canFire = !miningLaser.overheated;
-    if (miningLaser && leftMouseDown && hasEnergy && canFire) {
+    if (miningLaser && input.leftMouseDown && hasEnergy && canFire) {
       miningLaser.heat = Math.min(1, miningLaser.heat + laserStats.heatRate * dt);
-      const cell = getFirstChargedCell();
+      const cell = inventory.getFirstChargedCell();
       if (cell) cell.energy = Math.max(0, cell.energy - laserStats.energyDrain * dt);
 
-      const dx = mouseX - WIDTH / 2;
-      const dy = mouseY - HEIGHT / 2;
+      const dx = input.mouseX - WIDTH / 2;
+      const dy = input.mouseY - HEIGHT / 2;
       const dir = normalize(dx, dy);
       if (dir.x !== 0 || dir.y !== 0) {
         // Cap laser at screen edge (world units; 1:1 with screen pixels, ship at center)
@@ -1512,12 +1403,12 @@ function update(dt) {
     if (blaster.heat >= 1) blaster.overheated = true;
     if (blaster.heat <= 0) blaster.overheated = false;
     const blasterCanFire = !blaster.overheated;
-    const hasBlasterEnergy = getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT) != null;
-    if (blasterCanFire && leftMouseDown && hasBlasterEnergy) {
+    const hasBlasterEnergy = inventory.getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT) != null;
+    if (blasterCanFire && input.leftMouseDown && hasBlasterEnergy) {
       blasterFireAccum += BLASTER_FIRE_RATE * dt;
       while (blasterFireAccum >= 1) {
         blasterFireAccum -= 1;
-        const c = getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT);
+        const c = inventory.getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT);
         if (!c) break;
         c.energy = Math.max(0, c.energy - BLASTER_ENERGY_PER_SHOT);
         blaster.heat = Math.min(1, blaster.heat + BLASTER_HEAT_PER_SHOT);
@@ -1874,7 +1765,7 @@ function update(dt) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems.splice(i, 1);
         }
-      } else if (addToInventory(item.item, item.quantity)) {
+      } else if (inventory.add(item.item, item.quantity)) {
         if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
         floatingItems.splice(i, 1);
       }
@@ -1886,9 +1777,9 @@ function update(dt) {
     deathScreenOpen = true;
     gamePaused = true;
     // Clear latched inputs so nothing keeps firing/thrusting
-    leftMouseDown = false;
-    rightMouseDown = false;
-    ctrlBrake = false;
+    input.leftMouseDown = false;
+    input.rightMouseDown = false;
+    input.ctrlBrake = false;
     // Cancel any inventory drag state
     inventoryDrag = null;
     try { setDragGhostVisible(false); } catch (e) {}
@@ -2153,7 +2044,7 @@ function render(dt = 1 / 60) {
   // Ship: 3D model if loaded, else 2D triangle
   const cx = WIDTH / 2;
   const cy = HEIGHT / 2;
-  const aimAngle = Math.atan2(mouseY - cy, mouseX - cx);
+  const aimAngle = Math.atan2(input.mouseY - cy, input.mouseX - cx);
   // Always clear the ship canvas so it stays transparent before model load.
   if (shipRenderer) shipRenderer.clear();
   if (shipModelLoaded && shipMesh && shipRenderer && shipScene && shipCamera) {
@@ -2173,9 +2064,9 @@ function render(dt = 1 / 60) {
     shipMesh.rotation.y = aimAngle + Math.PI / 2;
     shipMesh.rotation.z = shipTilt;
     // Show thruster flames when thrusting
-    const thrustDx = mouseX - WIDTH / 2;
-    const thrustDy = mouseY - HEIGHT / 2;
-    const isThrusting = rightMouseDown && player.fuel > 0 && (thrustDx !== 0 || thrustDy !== 0);
+    const thrustDx = input.mouseX - WIDTH / 2;
+    const thrustDy = input.mouseY - HEIGHT / 2;
+    const isThrusting = input.rightMouseDown && player.fuel > 0 && (thrustDx !== 0 || thrustDy !== 0);
     for (const flame of shipFlames) {
       flame.visible = isThrusting;
       flame.rotation.z = shipTilt; // Tilt flames with ship
@@ -2192,15 +2083,15 @@ function render(dt = 1 / 60) {
   drawCrosshairAndHeatBar();
 
   // Mining laser beam (orange-red line) - any mining laser in MINING_LASER_STATS
-  const hasEnergy = getFirstChargedCell() != null;
+  const hasEnergy = inventory.getFirstChargedCell() != null;
   const selectedItem = hotbar[selectedSlot];
   const miningLaser = selectedItem && MINING_LASER_STATS[selectedItem.item] ? selectedItem : null;
   const canFire = miningLaser && !miningLaser.overheated;
-  if (miningLaser && leftMouseDown && hasEnergy && canFire) {
+  if (miningLaser && input.leftMouseDown && hasEnergy && canFire) {
     const cx = WIDTH / 2;
     const cy = HEIGHT / 2;
-    const dx = mouseX - cx;
-    const dy = mouseY - cy;
+    const dx = input.mouseX - cx;
+    const dy = input.mouseY - cy;
     const dir = normalize(dx, dy);
     // Cap at screen edge (world units; 1:1 with screen, ship at center)
     let maxLaserDist = 1500;
@@ -2384,41 +2275,10 @@ function render(dt = 1 / 60) {
 }
 
 // Input
-canvas.addEventListener('mousemove', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-  mouseX = (e.clientX - rect.left) * scaleX;
-  mouseY = (e.clientY - rect.top) * scaleY;
-});
 
-canvas.addEventListener('mousedown', (e) => {
-  if (startScreenOpen || deathScreenOpen) return;
-  if (warpMenuOpen) return;
-  if (shopMenuOpen) return;
-  if (e.button === 0) {
-    leftMouseDown = true;
-  } else if (e.button === 2) {
-    rightMouseDown = true;
-  }
-});
 
-canvas.addEventListener('mouseup', (e) => {
-  if (startScreenOpen || deathScreenOpen) return;
-  if (warpMenuOpen) return;
-  if (shopMenuOpen) return;
-  if (e.button === 0) {
-    leftMouseDown = false;
-  }
-  if (e.button === 2) rightMouseDown = false;
-});
 
-canvas.addEventListener('mouseleave', () => {
-  rightMouseDown = false;
-  leftMouseDown = false;
-});
 
-canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -2558,28 +2418,6 @@ function getShopItemPayload(itemKey) {
   return { item: itemKey };
 }
 
-function getItemLabel(it) {
-  if (!it) return '';
-  if (it.item === 'mining laser') return 'L';
-  if (it.item === 'medium mining laser') return 'M';
-  if (it.item === 'light blaster') return 'B';
-  if (it.item === 'small energy cell') return 'E';
-  if (it.item === 'medium energy cell') return 'M';
-  if (it.item === 'oxygen canister') return 'O';
-  if (it.item === 'large oxygen canister') return 'LO';
-  if (it.item === 'fuel tank') return 'F';
-  if (it.item === 'large fuel tank') return 'LF';
-  if (it.item === 'health pack') return 'H';
-  if (it.item === 'large health pack') return 'LH';
-  if (it.item === 'cuprite') return 'C';
-  if (it.item === 'hematite') return 'H';
-  if (it.item === 'aurite') return 'A';
-  if (it.item === 'diamite') return 'D';
-  if (it.item === 'platinite') return 'P';
-  if (it.item === 'scrap') return 'S';
-  if (it.item === 'warp key') return 'K';
-  return (it.item && it.item.charAt(0).toUpperCase()) || '';
-}
 
 function getWeaponTierLetter(itemKey) {
   if (itemKey === 'light blaster' || itemKey === 'mining laser') return 'L';
@@ -2806,7 +2644,7 @@ function returnSellAreaToHotbar() {
     if (!it) continue;
     const qty = it.quantity != null ? it.quantity : 1;
     if (ORE_ITEMS.includes(it.item)) {
-      addToInventory(it.item, qty);
+      inventory.add(it.item, qty);
     } else {
       for (let k = 0; k < qty; k++) {
         const payload = { ...it };
@@ -2835,7 +2673,6 @@ window.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if (e.key === 'Control') ctrlBrake = true;
   // Hotbar slot selection (1-9)
   if (e.key >= '1' && e.key <= '9') {
     selectedSlot = parseInt(e.key) - 1;
@@ -2844,9 +2681,9 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') {
     if (!warpMenuOpen && !gamePaused && isShipInWarpGate()) {
       e.preventDefault();
-      leftMouseDown = false;
-      rightMouseDown = false;
-      ctrlBrake = false;
+      input.leftMouseDown = false;
+      input.rightMouseDown = false;
+      input.ctrlBrake = false;
       gamePaused = true;
       warpMenuOpen = true;
       const overlay = document.getElementById('warp-menu-overlay');
@@ -2857,9 +2694,9 @@ window.addEventListener('keydown', (e) => {
       const shopSt = isShipInShop();
       if (shopSt) {
         e.preventDefault();
-        leftMouseDown = false;
-        rightMouseDown = false;
-        ctrlBrake = false;
+        input.leftMouseDown = false;
+        input.rightMouseDown = false;
+        input.ctrlBrake = false;
         openShopMenu(shopSt);
       }
     }
@@ -2869,7 +2706,6 @@ window.addEventListener('keyup', (e) => {
   if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
-  if (e.key === 'Control') ctrlBrake = false;
 });
 
 // Default shop inventory generator
@@ -3172,7 +3008,7 @@ function closeCraftingMenu() {
   // Return items to inventory or drop them
   for(let i=0; i<4; i++) {
     if (craftingInputSlots[i]) {
-        if (!addToInventory(craftingInputSlots[i].item, craftingInputSlots[i].quantity)) {
+        if (!inventory.add(craftingInputSlots[i].item, craftingInputSlots[i].quantity)) {
              // Drop if full
              const it = craftingInputSlots[i];
              const angle = Math.random() * Math.PI * 2;
@@ -3319,12 +3155,6 @@ if (craftingCloseBtn) {
   craftingCloseBtn.addEventListener('click', () => closeCraftingMenu());
 }
 
-// Ship Definitions
-const SHIP_STATS = {
-  'scout': { name: 'Scout', price: 0, health: 50, fuel: 25, oxygen: 30, speed: 175, desc: 'Standard issue scout ship.' },
-  'cutter': { name: 'Cutter', price: 5000, health: 80, fuel: 40, oxygen: 40, speed: 150, desc: 'Sturdy mining vessel with reinforced hull.' },
-  'transport': { name: 'Transport', price: 12000, health: 120, fuel: 80, oxygen: 60, speed: 120, desc: 'Heavy transport with massive capacity.' }
-};
 
 let currentShipType = 'scout';
 
@@ -3419,48 +3249,6 @@ if (shipyardCloseBtn) {
   shipyardCloseBtn.addEventListener('click', () => closeShipyardMenu());
 }
 
-// Shop item tooltip
-const ITEM_USAGE = {
-  'small energy cell': 'Powers mining lasers and blasters.',
-  'medium energy cell': 'Powers mining lasers and blasters. Holds 3x more charge.',
-  'fuel tank': 'Drag to fuel bar to refill ship fuel.',
-  'large fuel tank': 'Large capacity fuel tank.',
-  'oxygen canister': 'Drag to O2 bar to refill ship oxygen.',
-  'large oxygen canister': 'Large capacity oxygen canister.',
-  'health pack': 'Drag to health bar to repair ship.',
-  'large health pack': 'Large capacity repair kit.',
-  'light blaster': 'Select and left-click to fire rapid projectiles at enemies.',
-  'mining laser': 'Select and left-click to mine asteroids for ore.',
-  'medium mining laser': 'Upgraded laser that mines faster.',
-  'cuprite': 'Common ore. Sell at shops for credits.',
-  'hematite': 'Uncommon ore. Worth more than cuprite.',
-  'aurite': 'Rare golden ore. Valuable at shops.',
-  'diamite': 'Precious ore. High value.',
-  'platinite': 'Extremely rare ore. Most valuable.',
-  'scrap': 'Salvaged material. Can be sold for credits.',
-  'warp key': 'Required to activate warp gates.'
-};
-
-const ITEM_DISPLAY_NAMES = {
-  'small energy cell': 'Small Energy Cell',
-  'medium energy cell': 'Medium Energy Cell',
-  'fuel tank': 'Fuel Tank',
-  'large fuel tank': 'Large Fuel Tank',
-  'oxygen canister': 'Oxygen Canister',
-  'large oxygen canister': 'Large Oxygen Canister',
-  'health pack': 'Health Pack',
-  'large health pack': 'Large Health Pack',
-  'light blaster': 'Light Blaster',
-  'mining laser': 'Mining Laser',
-  'medium mining laser': 'Medium Mining Laser',
-  'cuprite': 'Cuprite',
-  'hematite': 'Hematite',
-  'aurite': 'Aurite',
-  'diamite': 'Diamite',
-  'platinite': 'Platinite',
-  'scrap': 'Scrap',
-  'warp key': 'Warp Key'
-};
 
 function showShopTooltip(itemKey, price, isBuy, slotEl) {
   const tooltip = document.getElementById('shop-item-tooltip');
@@ -3742,8 +3530,8 @@ function endDrag(clientX, clientY) {
     const from = drag.fromSlot;
     const it = hotbar[from];
     if (it) {
-      const dx = mouseX - WIDTH / 2;
-      const dy = mouseY - HEIGHT / 2;
+      const dx = input.mouseX - WIDTH / 2;
+      const dy = input.mouseY - HEIGHT / 2;
       const dir = normalize(dx, dy);
       if (dir.x !== 0 || dir.y !== 0) {
         const jettSpeed = 340;
@@ -3984,7 +3772,7 @@ window.addEventListener('mousedown', (e) => {
         e.preventDefault();
         // Shift+click: return to inventory
         if (e.shiftKey) {
-            if (addToInventory(craftingInputSlots[idx].item, craftingInputSlots[idx].quantity)) {
+            if (inventory.add(craftingInputSlots[idx].item, craftingInputSlots[idx].quantity)) {
                 craftingInputSlots[idx] = null;
                 syncCraftingUI();
                 updateHUD();
@@ -4006,7 +3794,7 @@ window.addEventListener('mousedown', (e) => {
       if (craftingOutputSlot && craftingOutputSlot.real) {
         e.preventDefault();
         if (e.shiftKey) {
-            if (addToInventory(craftingOutputSlot.item, craftingOutputSlot.quantity)) {
+            if (inventory.add(craftingOutputSlot.item, craftingOutputSlot.quantity)) {
                 craftingOutputSlot = null;
                 syncCraftingUI();
                 updateHUD();
