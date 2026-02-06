@@ -680,6 +680,45 @@ textarea {
   font-size: 14px;
 }
 
+#level-select-ui {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  pointer-events: auto;
+}
+
+#level-select-ui label {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+#level-select {
+  background: rgba(20, 20, 30, 0.75);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+#level-select:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
+}
+
+#level-select:focus {
+  border-color: rgba(100, 150, 255, 0.6);
+}
+
 #shop-drag-ghost {
   position: fixed;
   width: 40px;

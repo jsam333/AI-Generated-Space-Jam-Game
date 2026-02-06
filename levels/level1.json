@@ -355,7 +355,9 @@
     {
       "x": -432.7633463745625,
       "y": 7.526319067383696,
-      "type": "warpgate"
+      "type": "warpgate",
+      "warpCost": 3000,
+      "warpDestination": "level2"
     },
     {
       "x": 835.4214164795902,
@@ -429,6 +431,13 @@
         }
       ],
       "prices": {}
+    },
+    {
+      "x": -1290,
+      "y": 980,
+      "type": "warpgate",
+      "warpDestination": "level6",
+      "warpCost": 3000
     }
   ],
   "spawnSettings": {
@@ -439,14 +448,14 @@
     "waveSizeMax": 2,
     "tiers": [
       {
-        "startTime": 300,
+        "startTime": 260,
         "waveIntervalMin": 70,
         "waveIntervalMax": 110,
         "waveSizeMin": 2,
         "waveSizeMax": 4
       },
       {
-        "startTime": 600,
+        "startTime": 500,
         "waveIntervalMin": 60,
         "waveIntervalMax": 100,
         "waveSizeMin": 3,

@@ -1,8 +1,3 @@
-// #region agent log
-window.onerror = function(msg, url, line, col, error) {
-  fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:error',message:'Uncaught error',data:{msg,url,line,col,errorMsg:error?error.message:''},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-};
-// #endregion
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -31,15 +26,11 @@ const PIRATE_ACCEL = 150;
 const PIRATE_FRICTION = 0.15;
 const PIRATE_MAX_SPEED = 160;
 let levelElapsedTime = 0;
-let pirateSpawnTimer = 120; // first spawn at 2 min
+// Pirate wave spawning is scheduled against levelElapsedTime (seconds since level load).
+// Keep an absolute "next wave at time T" so tier/phase changes don't reset the timer.
+let pirateNextWaveTime = 120; // default; overwritten by loadLevel()
 let levelIsDebug = false;
 const PIRATE_HEALTH = 20;
-
-
-// #region agent log
-fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:1',message:'Script started parsing',data:{canvasFound:!!canvas,ctxFound:!!ctx},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
-
 const WIDTH = 1200;
 const HEIGHT = 900;
 
@@ -131,11 +122,11 @@ const LASER_HEAT_RATE = 1;    // per second when firing (full in 1 sec)
 const LASER_COOL_RATE = 1 / 3; // per second when not firing (empty in 3 sec)
 const WEAPON_ENERGY_DRAIN = 1; // per second when firing (light laser)
 const MINING_LASER_STATS = {
-  'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 5, energyDrain: 1 },           // 1s heat, 3s cool, 5 DPS
+  'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 7, energyDrain: 1 },           // 1s heat, 3s cool, 7 DPS
   'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.5 }  // 1.5s heat, 3s cool, 10 DPS, 50% faster energy
 };
 const BLASTER_ENERGY_PER_SHOT = 0.2;
-const BLASTER_HEAT_PER_SHOT = 0.1;
+const BLASTER_HEAT_PER_SHOT = 0.09;
 const BLASTER_COOL_RATE = 1 / 3;
 const BLASTER_FIRE_RATE = 10;  // pellets per second
 let selectedSlot = 0;
@@ -847,9 +838,10 @@ function refreshAsteroidMeshes() {
 
 // Non-cuprite asteroids: emissive glow in ore color, intensity 0.06
 const ORE_EMISSIVE_COLOR = { hematite: 0xA0522D, aurite: 0xFFD700, diamite: 0x909090, platinite: 0xE5E4E2 };
-const ORE_EMISSIVE_INTENSITY = 0.06;
+const ORE_EMISSIVE_INTENSITY = { hematite: 0.06, aurite: 0.02, diamite: 0.06, platinite: 0.06 };
 function applyOreEmissiveMaterial(mesh, oreType) {
   const emissiveColor = ORE_EMISSIVE_COLOR[oreType] ?? 0x888888;
+  const intensity = ORE_EMISSIVE_INTENSITY[oreType] ?? 0.06;
   mesh.traverse((child) => {
     if (child.isMesh && child.material) {
       const oldMat = child.material;
@@ -859,7 +851,7 @@ function applyOreEmissiveMaterial(mesh, oreType) {
         roughness: oldMat.roughness ?? 0.8,
         metalness: oldMat.metalness ?? 0.2,
         emissive: emissiveColor,
-        emissiveIntensity: ORE_EMISSIVE_INTENSITY
+        emissiveIntensity: intensity
       });
     }
   });
@@ -1009,40 +1001,42 @@ function updatePirates(dt) {
   }
 
   // Spawning logic using level settings
-  // Delay initial spawn
-  const canSpawn = levelIsDebug || levelElapsedTime >= levelSpawnSettings.initialDelay;
-  
-  if (canSpawn) {
-    pirateSpawnTimer -= dt;
-    if (pirateSpawnTimer <= 0) {
-      // Calculate next spawn
-      if (levelIsDebug) {
-        spawnPirateGroup(6, 10);
-        pirateSpawnTimer = 5;
-      } else {
-        // Determine active tier based on elapsed time
-        let activeTier = null;
-        if (levelSpawnSettings.tiers && levelSpawnSettings.tiers.length > 0) {
-          // Find the tier with the highest startTime that is <= current time
-          // Tiers should be sorted by startTime, but we'll iterate to be safe
-          let bestStart = -1;
-          for (const tier of levelSpawnSettings.tiers) {
-            if (levelElapsedTime >= tier.startTime && tier.startTime > bestStart) {
-              bestStart = tier.startTime;
-              activeTier = tier;
-            }
+  // Spawn based on absolute schedule (no countdown reset between tiers/phases).
+  if (levelIsDebug) {
+    while (levelElapsedTime >= pirateNextWaveTime) {
+      spawnPirateGroup(6, 10);
+      pirateNextWaveTime += 5;
+    }
+  } else {
+    while (levelElapsedTime >= pirateNextWaveTime) {
+      const t = pirateNextWaveTime;
+
+      // Determine active tier based on the scheduled spawn time.
+      let activeTier = null;
+      if (levelSpawnSettings.tiers && levelSpawnSettings.tiers.length > 0) {
+        // Find the tier with the highest startTime that is <= current time
+        // Tiers should be sorted by startTime, but we'll iterate to be safe
+        let bestStart = -1;
+        for (const tier of levelSpawnSettings.tiers) {
+          if (t >= tier.startTime && tier.startTime > bestStart) {
+            bestStart = tier.startTime;
+            activeTier = tier;
           }
         }
-
-        // Use active tier settings or fall back to base settings
-        const minWave = activeTier ? activeTier.waveSizeMin : levelSpawnSettings.waveSizeMin;
-        const maxWave = activeTier ? activeTier.waveSizeMax : levelSpawnSettings.waveSizeMax;
-        const minInt = activeTier ? activeTier.waveIntervalMin : levelSpawnSettings.waveIntervalMin;
-        const maxInt = activeTier ? activeTier.waveIntervalMax : levelSpawnSettings.waveIntervalMax;
-        
-        spawnPirateGroup(minWave, maxWave);
-        pirateSpawnTimer = minInt + Math.random() * (maxInt - minInt);
       }
+
+      // Use active tier settings or fall back to base settings
+      const minWave = activeTier ? activeTier.waveSizeMin : levelSpawnSettings.waveSizeMin;
+      const maxWave = activeTier ? activeTier.waveSizeMax : levelSpawnSettings.waveSizeMax;
+      const minInt = activeTier ? activeTier.waveIntervalMin : levelSpawnSettings.waveIntervalMin;
+      const maxInt = activeTier ? activeTier.waveIntervalMax : levelSpawnSettings.waveIntervalMax;
+
+      spawnPirateGroup(minWave, maxWave);
+
+      // Schedule next wave (keep time moving forward even if dt is large)
+      const rawInterval = minInt + Math.random() * (maxInt - minInt);
+      const interval = Math.max(0.1, rawInterval);
+      pirateNextWaveTime += interval;
     }
   }
 
@@ -1501,7 +1495,7 @@ function update(dt) {
     }
   }
 
-  // Light blaster: 5 pellets/sec, 0.5 energy per pellet, 0.1 heat per pellet, cool 1/3 per sec
+  // Light blaster: 5 pellets/sec, 0.5 energy per pellet, 0.09 heat per pellet, cool 1/3 per sec
   const blaster = hotbar[selectedSlot] && hotbar[selectedSlot].item === 'light blaster' ? hotbar[selectedSlot] : null;
   if (blaster && blaster.heat != null) {
     if (blaster.heat >= 1) blaster.overheated = true;
@@ -1562,7 +1556,7 @@ function update(dt) {
 
   // Bullets (movement + bullet-asteroid collision)
   const BULLET_DAMAGE = 4;            // pirate bullet damage to player
-  const BULLET_DAMAGE_PIRATE = 2.5;  // light blaster damage per pellet to pirates
+  const BULLET_DAMAGE_PIRATE = 3;    // light blaster damage per pellet to pirates
   const BULLET_DAMAGE_ASTEROID = 0.25; // pellets deal only 0.25 to asteroids
   const VIEWPORT_HALF_W = WIDTH / 2;
   const VIEWPORT_HALF_H = HEIGHT / 2;
@@ -2493,6 +2487,21 @@ function initShopBuySlots() {
   // Global init removed, handled per shop instance
 }
 
+// Remove one unit of an item from the active shop structure's persistent inventory
+function removeFromShopInventory(itemKey) {
+  if (!activeShopStructure || !activeShopStructure.inventory) return;
+  const inv = activeShopStructure.inventory;
+  const idx = inv.findIndex(entry => entry.item === itemKey);
+  if (idx === -1) return;
+  const entry = inv[idx];
+  const qty = entry.quantity || 1;
+  if (qty > 1) {
+    entry.quantity = qty - 1;
+  } else {
+    inv.splice(idx, 1);
+  }
+}
+
 function getShopItemPayload(itemKey) {
   if (itemKey === 'small energy cell') {
     return { item: 'small energy cell', energy: 10, maxEnergy: 10 };
@@ -2915,7 +2924,8 @@ function loadLevel(levelData) {
   }
   levelElapsedTime = 0;
   levelIsDebug = levelData.debug === true;
-  pirateSpawnTimer = levelIsDebug ? 5 : 0; // Debug: first spawn at 5s; normal: first spawn at 2 min
+  // Schedule first wave. (Non-debug uses spawnSettings.initialDelay.)
+  pirateNextWaveTime = levelIsDebug ? 5 : (levelSpawnSettings.initialDelay || 0);
   
   // Regenerate stars: same density as a 3000x3000 level, using level seed for reproducibility
   levelSeed = typeof levelData.seed === 'number' ? levelData.seed >>> 0 : 0;
@@ -2942,133 +2952,37 @@ function loadLevel(levelData) {
   tutorialTextWorldY = ship.y - 80; // Above the ship
 }
 
-// Level select: known levels (in levels folder) + levels loaded via file picker
+// Level select: scan known levels and populate dropdown
 const KNOWN_LEVELS = [
   { name: 'Level 1', path: 'levels/level1.json' },
+  { name: 'Level 2', path: 'levels/level2.json' },
   { name: 'Debug', path: 'levels/debug.json' }
 ];
-const loadedLevels = []; // { name, data } for levels loaded via L
-const LEVEL_SELECT_KEY = 'spacejam-level-select';
-const LEVEL_LOADED_DATA_KEY = 'spacejam-loaded-level-data';
 
-function refreshLevelSelect(selectedValue) {
-  const sel = document.getElementById('level-select');
-  if (!sel) return;
-  sel.textContent = '';
+const levelSelect = document.getElementById('level-select');
+if (levelSelect) {
   KNOWN_LEVELS.forEach((lev, i) => {
     const opt = document.createElement('option');
-    opt.value = 'known-' + i;
+    opt.value = i;
     opt.textContent = lev.name;
-    sel.appendChild(opt);
+    levelSelect.appendChild(opt);
   });
-  loadedLevels.forEach((lev, i) => {
-    const opt = document.createElement('option');
-    opt.value = 'loaded-' + i;
-    opt.textContent = lev.name;
-    sel.appendChild(opt);
-  });
-  if (selectedValue != null) sel.value = selectedValue;
-}
-
-function saveLevelSelection(value) {
-  try {
-    if (value.startsWith('loaded-')) {
-      localStorage.setItem(LEVEL_SELECT_KEY, 'loaded');
-      const i = parseInt(value.split('-')[1], 10);
-      if (loadedLevels[i]) localStorage.setItem(LEVEL_LOADED_DATA_KEY, JSON.stringify(loadedLevels[i].data));
-    } else {
-      localStorage.setItem(LEVEL_SELECT_KEY, value);
-      localStorage.removeItem(LEVEL_LOADED_DATA_KEY);
-    }
-  } catch (e) {}
-}
-
-function loadLevelFromSelect(value) {
-  if (!value) return;
-  saveLevelSelection(value);
-  if (value.startsWith('loaded-')) {
-    const i = parseInt(value.split('-')[1], 10);
-    if (loadedLevels[i]) loadLevel(loadedLevels[i].data);
-  } else if (value.startsWith('known-')) {
-    const i = parseInt(value.split('-')[1], 10);
-    const lev = KNOWN_LEVELS[i];
+  levelSelect.addEventListener('change', () => {
+    const lev = KNOWN_LEVELS[levelSelect.value];
     if (lev) {
       fetch(lev.path)
         .then(res => res.json())
         .then(level => loadLevel(level))
-        .catch(err => console.log('Failed to load ' + lev.path));
+        .catch(err => console.error('Failed to load ' + lev.path, err));
     }
-  }
+  });
 }
 
-const levelSelect = document.getElementById('level-select');
-if (levelSelect) {
-  levelSelect.addEventListener('change', () => loadLevelFromSelect(levelSelect.value));
-  // Restore saved level or default to Level 1
-  const saved = localStorage.getItem(LEVEL_SELECT_KEY);
-  if (saved === 'loaded') {
-    try {
-      const dataStr = localStorage.getItem(LEVEL_LOADED_DATA_KEY);
-      if (dataStr) {
-        const data = JSON.parse(dataStr);
-        loadedLevels.push({ name: 'Saved level', data });
-        refreshLevelSelect('loaded-0');
-        loadLevel(data);
-      } else {
-        refreshLevelSelect('known-0');
-        fetch('levels/level1.json').then(res => res.json()).then(level => loadLevel(level)).catch(() => {});
-      }
-    } catch (e) {
-      refreshLevelSelect('known-0');
-      fetch('levels/level1.json').then(res => res.json()).then(level => loadLevel(level)).catch(() => {});
-    }
-  } else if (saved === 'known-0' || saved === 'known-1') {
-    refreshLevelSelect(saved);
-    const i = parseInt(saved.split('-')[1], 10);
-    const lev = KNOWN_LEVELS[i];
-    if (lev) fetch(lev.path).then(res => res.json()).then(level => loadLevel(level)).catch(() => {});
-  } else {
-    refreshLevelSelect('known-0');
-    fetch('levels/level1.json').then(res => res.json()).then(level => loadLevel(level)).catch(() => {});
-  }
-}
-
-// File input for loading levels
-const levelInput = document.createElement('input');
-levelInput.type = 'file';
-levelInput.accept = '.json';
-levelInput.style.display = 'none';
-document.body.appendChild(levelInput);
-
-levelInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    try {
-      const level = JSON.parse(ev.target.result);
-      loadedLevels.push({ name: file.name.replace(/\.json$/i, '') || file.name, data: level });
-      const loadedValue = 'loaded-' + (loadedLevels.length - 1);
-      refreshLevelSelect(loadedValue);
-      saveLevelSelection(loadedValue);
-      loadLevel(level);
-    } catch (err) {
-      console.error('Invalid level file');
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = '';
-});
-
-// Press L to load a level file
-window.addEventListener('keydown', (e) => {
-  if (startScreenOpen || deathScreenOpen) return;
-  if (warpMenuOpen) return;
-  if (shopMenuOpen) return;
-  if (e.key === 'l' || e.key === 'L') {
-    levelInput.click();
-  }
-});
+// Load initial level (Level 1)
+fetch(KNOWN_LEVELS[0].path)
+  .then(res => res.json())
+  .then(level => loadLevel(level))
+  .catch(() => {});
 
 function closeWarpMenu() {
   warpMenuOpen = false;
@@ -3402,6 +3316,7 @@ function endDrag(clientX, clientY) {
         player.credits -= price;
         const addAmount = it.oxygen !== undefined ? it.oxygen : 10;
         player.oxygen = Math.min(player.maxOxygen, player.oxygen + addAmount);
+        removeFromShopInventory(it.item);
         shopBuySlots[from] = null;
         syncShopBuyArea();
         updateHUD();
@@ -3422,6 +3337,7 @@ function endDrag(clientX, clientY) {
         player.credits -= price;
         const addAmount = it.fuel !== undefined ? it.fuel : 10;
         player.fuel = Math.min(player.maxFuel, player.fuel + addAmount);
+        removeFromShopInventory(it.item);
         shopBuySlots[from] = null;
         syncShopBuyArea();
         updateHUD();
@@ -3529,6 +3445,7 @@ function endDrag(clientX, clientY) {
     if (player.credits < drag.price) return;
     player.credits -= drag.price;
     hotbar[to] = { ...it };
+    removeFromShopInventory(it.item);
     shopBuySlots[from] = null;
     syncShopBuyArea();
     updateHUD();
@@ -3645,24 +3562,13 @@ window.addEventListener('mouseup', (e) => {
 
 // Game loop
 let lastTime = performance.now();
-// #region agent log
-fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:init',message:'Before initStars/initShopBuySlots',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
 initStars();
 initShopBuySlots();
 initShip3D();
-// #region agent log
-fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:init',message:'After initStars/initShopBuySlots',data:{starsCount:stars.length,shopBuySlot0:shopBuySlots[0]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
-// #endregion
 
-// Initial level load is handled in level select init above (restore saved or level1)
+// Initial level load is handled at startup (level1.json)
 
-let gameLoopCount = 0;
 function gameLoop(now) {
-  // #region agent log
-  if (gameLoopCount === 0) fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:gameLoop',message:'First gameLoop call',data:{now},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-  gameLoopCount++;
-  // #endregion
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
 
@@ -3672,7 +3578,4 @@ function gameLoop(now) {
 
   requestAnimationFrame(gameLoop);
 }
-// #region agent log
-fetch('http://127.0.0.1:7244/ingest/ae77f125-e06b-4be8-98c6-edf46bc847e3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'game.js:end',message:'Script fully parsed, starting gameLoop',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-// #endregion
 requestAnimationFrame(gameLoop);

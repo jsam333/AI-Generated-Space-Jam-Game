@@ -11,6 +11,10 @@
 </head>
 <body>
   <div id="game-container">
+    <div id="level-select-ui">
+      <label for="level-select">Level:</label>
+      <select id="level-select"></select>
+    </div>
     <canvas id="game-canvas" tabindex="1"></canvas>
     <canvas id="ship-canvas"></canvas>
     <canvas id="ui-canvas"></canvas>
@@ -112,20 +116,7 @@
         <div class="credits-value">0</div>
       </div>
     </div>
-    <div id="game-ui">
-      <a href="editor.html">Level Editor</a>
-      <label>Level: <select id="level-select"></select></label>
-      <span>Press L to load a level</span>
-    </div>
   </div>
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-      }
-    }
-  </script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

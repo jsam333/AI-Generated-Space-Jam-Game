@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as THREE from '../vendor/three/build/three.module.js';
+import { GLTFLoader } from '../vendor/three/examples/jsm/loaders/GLTFLoader.js';
 
 // Bridge: expose Three + GLTFLoader for existing game.js code.
 window.THREE = THREE;

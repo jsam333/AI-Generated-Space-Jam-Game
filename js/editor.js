@@ -684,11 +684,15 @@ function handlePlaceObject(world) {
       oreType 
     });
   } else if (STRUCTURE_STYLES[state.tool.selected]) {
-    state.level.structures.push({ 
-      x: world.x, 
-      y: world.y, 
-      type: state.tool.selected 
-    });
+    // Initialize per-structure defaults so export/import round-trips reliably,
+    // especially for multiple warp gates (each gate needs its own destination/cost).
+    const type = state.tool.selected;
+    const st = { x: world.x, y: world.y, type };
+    if (type === 'warpgate') {
+      st.warpCost = 3000;
+      st.warpDestination = 'level2';
+    }
+    state.level.structures.push(st);
   }
   saveLevel();
 }
@@ -824,7 +828,13 @@ document.getElementById('export-level').addEventListener('click', () => {
     asteroids: state.level.asteroids,
     structures: state.level.structures.map(s => {
       // Ensure we save all properties, not just x/y/type
-      return { ...s };
+      const out = { ...s };
+      // Normalize warp gate defaults so exported JSON always contains them per gate.
+      if (out.type === 'warpgate') {
+        if (out.warpCost == null || Number.isNaN(out.warpCost)) out.warpCost = 3000;
+        if (!out.warpDestination) out.warpDestination = 'level2';
+      }
+      return out;
     }),
     spawnSettings: state.level.spawnSettings || undefined,
   };
