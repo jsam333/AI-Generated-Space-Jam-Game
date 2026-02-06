@@ -31,6 +31,44 @@
         <button type="button" id="warp-cancel-btn">Cancel</button>
       </div>
     </div>
+    <div id="crafting-menu-overlay" style="display: none;">
+      <div id="crafting-menu">
+        <div id="crafting-header">
+          <span>Crafting Station</span>
+          <button type="button" id="crafting-close-btn">Close</button>
+        </div>
+        <div id="crafting-main">
+          <div id="crafting-recipes-list">
+            <!-- Recipes injected here -->
+          </div>
+          <div id="crafting-work-area">
+            <div class="crafting-section-title">Input</div>
+            <div id="crafting-input-grid">
+              <div class="crafting-slot input-slot" data-craft-input="0"></div>
+              <div class="crafting-slot input-slot" data-craft-input="1"></div>
+              <div class="crafting-slot input-slot" data-craft-input="2"></div>
+              <div class="crafting-slot input-slot" data-craft-input="3"></div>
+            </div>
+            <div class="crafting-arrow">➜</div>
+            <div class="crafting-section-title">Output</div>
+            <div id="crafting-output-slot" class="crafting-slot output-slot"></div>
+            <button id="craft-btn">Craft</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="shipyard-menu-overlay" style="display: none;">
+      <div id="shipyard-menu">
+        <div id="shipyard-header">
+          <span>Shipyard</span>
+          <button type="button" id="shipyard-close-btn">Close</button>
+        </div>
+        <div id="shipyard-list">
+          <!-- Ships injected here -->
+        </div>
+        <div id="shipyard-credits">You have 0 credits</div>
+      </div>
+    </div>
     <div id="shop-menu-overlay" style="display: none;">
       <div id="shop-item-tooltip" style="display: none;"></div>
       <div id="shop-menu">
@@ -97,6 +135,7 @@
     </div>
     <div id="shop-drag-ghost" style="display: none;" aria-hidden="true"></div>
     <div id="oxygen-bar-drop-zone" aria-label="O2 bar - drop oxygen canister to refill"></div>
+    <div id="health-bar-drop-zone" aria-label="Health bar - drop health pack to restore HP"></div>
     <div id="fuel-bar-drop-zone" aria-label="Fuel bar - drop fuel tank to refill"></div>
     <div id="hud-overlay" aria-label="Hotbar">
       <div id="hotbar">

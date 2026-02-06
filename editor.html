@@ -26,6 +26,10 @@
       <input type="file" id="import-file" accept=".json" style="display:none">
     </div>
     <div class="tool-group">
+      <button id="copy-btn" title="Copy selected object (Ctrl+C)">Copy</button>
+      <button id="paste-btn" title="Paste at cursor (Ctrl+V)">Paste</button>
+    </div>
+    <div class="tool-group">
       <a href="index.html">Back to Game</a>
     </div>
     <div id="instructions">
@@ -33,6 +37,10 @@
       <p>Right-click: Remove object</p>
       <p>Scroll: Zoom in/out</p>
       <p>Middle-click drag: Pan view</p>
+      <p>Ctrl+C: Copy (drag to select area)</p>
+      <p>Ctrl+V: Paste copied objects</p>
+      <p>Esc: Cancel copy/paste</p>
+      <p>Delete: Remove selected</p>
     </div>
   </div>
   <div id="editor-container">
@@ -41,6 +49,7 @@
       <div class="palette-title">Tools</div>
       <div class="palette-grid" style="margin-bottom: 10px;">
         <button class="palette-btn" data-tool="select" title="Select Object">Select</button>
+        <button class="palette-btn" data-tool="eraser" title="Eraser (left-click to remove)">Eraser</button>
       </div>
       <div class="palette-title">Place</div>
       <div class="palette-grid">
@@ -54,6 +63,7 @@
         <button class="palette-btn" data-tool="shipyard" title="Shipyard">Shipyard</button>
         <button class="palette-btn" data-tool="refinery" title="Refinery">Refinery</button>
         <button class="palette-btn" data-tool="fueling" title="Fueling Station">Fueling</button>
+        <button class="palette-btn" data-tool="crafting" title="Crafting Station">Crafting</button>
         <button class="palette-btn" data-tool="warpgate" title="Warp Gate">Warp Gate</button>
         <button class="palette-btn" data-tool="piratebase" title="Pirate Base">Pirate Base</button>
       </div>

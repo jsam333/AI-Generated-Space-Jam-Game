@@ -231,6 +231,256 @@ textarea {
   cursor: not-allowed;
 }
 
+#crafting-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  z-index: 10;
+  pointer-events: auto;
+  cursor: default;
+}
+
+#crafting-menu {
+  background: rgba(30, 30, 30, 0.95);
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 500px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #666;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+#crafting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#crafting-header span {
+  color: #eee;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 18px;
+}
+
+#crafting-header button {
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #444;
+  color: #fff;
+}
+
+#crafting-main {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+}
+
+#crafting-recipes-list {
+  width: 200px;
+  background: #222;
+  border: 1px solid #444;
+  padding: 10px;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.recipe-item {
+  padding: 8px;
+  background: #333;
+  margin-bottom: 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.recipe-item:hover {
+  background: #444;
+  color: #fff;
+}
+
+#crafting-work-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #252525;
+  border-radius: 4px;
+}
+
+#crafting-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 50px);
+  gap: 4px;
+}
+
+.crafting-slot {
+  width: 50px;
+  height: 50px;
+  background: #1a1a1a;
+  border: 1px solid #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.crafting-slot.has-item {
+  cursor: grab;
+}
+
+.crafting-arrow {
+  font-size: 24px;
+  color: #888;
+  margin: 10px 0;
+}
+
+#craft-btn {
+  margin-top: auto;
+  width: 100%;
+  padding: 10px;
+  background: #3a6ea5;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+#craft-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#shipyard-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  z-index: 10;
+  pointer-events: auto;
+  cursor: default;
+}
+
+#shipyard-menu {
+  background: rgba(30, 30, 30, 0.95);
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #666;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+#shipyard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#shipyard-header span {
+  color: #eee;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 18px;
+}
+
+#shipyard-header button {
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #444;
+  color: #fff;
+}
+
+#shipyard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.ship-item {
+  background: #252525;
+  border: 1px solid #444;
+  padding: 10px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ship-info h4 {
+  margin: 0 0 4px 0;
+  color: #fff;
+  font-size: 14px;
+}
+
+.ship-info p {
+  margin: 0;
+  color: #aaa;
+  font-size: 12px;
+}
+
+.ship-buy-btn {
+  padding: 8px 12px;
+  background: #3a6ea5;
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.ship-buy-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ship-buy-btn.owned {
+  background: #4a4;
+  cursor: default;
+}
+
+#shipyard-credits {
+  color: #eee;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 16px;
+  text-align: right;
+}
+
 #shop-menu-overlay {
   position: absolute;
   left: 0;
@@ -619,6 +869,23 @@ textarea {
 }
 
 #oxygen-bar-drop-zone.highlight {
+  border-color: #fff;
+}
+
+#health-bar-drop-zone {
+  position: absolute;
+  left: 1150px;
+  bottom: 20px;
+  width: 40px;
+  height: 100px;
+  pointer-events: auto;
+  z-index: 15;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+
+#health-bar-drop-zone.highlight {
   border-color: #fff;
 }
 

@@ -40,6 +40,7 @@ const STRUCTURE_STYLES = {
   shipyard: { fill: '#664466', stroke: '#886688' },
   refinery: { fill: '#666644', stroke: '#888866' },
   fueling: { fill: '#446644', stroke: '#668866' },
+  crafting: { fill: '#886644', stroke: '#aa8866' },
   warpgate: { fill: '#6644aa', stroke: '#8866cc' },
   piratebase: { fill: '#884422', stroke: '#aa6644' }
 };
@@ -70,7 +71,12 @@ const state = {
     selected: 'asteroid_cuprite',
     asteroidSize: 40
   },
-  selectedObject: null
+  selectedObject: null,
+  clipboard: null, // { asteroids: [...], structures: [...] } with positions relative to center
+  copySelectMode: false, // true when waiting for user to drag a selection rectangle
+  copySelect: null, // { startX, startY } in world coords while dragging selection rect
+  copySelectScreen: null, // { sx, sy } screen start for the drag
+  pasteMode: false // true when in paste-preview mode
 };
 
 // --- Core Functions ---
@@ -260,7 +266,21 @@ function drawOverlay() {
   // Draw tool preview
   const world = screenToWorld(state.mouse.x, state.mouse.y);
   
-  if (state.tool.selected.startsWith('asteroid_')) {
+  if (state.tool.selected === 'eraser') {
+    // Draw eraser cursor (circle with X)
+    const r = 14;
+    ctx.strokeStyle = '#ff4444';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(state.mouse.x, state.mouse.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(state.mouse.x - r * 0.5, state.mouse.y - r * 0.5);
+    ctx.lineTo(state.mouse.x + r * 0.5, state.mouse.y + r * 0.5);
+    ctx.moveTo(state.mouse.x + r * 0.5, state.mouse.y - r * 0.5);
+    ctx.lineTo(state.mouse.x - r * 0.5, state.mouse.y + r * 0.5);
+    ctx.stroke();
+  } else if (state.tool.selected.startsWith('asteroid_')) {
     const type = state.tool.selected.replace('asteroid_', '');
     drawAsteroid(ctx, world.x, world.y, state.tool.asteroidSize, type, true);
   } else if (STRUCTURE_STYLES[state.tool.selected]) {
@@ -283,6 +303,51 @@ function drawOverlay() {
     ctx.stroke();
     ctx.setLineDash([]);
   }
+
+  // Draw copy-selection rectangle while dragging
+  if (state.copySelectScreen) {
+    const sx = state.copySelectScreen.sx;
+    const sy = state.copySelectScreen.sy;
+    const ex = state.mouse.x;
+    const ey = state.mouse.y;
+    const rx = Math.min(sx, ex);
+    const ry = Math.min(sy, ey);
+    const rw = Math.abs(ex - sx);
+    const rh = Math.abs(ey - sy);
+    ctx.strokeStyle = '#44aaff';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.fillStyle = 'rgba(68, 170, 255, 0.1)';
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.setLineDash([]);
+
+    // Draw "Select area to copy" label
+    ctx.fillStyle = '#44aaff';
+    ctx.font = '12px Arial';
+    ctx.fillText('Drag to select area', rx, ry - 6);
+  }
+
+  // Draw paste preview (ghost outlines at cursor)
+  if (state.pasteMode && state.clipboard) {
+    const cx = world.x;
+    const cy = world.y;
+    ctx.globalAlpha = 0.5;
+    for (const a of state.clipboard.asteroids) {
+      const type = a.oreType || 'cuprite';
+      drawAsteroid(ctx, cx + a.rx, cy + a.ry, a.radius, type, true);
+    }
+    for (const s of state.clipboard.structures) {
+      drawStructure(ctx, cx + s.rx, cy + s.ry, s.type, true);
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Label
+    const screenPos = worldToScreen(cx, cy);
+    ctx.fillStyle = '#88ff88';
+    ctx.font = '12px Arial';
+    ctx.fillText('Click to paste (' + (state.clipboard.asteroids.length + state.clipboard.structures.length) + ' objects) — Esc to cancel', screenPos.x - 80, screenPos.y - 20);
+  }
 }
 
 function drawUI() {
@@ -290,6 +355,17 @@ function drawUI() {
   ctx.font = '12px Arial';
   const infoText = `Asteroids: ${state.level.asteroids.length} | Structures: ${state.level.structures.length} | Zoom: ${(state.camera.zoom * 100).toFixed(0)}%`;
   ctx.fillText(infoText, 10, 20);
+
+  // Mode indicator
+  if (state.copySelectMode && !state.copySelectScreen) {
+    ctx.fillStyle = '#44aaff';
+    ctx.font = '14px Arial';
+    ctx.fillText('COPY: Drag a rectangle to select objects (Esc to cancel)', 10, 40);
+  } else if (state.pasteMode) {
+    ctx.fillStyle = '#88ff88';
+    ctx.font = '14px Arial';
+    ctx.fillText('PASTE: Click to place copied objects (Esc to cancel)', 10, 40);
+  }
 }
 
 function render() {
@@ -397,6 +473,10 @@ function updatePropertiesPanel() {
 
     if (obj.type === 'shop') {
       renderShopProperties(content, obj);
+    } else if (obj.type === 'crafting') {
+      renderCraftingProperties(content, obj);
+    } else if (obj.type === 'shipyard') {
+      renderShipyardProperties(content, obj);
     } else if (obj.type === 'piratebase') {
       renderPirateBaseProperties(content, obj);
     } else if (obj.type === 'warpgate') {
@@ -515,7 +595,7 @@ function renderShopProperties(parent, obj) {
   addItemDiv.style.display = 'flex';
   addItemDiv.style.gap = '5px';
   const itemSelect = document.createElement('select');
-  ['small energy cell', 'medium energy cell', 'fuel tank', 'oxygen canister', 'light blaster', 'medium mining laser'].forEach(i => {
+  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium mining laser'].forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
@@ -531,8 +611,12 @@ function renderShopProperties(parent, obj) {
     // Set full capacity for containers
     if (name === 'small energy cell') { newItem.energy = 10; newItem.maxEnergy = 10; }
     else if (name === 'medium energy cell') { newItem.energy = 30; newItem.maxEnergy = 30; }
-    else if (name.includes('fuel')) { newItem.fuel = 10; newItem.maxFuel = 10; }
-    else if (name.includes('oxygen')) { newItem.oxygen = 10; newItem.maxOxygen = 10; }
+    else if (name === 'large fuel tank') { newItem.fuel = 30; newItem.maxFuel = 30; }
+    else if (name === 'fuel tank') { newItem.fuel = 10; newItem.maxFuel = 10; }
+    else if (name === 'large oxygen canister') { newItem.oxygen = 30; newItem.maxOxygen = 30; }
+    else if (name === 'oxygen canister') { newItem.oxygen = 10; newItem.maxOxygen = 10; }
+    else if (name === 'health pack') { newItem.health = 10; }
+    else if (name === 'large health pack') { newItem.health = 30; }
     else if (name.includes('laser') || name.includes('blaster')) { newItem.heat = 0; newItem.overheated = false; }
     
     obj.inventory.push(newItem);
@@ -579,7 +663,7 @@ function renderShopProperties(parent, obj) {
   addPriceDiv.style.gap = '5px';
   const priceSelect = document.createElement('select');
   // Add common items to price override list
-  ['small energy cell', 'medium energy cell', 'fuel tank', 'oxygen canister', 'light blaster', 'medium mining laser', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'].forEach(i => {
+  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium mining laser', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'].forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
@@ -599,6 +683,153 @@ function renderShopProperties(parent, obj) {
   priceDiv.appendChild(priceList);
   priceDiv.appendChild(addPriceDiv);
   parent.appendChild(priceDiv);
+}
+
+function renderCraftingProperties(parent, obj) {
+  if (!obj.recipes) obj.recipes = [];
+
+  const recipesDiv = document.createElement('div');
+  recipesDiv.className = 'prop-group';
+  recipesDiv.innerHTML = `<label>Recipes</label>`;
+  const recipesList = document.createElement('div');
+  recipesList.className = 'prop-list';
+  
+  const renderRecipes = () => {
+    recipesList.innerHTML = '';
+    obj.recipes.forEach((recipe, idx) => {
+      const row = document.createElement('div');
+      row.className = 'prop-list-item';
+      row.style.flexDirection = 'column';
+      row.style.alignItems = 'stretch';
+      
+      // Inputs
+      const inputsDiv = document.createElement('div');
+      inputsDiv.style.display = 'flex';
+      inputsDiv.style.flexWrap = 'wrap';
+      inputsDiv.style.gap = '4px';
+      inputsDiv.innerHTML = '<span style="font-size:10px;width:100%;">In:</span>';
+      
+      recipe.inputs.forEach((inp, iIdx) => {
+        const iSpan = document.createElement('span');
+        iSpan.style.fontSize = '10px';
+        iSpan.style.background = '#444';
+        iSpan.style.padding = '2px';
+        iSpan.textContent = `${inp.quantity}x ${inp.item}`;
+        inputsDiv.appendChild(iSpan);
+      });
+      
+      // Add Input Button (simplified for space)
+      const addInputBtn = document.createElement('button');
+      addInputBtn.textContent = '+';
+      addInputBtn.style.fontSize = '10px';
+      addInputBtn.onclick = () => {
+        const item = prompt('Item name (e.g. scrap, cuprite):', 'scrap');
+        if (item) {
+          const qty = parseInt(prompt('Quantity:', '1')) || 1;
+          recipe.inputs.push({ item, quantity: qty });
+          saveLevel();
+          renderRecipes();
+        }
+      };
+      inputsDiv.appendChild(addInputBtn);
+
+      // Output
+      const outputDiv = document.createElement('div');
+      outputDiv.style.display = 'flex';
+      outputDiv.style.alignItems = 'center';
+      outputDiv.style.marginTop = '4px';
+      outputDiv.innerHTML = '<span style="font-size:10px;margin-right:4px;">Out:</span>';
+      
+      const outSpan = document.createElement('span');
+      outSpan.style.fontSize = '10px';
+      outSpan.style.background = '#445';
+      outSpan.style.padding = '2px';
+      outSpan.textContent = `${recipe.output.quantity}x ${recipe.output.item}`;
+      outSpan.onclick = () => {
+        const item = prompt('Output Item:', recipe.output.item);
+        if (item) {
+          const qty = parseInt(prompt('Output Quantity:', recipe.output.quantity)) || 1;
+          recipe.output = { item, quantity: qty };
+          saveLevel();
+          renderRecipes();
+        }
+      };
+      outputDiv.appendChild(outSpan);
+
+      // Delete Recipe
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete Recipe';
+      delBtn.style.marginTop = '4px';
+      delBtn.style.background = '#844';
+      delBtn.onclick = () => {
+        obj.recipes.splice(idx, 1);
+        saveLevel();
+        renderRecipes();
+      };
+
+      row.appendChild(inputsDiv);
+      row.appendChild(outputDiv);
+      row.appendChild(delBtn);
+      recipesList.appendChild(row);
+    });
+  };
+  renderRecipes();
+
+  const addRecipeBtn = document.createElement('button');
+  addRecipeBtn.className = 'add-btn';
+  addRecipeBtn.textContent = 'Add Recipe';
+  addRecipeBtn.onclick = () => {
+    obj.recipes.push({
+      inputs: [{ item: 'scrap', quantity: 5 }],
+      output: { item: 'fuel tank', quantity: 1 }
+    });
+    saveLevel();
+    renderRecipes();
+  };
+
+  recipesDiv.appendChild(recipesList);
+  recipesDiv.appendChild(addRecipeBtn);
+  parent.appendChild(recipesDiv);
+}
+
+function renderShipyardProperties(parent, obj) {
+  if (!obj.availableShips) obj.availableShips = ['scout']; // Default
+
+  const shipsDiv = document.createElement('div');
+  shipsDiv.className = 'prop-group';
+  shipsDiv.innerHTML = `<label>Available Ships</label>`;
+  
+  const shipTypes = ['scout', 'cutter', 'transport'];
+  
+  shipTypes.forEach(type => {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '8px';
+    row.style.marginBottom = '4px';
+    
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = obj.availableShips.includes(type);
+    cb.onchange = (e) => {
+      if (e.target.checked) {
+        if (!obj.availableShips.includes(type)) obj.availableShips.push(type);
+      } else {
+        obj.availableShips = obj.availableShips.filter(s => s !== type);
+      }
+      saveLevel();
+    };
+    
+    const label = document.createElement('span');
+    label.style.fontSize = '12px';
+    label.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+    
+    row.appendChild(cb);
+    row.appendChild(label);
+    shipsDiv.appendChild(row);
+  });
+  
+  parent.appendChild(shipsDiv);
 }
 
 function renderPirateBaseProperties(parent, obj) {
@@ -692,6 +923,12 @@ function handlePlaceObject(world) {
       st.warpCost = 3000;
       st.warpDestination = 'level2';
     }
+    if (type === 'crafting') {
+      st.recipes = [];
+    }
+    if (type === 'shipyard') {
+      st.availableShips = ['scout', 'cutter', 'transport'];
+    }
     state.level.structures.push(st);
   }
   saveLevel();
@@ -735,13 +972,57 @@ function handleMouseDown(e) {
   
   if (e.button === 0) { // Left click
     const world = screenToWorld(state.mouse.x, state.mouse.y);
+
+    // If in paste mode, stamp down the clipboard contents
+    if (state.pasteMode && state.clipboard) {
+      for (const a of state.clipboard.asteroids) {
+        const clone = JSON.parse(JSON.stringify(a));
+        clone.x = world.x + a.rx;
+        clone.y = world.y + a.ry;
+        delete clone.rx;
+        delete clone.ry;
+        state.level.asteroids.push(clone);
+      }
+      for (const s of state.clipboard.structures) {
+        const clone = JSON.parse(JSON.stringify(s));
+        clone.x = world.x + s.rx;
+        clone.y = world.y + s.ry;
+        delete clone.rx;
+        delete clone.ry;
+        state.level.structures.push(clone);
+      }
+      saveLevel();
+      state.pasteMode = false;
+      render();
+      return;
+    }
+
+    // If in copy-select mode, start the drag rectangle
+    if (state.copySelectMode) {
+      state.copySelect = { startX: world.x, startY: world.y };
+      state.copySelectScreen = { sx: state.mouse.x, sy: state.mouse.y };
+      render();
+      return;
+    }
+
     if (state.tool.selected === 'select') {
       handleSelectObject(world);
+    } else if (state.tool.selected === 'eraser') {
+      handleRemoveObject(world);
     } else {
       handlePlaceObject(world);
     }
     render();
   } else if (e.button === 2) { // Right click
+    // Cancel copy/paste modes on right click
+    if (state.copySelectMode || state.pasteMode) {
+      state.copySelectMode = false;
+      state.copySelect = null;
+      state.copySelectScreen = null;
+      state.pasteMode = false;
+      render();
+      return;
+    }
     const world = screenToWorld(state.mouse.x, state.mouse.y);
     handleRemoveObject(world);
     render();
@@ -773,7 +1054,57 @@ function updateAsteroidSize(newSize) {
 // Canvas events
 canvas.addEventListener('mousemove', handleMouseMove);
 canvas.addEventListener('mousedown', handleMouseDown);
-canvas.addEventListener('mouseup', (e) => { if (e.button === 1) state.mouse.isPanning = false; });
+canvas.addEventListener('mouseup', (e) => {
+  if (e.button === 1) state.mouse.isPanning = false;
+  if (e.button === 0 && state.copySelect && state.copySelectMode) {
+    // Finalize copy selection rectangle
+    const world = screenToWorld(state.mouse.x, state.mouse.y);
+    const x1 = Math.min(state.copySelect.startX, world.x);
+    const y1 = Math.min(state.copySelect.startY, world.y);
+    const x2 = Math.max(state.copySelect.startX, world.x);
+    const y2 = Math.max(state.copySelect.startY, world.y);
+
+    // Don't capture if rect is too tiny (accidental click)
+    if (Math.abs(x2 - x1) < 5 && Math.abs(y2 - y1) < 5) {
+      state.copySelect = null;
+      state.copySelectScreen = null;
+      render();
+      return;
+    }
+
+    const centerX = (x1 + x2) / 2;
+    const centerY = (y1 + y2) / 2;
+    const capturedAsteroids = [];
+    const capturedStructures = [];
+
+    for (const a of state.level.asteroids) {
+      if (a.x >= x1 && a.x <= x2 && a.y >= y1 && a.y <= y2) {
+        const clone = JSON.parse(JSON.stringify(a));
+        clone.rx = a.x - centerX;
+        clone.ry = a.y - centerY;
+        capturedAsteroids.push(clone);
+      }
+    }
+    for (const s of state.level.structures) {
+      if (s.x >= x1 && s.x <= x2 && s.y >= y1 && s.y <= y2) {
+        const clone = JSON.parse(JSON.stringify(s));
+        clone.rx = s.x - centerX;
+        clone.ry = s.y - centerY;
+        capturedStructures.push(clone);
+      }
+    }
+
+    const total = capturedAsteroids.length + capturedStructures.length;
+    if (total > 0) {
+      state.clipboard = { asteroids: capturedAsteroids, structures: capturedStructures };
+    }
+
+    state.copySelect = null;
+    state.copySelectScreen = null;
+    state.copySelectMode = false;
+    render();
+  }
+});
 canvas.addEventListener('mouseenter', () => { state.mouse.inCanvas = true; render(); });
 canvas.addEventListener('mouseleave', () => { state.mouse.inCanvas = false; state.mouse.isPanning = false; render(); });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -787,6 +1118,54 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
     updateAsteroidSize(state.tool.asteroidSize - CONSTANTS.ASTEROID_SIZE_STEP);
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    // Enter copy-select mode (drag rectangle)
+    e.preventDefault();
+    state.pasteMode = false;
+    state.copySelectMode = true;
+    state.copySelect = null;
+    state.copySelectScreen = null;
+    render();
+  } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+    // Enter paste mode if clipboard has content
+    if (state.clipboard) {
+      e.preventDefault();
+      state.copySelectMode = false;
+      state.copySelect = null;
+      state.copySelectScreen = null;
+      state.pasteMode = true;
+      render();
+    }
+  } else if (e.key === 'Escape') {
+    // Cancel copy-select or paste mode
+    if (state.copySelectMode || state.pasteMode) {
+      e.preventDefault();
+      state.copySelectMode = false;
+      state.copySelect = null;
+      state.copySelectScreen = null;
+      state.pasteMode = false;
+      render();
+    }
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    // Delete selected object
+    if (state.selectedObject) {
+      e.preventDefault();
+      const sel = state.selectedObject;
+      // Check if it's an asteroid
+      const astIdx = state.level.asteroids.indexOf(sel);
+      if (astIdx !== -1) {
+        state.level.asteroids.splice(astIdx, 1);
+      } else {
+        const stIdx = state.level.structures.indexOf(sel);
+        if (stIdx !== -1) {
+          state.level.structures.splice(stIdx, 1);
+        }
+      }
+      state.selectedObject = null;
+      document.getElementById('properties-panel').style.display = 'none';
+      saveLevel();
+      render();
+    }
   }
 });
 
@@ -857,6 +1236,24 @@ document.getElementById('export-level').addEventListener('click', () => {
 
 document.getElementById('import-level').addEventListener('click', () => {
   document.getElementById('import-file').click();
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+  state.pasteMode = false;
+  state.copySelectMode = true;
+  state.copySelect = null;
+  state.copySelectScreen = null;
+  render();
+});
+
+document.getElementById('paste-btn').addEventListener('click', () => {
+  if (state.clipboard) {
+    state.copySelectMode = false;
+    state.copySelect = null;
+    state.copySelectScreen = null;
+    state.pasteMode = true;
+    render();
+  }
 });
 
 document.getElementById('import-file').addEventListener('change', (e) => {

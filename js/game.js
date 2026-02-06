@@ -36,7 +36,8 @@ const HEIGHT = 900;
 
 const ACCEL = 150;
 const FRICTION = 0.15;
-const MAX_SPEED = 175;
+// MAX_SPEED is now dynamic based on ship type
+let MAX_SPEED = 175; 
 const BRAKE_FRICTION = 1.5;
 const BULLET_SPEED = 500;
 const PIRATE_BULLET_SPEED = 250; // half of BULLET_SPEED; aim uses this for lead time
@@ -63,6 +64,10 @@ ITEM_IMAGES['fuel tank'].src = 'assets/fuel-can.png';
 ITEM_IMAGES['small energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['medium energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['oxygen canister'].src = 'assets/oxygen-can.png';
+ITEM_IMAGES['health pack'] = ITEM_IMAGES['oxygen canister']; // Reuse for now
+ITEM_IMAGES['large health pack'] = ITEM_IMAGES['oxygen canister'];
+ITEM_IMAGES['large fuel tank'] = ITEM_IMAGES['fuel tank'];
+ITEM_IMAGES['large oxygen canister'] = ITEM_IMAGES['oxygen canister'];
 const laserImg = new Image();
 laserImg.src = 'assets/laser.png';
 ITEM_IMAGES['mining laser'] = laserImg;
@@ -72,9 +77,10 @@ blasterImg.src = 'assets/blaster.png';
 ITEM_IMAGES['light blaster'] = blasterImg;
 
 function getItemImagePath(itemName) {
-  if (itemName === 'fuel tank') return 'assets/fuel-can.png';
+  if (itemName === 'oxygen canister' || itemName === 'large oxygen canister') return 'assets/oxygen-can.png';
+  if (itemName === 'fuel tank' || itemName === 'large fuel tank') return 'assets/fuel-can.png';
+  if (itemName === 'health pack' || itemName === 'large health pack') return 'assets/oxygen-can.png';
   if (itemName === 'small energy cell' || itemName === 'medium energy cell') return 'assets/energy-cell.png';
-  if (itemName === 'oxygen canister') return 'assets/oxygen-can.png';
   if (itemName === 'mining laser' || itemName === 'medium mining laser') return 'assets/laser.png';
   if (itemName === 'light blaster') return 'assets/blaster.png';
   return null;
@@ -164,6 +170,8 @@ let shipTiltInitialized = false;
 let gamePaused = true;
 let warpMenuOpen = false;
 let shopMenuOpen = false;
+let craftingMenuOpen = false;
+let shipyardMenuOpen = false;
 let startScreenOpen = true;
 let deathScreenOpen = false;
 let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
@@ -173,6 +181,9 @@ let tutorialTextTimerStarted = false; // True after player thrusts for the first
 let tutorialTextWorldX = 0; // World X position of tutorial text
 let tutorialTextWorldY = 0; // World Y position of tutorial text
 let activeShopStructure = null;
+let activeCraftingStructure = null;
+const craftingInputSlots = [null, null, null, null];
+let craftingOutputSlot = null;
 
 // Start screen overlay (click to start). Keep rendering/asset loading running behind it.
 const startOverlayEl = document.getElementById('start-menu-overlay');
@@ -184,7 +195,7 @@ if (startOverlayEl) {
     startOverlayEl.style.display = 'none';
     startScreenOpen = false;
     // Unpause unless another menu is open (shouldn't be at boot)
-    gamePaused = warpMenuOpen || shopMenuOpen;
+    gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
     // Clear latched inputs so the click doesn't immediately fire/thrust
     leftMouseDown = false;
     rightMouseDown = false;
@@ -885,12 +896,12 @@ function refreshStructureMeshes() {
   const STRUCTURE_SIZE = 40;
   const STRUCTURE_DIAMETER = STRUCTURE_SIZE * 2;
   const STRUCTURE_SCALE_MULT = 2.7; // base
-  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0 };
+  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0, crafting: 1.0, shipyard: 1.2 };
   while (structureContainer.children.length) structureContainer.remove(structureContainer.children[0]);
   for (const st of structures) {
-    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
     if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
-    const src = structureModels[st.type];
+    const src = structureModels[st.type] || structureModels['shop']; // Fallback to shop model
     if (!src) continue;
     const clone = src.clone(true);
     const box = new THREE.Box3().setFromObject(clone);
@@ -1095,7 +1106,7 @@ function updatePirates(dt) {
           }
       }
       for (const st of structures) {
-         if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+         if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
          if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
          const sdx = st.x - p.x;
          const sdy = st.y - p.y;
@@ -1172,7 +1183,7 @@ function updatePirates(dt) {
     }
     // Structures
     for (const st of structures) {
-        if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+        if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
         if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
         const cdx = p.x - st.x;
         const cdy = p.y - st.y;
@@ -1331,7 +1342,7 @@ function update(dt) {
   // Ship–warp gate and shop collision (radius 35% bigger than base 40)
   const STRUCTURE_SIZE_COLL = 54;
   for (const st of structures) {
-    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase') continue;
+    if (st.type !== 'warpgate' && st.type !== 'shop' && st.type !== 'piratebase' && st.type !== 'crafting' && st.type !== 'shipyard') continue;
     if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
@@ -2478,7 +2489,18 @@ function canAcceptFloatingItem(item) {
 }
 
 // Shop: buy/sell 5x3 grid (15 slots)
-const ITEM_BUY_PRICE = { 'small energy cell': 150, 'medium energy cell': 550, 'oxygen canister': 500, 'fuel tank': 300, 'light blaster': 1000, 'medium mining laser': 1500 };
+const ITEM_BUY_PRICE = { 
+  'small energy cell': 150, 
+  'medium energy cell': 550, 
+  'oxygen canister': 500, 
+  'fuel tank': 300, 
+  'light blaster': 1000, 
+  'medium mining laser': 1500,
+  'health pack': 400,
+  'large health pack': 1000,
+  'large fuel tank': 750,
+  'large oxygen canister': 1250
+};
 const ITEM_SELL_PRICE = { cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60, scrap: 40, 'warp key': 500, 'mining laser': 300, 'light blaster': 500, 'medium mining laser': 750 };
 const shopBuySlots = Array(15).fill(null);
 const shopSellSlots = Array(15).fill(null);
@@ -2512,8 +2534,20 @@ function getShopItemPayload(itemKey) {
   if (itemKey === 'oxygen canister') {
     return { item: 'oxygen canister', oxygen: 10, maxOxygen: 10 };
   }
+  if (itemKey === 'large oxygen canister') {
+    return { item: 'large oxygen canister', oxygen: 30, maxOxygen: 30 };
+  }
   if (itemKey === 'fuel tank') {
     return { item: 'fuel tank', fuel: 10, maxFuel: 10 };
+  }
+  if (itemKey === 'large fuel tank') {
+    return { item: 'large fuel tank', fuel: 30, maxFuel: 30 };
+  }
+  if (itemKey === 'health pack') {
+    return { item: 'health pack', health: 10 };
+  }
+  if (itemKey === 'large health pack') {
+    return { item: 'large health pack', health: 30 };
   }
   if (itemKey === 'light blaster') {
     return { item: 'light blaster', heat: 0, overheated: false };
@@ -2531,8 +2565,12 @@ function getItemLabel(it) {
   if (it.item === 'light blaster') return 'B';
   if (it.item === 'small energy cell') return 'E';
   if (it.item === 'medium energy cell') return 'M';
-  if (it.item === 'fuel tank') return 'F';
   if (it.item === 'oxygen canister') return 'O';
+  if (it.item === 'large oxygen canister') return 'LO';
+  if (it.item === 'fuel tank') return 'F';
+  if (it.item === 'large fuel tank') return 'LF';
+  if (it.item === 'health pack') return 'H';
+  if (it.item === 'large health pack') return 'LH';
   if (it.item === 'cuprite') return 'C';
   if (it.item === 'hematite') return 'H';
   if (it.item === 'aurite') return 'A';
@@ -2594,12 +2632,20 @@ function getSlotHTML(it) {
       const fillH = Math.round(32 * charge);
       const color = charge > 0.5 ? '#ffaa44' : (charge > 0.25 ? '#ffcc66' : '#ff8844');
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
-    } else if (it.item === 'oxygen canister' && it.oxygen != null) {
+    } else if ((it.item === 'oxygen canister' || it.item === 'large oxygen canister') && it.oxygen != null) {
       // Oxygen canister: oxygen value + charge bar (blue)
       html += `<span class="slot-energy">${it.oxygen.toFixed(1)}</span>`;
       const charge = it.maxOxygen > 0 ? it.oxygen / it.maxOxygen : 0;
       const fillH = Math.round(32 * charge);
       const color = charge > 0.5 ? '#66aaff' : (charge > 0.25 ? '#88ccff' : '#4488dd');
+      html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
+    } else if ((it.item === 'health pack' || it.item === 'large health pack') && it.health != null) {
+      // Health pack: health value + charge bar (reddish)
+      html += `<span class="slot-energy">${it.health.toFixed(1)}</span>`;
+      const maxHealth = it.item === 'large health pack' ? 30 : 10;
+      const charge = it.health / maxHealth;
+      const fillH = Math.round(32 * charge);
+      const color = '#ff4444';
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
     } else if (it.quantity != null && it.quantity > 1) {
       html += `<span class="slot-qty">${it.quantity}</span>`;
@@ -2625,7 +2671,7 @@ function getItemSellPrice(item) {
     return Math.max(ENERGY_CELL_MIN_SELL, Math.round(MEDIUM_ENERGY_CELL_FULL_SELL * chargeRatio));
   }
   // Fuel tank and oxygen canister: always sell for half of purchase price
-  if (item.item === 'fuel tank' || item.item === 'oxygen canister') {
+  if (['fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack'].includes(item.item)) {
     const buy = ITEM_BUY_PRICE[item.item];
     return buy != null ? Math.floor(buy / 2) : 0;
   }
@@ -2673,7 +2719,11 @@ function syncShopBuyArea() {
       'small energy cell': 'Small Energy Cell',
       'medium energy cell': 'Medium Energy Cell', 
       'fuel tank': 'Fuel Tank', 
+      'large fuel tank': 'Large Fuel Tank',
       'oxygen canister': 'Oxygen Canister',
+      'large oxygen canister': 'Large Oxygen Canister',
+      'health pack': 'Health Pack',
+      'large health pack': 'Large Health Pack',
       'light blaster': 'Light Blaster',
       'medium mining laser': 'Medium Mining Laser',
       cuprite: 'Cuprite',
@@ -2845,6 +2895,12 @@ let levelSpawnSettings = {
 
 // Load level from JSON file
 function loadLevel(levelData) {
+  // Reset ship position and velocity
+  ship.x = 0;
+  ship.y = 0;
+  ship.vx = 0;
+  ship.vy = 0;
+  
   levelWidth = levelData.width || 10000;
   levelHeight = levelData.height || 10000;
   
@@ -2970,7 +3026,7 @@ if (levelSelect) {
   levelSelect.addEventListener('change', () => {
     const lev = KNOWN_LEVELS[levelSelect.value];
     if (lev) {
-      fetch(lev.path)
+      fetch(lev.path + '?t=' + Date.now())
         .then(res => res.json())
         .then(level => loadLevel(level))
         .catch(err => console.error('Failed to load ' + lev.path, err));
@@ -2979,14 +3035,14 @@ if (levelSelect) {
 }
 
 // Load initial level (Level 1)
-fetch(KNOWN_LEVELS[0].path)
+fetch(KNOWN_LEVELS[0].path + '?t=' + Date.now())
   .then(res => res.json())
   .then(level => loadLevel(level))
   .catch(() => {});
 
 function closeWarpMenu() {
   warpMenuOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
   const overlay = document.getElementById('warp-menu-overlay');
   if (overlay) overlay.style.display = 'none';
 }
@@ -3009,6 +3065,11 @@ function openShopMenu(shopStructure) {
         if (item.item === 'small energy cell') { item.energy = 10; item.maxEnergy = 10; }
         else if (item.item === 'medium energy cell') { item.energy = 30; item.maxEnergy = 30; }
         else if (item.item === 'fuel tank') { item.fuel = 10; item.maxFuel = 10; }
+        else if (item.item === 'large fuel tank') { item.fuel = 30; item.maxFuel = 30; }
+        else if (item.item === 'oxygen canister') { item.oxygen = 10; item.maxOxygen = 10; }
+        else if (item.item === 'large oxygen canister') { item.oxygen = 30; item.maxOxygen = 30; }
+        else if (item.item === 'health pack') { item.health = 10; }
+        else if (item.item === 'large health pack') { item.health = 30; }
         else if (item.maxFuel !== undefined) item.fuel = item.maxFuel;
         else if (item.maxOxygen !== undefined) item.oxygen = item.maxOxygen;
         shopBuySlots[slotIndex++] = item;
@@ -3034,7 +3095,7 @@ function openShopMenu(shopStructure) {
 function closeShopMenu() {
   returnSellAreaToHotbar();
   shopMenuOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
   inventoryDrag = null;
   activeShopStructure = null;
   const overlay = document.getElementById('shop-menu-overlay');
@@ -3076,12 +3137,298 @@ if (shopSellBtn) {
   });
 }
 
+// Crafting Menu Logic
+function openCraftingMenu(structure) {
+  if (craftingMenuOpen) return;
+  activeCraftingStructure = structure;
+  craftingMenuOpen = true;
+  gamePaused = true;
+  
+  // Clear slots
+  for(let i=0; i<4; i++) craftingInputSlots[i] = null;
+  craftingOutputSlot = null;
+  
+  // Render recipes list
+  const list = document.getElementById('crafting-recipes-list');
+  if (list) {
+    list.innerHTML = '';
+    if (structure.recipes) {
+      structure.recipes.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'recipe-item';
+        const inputs = r.inputs.map(i => `${i.quantity}x ${i.item}`).join(', ');
+        div.textContent = `${inputs} -> ${r.output.quantity}x ${r.output.item}`;
+        list.appendChild(div);
+      });
+    }
+  }
+  
+  const overlay = document.getElementById('crafting-menu-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  syncCraftingUI();
+}
+
+function closeCraftingMenu() {
+  // Return items to inventory or drop them
+  for(let i=0; i<4; i++) {
+    if (craftingInputSlots[i]) {
+        if (!addToInventory(craftingInputSlots[i].item, craftingInputSlots[i].quantity)) {
+             // Drop if full
+             const it = craftingInputSlots[i];
+             const angle = Math.random() * Math.PI * 2;
+             floatingItems.push({
+               x: ship.x + Math.cos(angle) * 40,
+               y: ship.y + Math.sin(angle) * 40,
+               vx: Math.cos(angle) * 20,
+               vy: Math.sin(angle) * 20,
+               item: it.item,
+               quantity: it.quantity,
+               energy: it.energy, maxEnergy: it.maxEnergy,
+               fuel: it.fuel, maxFuel: it.maxFuel,
+               oxygen: it.oxygen, maxOxygen: it.maxOxygen
+             });
+        }
+        craftingInputSlots[i] = null;
+    }
+  }
+  
+  craftingMenuOpen = false;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+  activeCraftingStructure = null;
+  const overlay = document.getElementById('crafting-menu-overlay');
+  if (overlay) overlay.style.display = 'none';
+  inventoryDrag = null;
+}
+
+function syncCraftingUI() {
+    // Sync input slots
+    for(let i=0; i<4; i++) {
+        const el = document.querySelector(`.crafting-slot[data-craft-input="${i}"]`);
+        if (el) {
+            el.innerHTML = getSlotHTML(craftingInputSlots[i]);
+            el.classList.toggle('has-item', !!craftingInputSlots[i]);
+        }
+    }
+    // Sync output slot
+    const outEl = document.getElementById('crafting-output-slot');
+    if (outEl) {
+        outEl.innerHTML = getSlotHTML(craftingOutputSlot);
+        outEl.classList.toggle('has-item', !!craftingOutputSlot && craftingOutputSlot.real);
+        if (craftingOutputSlot && !craftingOutputSlot.real) outEl.style.opacity = '0.5';
+        else outEl.style.opacity = '1';
+    }
+    
+    // Check recipes
+    checkCraftingRecipe();
+}
+
+function checkCraftingRecipe() {
+    if (!activeCraftingStructure || !activeCraftingStructure.recipes) return;
+    
+    // If output is real (crafted but not taken), don't update preview
+    if (craftingOutputSlot && craftingOutputSlot.real) {
+        const btn = document.getElementById('craft-btn');
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Output Full';
+        }
+        return;
+    }
+
+    // Aggregate inputs
+    const currentInputs = {};
+    for(const slot of craftingInputSlots) {
+        if (slot) {
+            currentInputs[slot.item] = (currentInputs[slot.item] || 0) + slot.quantity;
+        }
+    }
+    
+    let match = null;
+    for (const r of activeCraftingStructure.recipes) {
+        let possible = true;
+        for (const req of r.inputs) {
+            if ((currentInputs[req.item] || 0) < req.quantity) {
+                possible = false;
+                break;
+            }
+        }
+        if (possible) {
+            match = r;
+            break; 
+        }
+    }
+    
+    const btn = document.getElementById('craft-btn');
+    if (match) {
+        craftingOutputSlot = { item: match.output.item, quantity: match.output.quantity, real: false };
+        const payload = getShopItemPayload(match.output.item);
+        Object.assign(craftingOutputSlot, payload);
+        
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Craft';
+            btn.onclick = () => craftItem(match);
+        }
+    } else {
+        craftingOutputSlot = null;
+        if (btn) {
+            btn.disabled = true;
+            btn.textContent = 'Craft';
+            btn.onclick = null;
+        }
+    }
+    
+    // Re-render output slot to show ghost
+    const outEl = document.getElementById('crafting-output-slot');
+    if (outEl) {
+        outEl.innerHTML = getSlotHTML(craftingOutputSlot);
+        if (craftingOutputSlot && !craftingOutputSlot.real) outEl.style.opacity = '0.5';
+        else outEl.style.opacity = '1';
+    }
+}
+
+function craftItem(recipe) {
+    if (craftingOutputSlot && craftingOutputSlot.real) return;
+
+    // Consume inputs
+    // Deep copy inputs to avoid modifying recipe definition
+    const inputsNeeded = recipe.inputs.map(i => ({...i}));
+    
+    for (const req of inputsNeeded) {
+        let needed = req.quantity;
+        for (let i=0; i<4; i++) {
+            if (craftingInputSlots[i] && craftingInputSlots[i].item === req.item) {
+                const take = Math.min(needed, craftingInputSlots[i].quantity);
+                craftingInputSlots[i].quantity -= take;
+                needed -= take;
+                if (craftingInputSlots[i].quantity <= 0) craftingInputSlots[i] = null;
+                if (needed <= 0) break;
+            }
+        }
+    }
+    
+    // Set Output
+    if (craftingOutputSlot) {
+        craftingOutputSlot.real = true;
+    }
+    syncCraftingUI();
+}
+
+const craftingCloseBtn = document.getElementById('crafting-close-btn');
+if (craftingCloseBtn) {
+  craftingCloseBtn.addEventListener('click', () => closeCraftingMenu());
+}
+
+// Ship Definitions
+const SHIP_STATS = {
+  'scout': { name: 'Scout', price: 0, health: 50, fuel: 25, oxygen: 30, speed: 175, desc: 'Standard issue scout ship.' },
+  'cutter': { name: 'Cutter', price: 5000, health: 80, fuel: 40, oxygen: 40, speed: 150, desc: 'Sturdy mining vessel with reinforced hull.' },
+  'transport': { name: 'Transport', price: 12000, health: 120, fuel: 80, oxygen: 60, speed: 120, desc: 'Heavy transport with massive capacity.' }
+};
+
+let currentShipType = 'scout';
+
+// Shipyard Menu Logic
+function openShipyardMenu(structure) {
+  if (shipyardMenuOpen) return;
+  shipyardMenuOpen = true;
+  gamePaused = true;
+  
+  const list = document.getElementById('shipyard-list');
+  if (list) {
+    list.innerHTML = '';
+    const available = structure.availableShips || ['scout'];
+    
+    available.forEach(type => {
+      const stats = SHIP_STATS[type];
+      if (!stats) return;
+      
+      const div = document.createElement('div');
+      div.className = 'ship-item';
+      
+      const info = document.createElement('div');
+      info.className = 'ship-info';
+      info.innerHTML = `<h4>${stats.name}</h4><p>${stats.desc}</p><p>HP: ${stats.health} | Fuel: ${stats.fuel} | O2: ${stats.oxygen} | Spd: ${stats.speed}</p>`;
+      
+      const btn = document.createElement('button');
+      btn.className = 'ship-buy-btn';
+      
+      if (currentShipType === type) {
+        btn.textContent = 'Owned';
+        btn.classList.add('owned');
+        btn.disabled = true;
+      } else {
+        btn.textContent = `Buy (${stats.price} cr)`;
+        if (player.credits < stats.price) btn.disabled = true;
+        btn.onclick = () => buyShip(type);
+      }
+      
+      div.appendChild(info);
+      div.appendChild(btn);
+      list.appendChild(div);
+    });
+  }
+  
+  const creditsEl = document.getElementById('shipyard-credits');
+  if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+  
+  const overlay = document.getElementById('shipyard-menu-overlay');
+  if (overlay) overlay.style.display = 'flex';
+}
+
+function closeShipyardMenu() {
+  shipyardMenuOpen = false;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+  const overlay = document.getElementById('shipyard-menu-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function buyShip(type) {
+  const stats = SHIP_STATS[type];
+  if (!stats) return;
+  if (player.credits < stats.price) return;
+  
+  player.credits -= stats.price;
+  currentShipType = type;
+  
+  // Update player stats to match new ship (heal to full)
+  player.maxHealth = stats.health;
+  player.health = stats.health;
+  player.maxFuel = stats.fuel;
+  player.fuel = stats.fuel;
+  player.maxOxygen = stats.oxygen;
+  player.oxygen = stats.oxygen;
+  
+  // Update physics constants
+  MAX_SPEED = stats.speed;
+  
+  // Refresh menu
+  const list = document.getElementById('shipyard-list');
+  // Re-open to refresh
+  const overlay = document.getElementById('shipyard-menu-overlay');
+  if (overlay) overlay.style.display = 'none';
+  // We need the structure reference to re-open... 
+  // Actually simpler to just close it.
+  closeShipyardMenu();
+  alert(`Purchased ${stats.name}!`);
+  updateHUD();
+}
+
+const shipyardCloseBtn = document.getElementById('shipyard-close-btn');
+if (shipyardCloseBtn) {
+  shipyardCloseBtn.addEventListener('click', () => closeShipyardMenu());
+}
+
 // Shop item tooltip
 const ITEM_USAGE = {
   'small energy cell': 'Powers mining lasers and blasters.',
   'medium energy cell': 'Powers mining lasers and blasters. Holds 3x more charge.',
   'fuel tank': 'Drag to fuel bar to refill ship fuel.',
+  'large fuel tank': 'Large capacity fuel tank.',
   'oxygen canister': 'Drag to O2 bar to refill ship oxygen.',
+  'large oxygen canister': 'Large capacity oxygen canister.',
+  'health pack': 'Drag to health bar to repair ship.',
+  'large health pack': 'Large capacity repair kit.',
   'light blaster': 'Select and left-click to fire rapid projectiles at enemies.',
   'mining laser': 'Select and left-click to mine asteroids for ore.',
   'medium mining laser': 'Upgraded laser that mines faster.',
@@ -3098,7 +3445,11 @@ const ITEM_DISPLAY_NAMES = {
   'small energy cell': 'Small Energy Cell',
   'medium energy cell': 'Medium Energy Cell',
   'fuel tank': 'Fuel Tank',
+  'large fuel tank': 'Large Fuel Tank',
   'oxygen canister': 'Oxygen Canister',
+  'large oxygen canister': 'Large Oxygen Canister',
+  'health pack': 'Health Pack',
+  'large health pack': 'Large Health Pack',
   'light blaster': 'Light Blaster',
   'mining laser': 'Mining Laser',
   'medium mining laser': 'Medium Mining Laser',
@@ -3270,21 +3621,24 @@ function endDrag(clientX, clientY) {
   if (fuelBarEl) fuelBarEl.classList.remove('highlight');
   const oxygenBarEl = document.getElementById('oxygen-bar-drop-zone');
   if (oxygenBarEl) oxygenBarEl.classList.remove('highlight');
+  const healthBarEl = document.getElementById('health-bar-drop-zone');
+  if (healthBarEl) healthBarEl.classList.remove('highlight');
   if (!drag) return;
 
   const under = document.elementFromPoint(clientX, clientY);
   let targetSlotEl = null;
   const isOverFuelBar = under && under.closest('#fuel-bar-drop-zone');
   const isOverO2Bar = under && under.closest('#oxygen-bar-drop-zone');
+  const isOverHealthBar = under && under.closest('#health-bar-drop-zone');
   if (under) {
     targetSlotEl = under.closest('.slot') || under.closest('.shop-buy-slot') || under.closest('.shop-sell-slot');
   }
 
-  // Handle drop on O2 bar: oxygen canister adds O2
+  // Handle drop on O2 bar
   if (isOverO2Bar && drag.kind === 'hotbar') {
     const from = drag.fromSlot;
     const it = hotbar[from];
-    if (it && it.item === 'oxygen canister') {
+    if (it && (it.item === 'oxygen canister' || it.item === 'large oxygen canister')) {
       const addAmount = it.oxygen !== undefined ? it.oxygen : 10;
       player.oxygen = Math.min(player.maxOxygen, player.oxygen + addAmount);
       hotbar[from] = null;
@@ -3293,11 +3647,11 @@ function endDrag(clientX, clientY) {
     }
   }
 
-  // Handle drop on fuel bar: fuel tank adds fuel
+  // Handle drop on fuel bar
   if (isOverFuelBar && drag.kind === 'hotbar') {
     const from = drag.fromSlot;
     const it = hotbar[from];
-    if (it && it.item === 'fuel tank') {
+    if (it && (it.item === 'fuel tank' || it.item === 'large fuel tank')) {
       const addAmount = it.fuel !== undefined ? it.fuel : 10;
       player.fuel = Math.min(player.maxFuel, player.fuel + addAmount);
       hotbar[from] = null;
@@ -3306,11 +3660,24 @@ function endDrag(clientX, clientY) {
     }
   }
 
-  // Handle drop on O2 bar from buy slot: buy and use instantly
+  // Handle drop on health bar
+  if (isOverHealthBar && drag.kind === 'hotbar') {
+    const from = drag.fromSlot;
+    const it = hotbar[from];
+    if (it && (it.item === 'health pack' || it.item === 'large health pack')) {
+      const addAmount = it.health !== undefined ? it.health : 10;
+      player.health = Math.min(player.maxHealth, player.health + addAmount);
+      hotbar[from] = null;
+      updateHUD();
+      return;
+    }
+  }
+
+  // Handle drop on O2 bar from buy slot
   if (isOverO2Bar && drag.kind === 'buy') {
     const from = drag.fromBuySlot;
     const it = shopBuySlots[from];
-    if (it && it.item === 'oxygen canister') {
+    if (it && (it.item === 'oxygen canister' || it.item === 'large oxygen canister')) {
       const price = drag.price;
       if (player.credits >= price) {
         player.credits -= price;
@@ -3327,11 +3694,11 @@ function endDrag(clientX, clientY) {
     }
   }
 
-  // Handle drop on fuel bar from buy slot: buy and use instantly
+  // Handle drop on fuel bar from buy slot
   if (isOverFuelBar && drag.kind === 'buy') {
     const from = drag.fromBuySlot;
     const it = shopBuySlots[from];
-    if (it && it.item === 'fuel tank') {
+    if (it && (it.item === 'fuel tank' || it.item === 'large fuel tank')) {
       const price = drag.price;
       if (player.credits >= price) {
         player.credits -= price;
@@ -3348,8 +3715,29 @@ function endDrag(clientX, clientY) {
     }
   }
 
+  // Handle drop on health bar from buy slot
+  if (isOverHealthBar && drag.kind === 'buy') {
+    const from = drag.fromBuySlot;
+    const it = shopBuySlots[from];
+    if (it && (it.item === 'health pack' || it.item === 'large health pack')) {
+      const price = drag.price;
+      if (player.credits >= price) {
+        player.credits -= price;
+        const addAmount = it.health !== undefined ? it.health : 10;
+        player.health = Math.min(player.maxHealth, player.health + addAmount);
+        removeFromShopInventory(it.item);
+        shopBuySlots[from] = null;
+        syncShopBuyArea();
+        updateHUD();
+        const creditsEl = document.getElementById('shop-credits-display');
+        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+      }
+      return;
+    }
+  }
+
   // Handle Jettison if dropped outside of UI and shop is closed
-  if (!targetSlotEl && !shopMenuOpen && drag.kind === 'hotbar') {
+  if (!targetSlotEl && !shopMenuOpen && !craftingMenuOpen && !shipyardMenuOpen && drag.kind === 'hotbar') {
     // Drop into space
     const from = drag.fromSlot;
     const it = hotbar[from];
@@ -3409,6 +3797,8 @@ function endDrag(clientX, clientY) {
   const isHotbar = targetSlotEl.classList.contains('slot');
   const isSell = targetSlotEl.classList.contains('shop-sell-slot');
   const isBuy = targetSlotEl.classList.contains('shop-buy-slot'); // Can't drop onto buy slots generally
+  const isCraftInput = targetSlotEl.classList.contains('input-slot');
+  const isCraftOutput = targetSlotEl.classList.contains('output-slot');
 
   if (drag.kind === 'hotbar') {
     const from = drag.fromSlot;
@@ -3422,6 +3812,15 @@ function endDrag(clientX, clientY) {
         hotbar[from] = null;
         updateHUD();
         syncShopSellArea();
+        return;
+      }
+    } else if (isCraftInput && craftingMenuOpen) {
+      const idx = parseInt(targetSlotEl.dataset.craftInput, 10);
+      if (idx >= 0 && !craftingInputSlots[idx]) {
+        craftingInputSlots[idx] = { ...it };
+        hotbar[from] = null;
+        updateHUD();
+        syncCraftingUI();
         return;
       }
     } else if (isHotbar) {
@@ -3473,6 +3872,45 @@ function endDrag(clientX, clientY) {
         return;
       }
     }
+  } else if (drag.kind === 'craftInput') {
+    const from = drag.fromCraftInput;
+    const it = craftingInputSlots[from];
+    if (!it) return;
+    
+    if (isHotbar) {
+      const to = parseInt(targetSlotEl.dataset.slot, 10);
+      if (to >= 0 && !hotbar[to]) {
+        hotbar[to] = { ...it };
+        craftingInputSlots[from] = null;
+        updateHUD();
+        syncCraftingUI();
+        return;
+      }
+    } else if (isCraftInput) {
+      const to = parseInt(targetSlotEl.dataset.craftInput, 10);
+      if (to >= 0 && to !== from) {
+        const tmp = craftingInputSlots[to];
+        craftingInputSlots[to] = craftingInputSlots[from];
+        craftingInputSlots[from] = tmp;
+        syncCraftingUI();
+        return;
+      }
+    }
+  } else if (drag.kind === 'craftOutput') {
+    const it = craftingOutputSlot;
+    if (!it || !it.real) return;
+    
+    if (isHotbar) {
+      const to = parseInt(targetSlotEl.dataset.slot, 10);
+      if (to >= 0 && !hotbar[to]) {
+        hotbar[to] = { ...it };
+        // Clear output slot
+        craftingOutputSlot = null;
+        updateHUD();
+        syncCraftingUI();
+        return;
+      }
+    }
   }
 }
 
@@ -3484,6 +3922,8 @@ window.addEventListener('mousedown', (e) => {
   const hotbarSlotEl = t.closest && t.closest('#hotbar .slot');
   const buySlotEl = t.closest && t.closest('.shop-buy-slot');
   const sellSlotEl = t.closest && t.closest('.shop-sell-slot');
+  const craftInputEl = t.closest && t.closest('.crafting-slot.input-slot');
+  const craftOutputEl = t.closest && t.closest('.crafting-slot.output-slot');
   
   if (hotbarSlotEl) {
     const slotIndex = parseInt(hotbarSlotEl.dataset.slot, 10);
@@ -3497,6 +3937,18 @@ window.addEventListener('mousedown', (e) => {
           shopSellSlots[firstEmpty] = { ...it };
           hotbar[slotIndex] = null;
           syncShopSellArea();
+          updateHUD();
+        }
+        return;
+      }
+      // Shift+click (with crafting open): transfer to first empty input slot
+      if (e.shiftKey && craftingMenuOpen) {
+        const it = hotbar[slotIndex];
+        const firstEmpty = craftingInputSlots.findIndex(s => !s);
+        if (firstEmpty >= 0) {
+          craftingInputSlots[firstEmpty] = { ...it };
+          hotbar[slotIndex] = null;
+          syncCraftingUI();
           updateHUD();
         }
         return;
@@ -3524,6 +3976,55 @@ window.addEventListener('mousedown', (e) => {
       return;
     }
   }
+
+  if (craftingMenuOpen) {
+    if (craftInputEl) {
+      const idx = parseInt(craftInputEl.dataset.craftInput, 10);
+      if (idx >= 0 && craftingInputSlots[idx]) {
+        e.preventDefault();
+        // Shift+click: return to inventory
+        if (e.shiftKey) {
+            if (addToInventory(craftingInputSlots[idx].item, craftingInputSlots[idx].quantity)) {
+                craftingInputSlots[idx] = null;
+                syncCraftingUI();
+                updateHUD();
+            }
+            return;
+        }
+        // Drag
+        hideShopTooltip();
+        const it = craftingInputSlots[idx];
+        inventoryDrag = { kind: 'craftInput', fromCraftInput: idx };
+        const qty = it.quantity != null ? String(it.quantity) : '';
+        setDragGhostContent(it, getItemLabel(it), qty);
+        setDragGhostPos(e.clientX, e.clientY);
+        setDragGhostVisible(true);
+      }
+      return;
+    }
+    if (craftOutputEl) {
+      if (craftingOutputSlot && craftingOutputSlot.real) {
+        e.preventDefault();
+        if (e.shiftKey) {
+            if (addToInventory(craftingOutputSlot.item, craftingOutputSlot.quantity)) {
+                craftingOutputSlot = null;
+                syncCraftingUI();
+                updateHUD();
+            }
+            return;
+        }
+        // Drag
+        hideShopTooltip();
+        const it = craftingOutputSlot;
+        inventoryDrag = { kind: 'craftOutput' };
+        const qty = it.quantity != null ? String(it.quantity) : '';
+        setDragGhostContent(it, getItemLabel(it), qty);
+        setDragGhostPos(e.clientX, e.clientY);
+        setDragGhostVisible(true);
+      }
+      return;
+    }
+  }
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -3531,6 +4032,7 @@ window.addEventListener('mousemove', (e) => {
     setDragGhostPos(e.clientX, e.clientY);
     const fuelBarEl = document.getElementById('fuel-bar-drop-zone');
     const oxygenBarEl = document.getElementById('oxygen-bar-drop-zone');
+    const healthBarEl = document.getElementById('health-bar-drop-zone');
     const under = document.elementFromPoint(e.clientX, e.clientY);
     
     let it = null;
@@ -3538,18 +4040,27 @@ window.addEventListener('mousemove', (e) => {
       it = hotbar[inventoryDrag.fromSlot];
     } else if (inventoryDrag.kind === 'buy') {
       it = shopBuySlots[inventoryDrag.fromBuySlot];
+    } else if (inventoryDrag.kind === 'craftInput') {
+      it = craftingInputSlots[inventoryDrag.fromCraftInput];
+    } else if (inventoryDrag.kind === 'craftOutput') {
+      it = craftingOutputSlot;
     }
     
     const isOverFuel = under && under.closest('#fuel-bar-drop-zone');
     const isOverO2 = under && under.closest('#oxygen-bar-drop-zone');
+    const isOverHealth = under && under.closest('#health-bar-drop-zone');
     
     // Highlight fuel bar
-    const showFuelHighlight = it && it.item === 'fuel tank' && isOverFuel;
+    const showFuelHighlight = it && (it.item === 'fuel tank' || it.item === 'large fuel tank') && isOverFuel;
     if (fuelBarEl) fuelBarEl.classList.toggle('highlight', showFuelHighlight);
     
     // Highlight O2 bar
-    const showO2Highlight = it && it.item === 'oxygen canister' && isOverO2;
+    const showO2Highlight = it && (it.item === 'oxygen canister' || it.item === 'large oxygen canister') && isOverO2;
     if (oxygenBarEl) oxygenBarEl.classList.toggle('highlight', showO2Highlight);
+
+    // Highlight Health bar
+    const showHealthHighlight = it && (it.item === 'health pack' || it.item === 'large health pack') && isOverHealth;
+    if (healthBarEl) healthBarEl.classList.toggle('highlight', showHealthHighlight);
   }
 });
 
