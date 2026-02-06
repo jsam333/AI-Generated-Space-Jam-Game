@@ -99,6 +99,7 @@ const hotbar = inventory.slots; // Alias for compatibility
 
 let selectedSlot = 0;
 let blasterFireAccum = 0;
+let hudDirty = true; // When true, updateHUD() will re-render; set by any mutation
 
 // Input
 const input = new InputHandler(canvas);
@@ -723,7 +724,7 @@ function applyOreEmissiveMaterial(mesh, oreType) {
 }
 
 // Floating ore drops: self-lit like asteroids with ore-colored emissive tint
-const FLOATING_ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'];
+const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key']);
 const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A };
 const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
 
@@ -1077,7 +1078,7 @@ function updatePirates(dt) {
           }
         }
         if (p._mesh && pirateContainer) pirateContainer.remove(p._mesh);
-        pirates.splice(i, 1);
+        pirates[i] = pirates[pirates.length - 1]; pirates.pop();
     }
   }
 }
@@ -1415,19 +1416,19 @@ function update(dt) {
           }
       }
     }
-    if (remove) bullets.splice(i, 1);
+    if (remove) { bullets[i] = bullets[bullets.length - 1]; bullets.pop(); }
   }
 
-  // Particles (sparks)
+  // Particles (sparks) — damp computed once (same for all particles)
+  const particleDamp = Math.exp(-PARTICLE_DRAG * dt);
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    const damp = Math.exp(-PARTICLE_DRAG * dt);
-    p.vx *= damp;
-    p.vy *= damp;
+    p.vx *= particleDamp;
+    p.vy *= particleDamp;
     p.life -= dt;
-    if (p.life <= 0) particles.splice(i, 1);
+    if (p.life <= 0) { particles[i] = particles[particles.length - 1]; particles.pop(); }
   }
 
   // Check for destroyed asteroids and drop ore (diminishing returns: +10 at tier 1, then decreases by 1 every 2 tiers, min +4)
@@ -1461,7 +1462,7 @@ function update(dt) {
           });
         }
       }
-      asteroids.splice(i, 1);
+      asteroids[i] = asteroids[asteroids.length - 1]; asteroids.pop();
     }
   }
 
@@ -1507,10 +1508,10 @@ function update(dt) {
     }
   }
 
-  // Create/update 3D mesh for ore-type floating items
+  // Create/update 3D mesh for ore-type floating items (skip off-screen position updates)
   if (floatingOreContainer && (oreModel || scrapModel)) {
     for (const item of floatingItems) {
-      if (!FLOATING_ORE_ITEMS.includes(item.item)) continue;
+      if (!FLOATING_ORE_ITEMS.has(item.item)) continue;
       const src = (item.item === 'scrap' && scrapModel) ? scrapModel : oreModel;
       if (!src) continue;
       if (!item._mesh) {
@@ -1519,11 +1520,13 @@ function update(dt) {
         clone.scale.setScalar(FLOATING_ORE_SCALE);
         item._mesh = clone;
         floatingOreContainer.add(clone);
-        // Random spin: axis, direction, speed (faster than asteroids)
-        item._spinAxis = Math.floor(Math.random() * 3); // 0=x, 1=y, 2=z
+        item._spinAxis = Math.floor(Math.random() * 3);
         item._spinDirection = Math.random() < 0.5 ? -1 : 1;
-        item._spinSpeed = 0.5 + Math.random() * 0.4; // 0.5–0.9 (faster than asteroids ~0.2–0.4)
+        item._spinSpeed = 0.5 + Math.random() * 0.4;
       }
+      const onScreen = item.x > cullLeft && item.x < cullRight && item.y > cullTop && item.y < cullBottom;
+      item._mesh.visible = onScreen;
+      if (!onScreen) continue;
       item._mesh.position.set(item.x - ship.x, -(item.y - ship.y), 0);
       const spin = (item._spinSpeed ?? 0.6) * (item._spinDirection ?? 1) * dt;
       if (item._spinAxis === 0) item._mesh.rotation.x += spin;
@@ -1551,7 +1554,7 @@ function update(dt) {
         }
         if (added) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems.splice(i, 1);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (item.fuel != null) {
         let added = false;
@@ -1564,7 +1567,7 @@ function update(dt) {
         }
         if (added) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems.splice(i, 1);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (item.oxygen != null && item.item === 'oxygen canister') {
         let added = false;
@@ -1577,7 +1580,7 @@ function update(dt) {
         }
         if (added) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems.splice(i, 1);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (item.item === 'mining laser' && item.heat != null) {
         // Mining laser: restore heat/overheated
@@ -1591,7 +1594,7 @@ function update(dt) {
         }
         if (added) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems.splice(i, 1);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (item.item === 'medium mining laser' && item.heat != null) {
         let added = false;
@@ -1604,7 +1607,7 @@ function update(dt) {
         }
         if (added) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems.splice(i, 1);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (item.item === 'light blaster' && item.heat != null) {
         let added = false;
@@ -1617,11 +1620,11 @@ function update(dt) {
         }
         if (added) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems.splice(i, 1);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (inventory.add(item.item, item.quantity)) {
         if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-        floatingItems.splice(i, 1);
+        floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
       }
     }
   }
@@ -1644,6 +1647,13 @@ function update(dt) {
 function render(dt = 1 / 60) {
   ctx.fillStyle = '#0a0a12';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // Off-screen culling bounds (world coordinates, with margin for large objects)
+  const CULL_MARGIN = 350;
+  const cullLeft   = ship.x - WIDTH / 2 - CULL_MARGIN;
+  const cullRight  = ship.x + WIDTH / 2 + CULL_MARGIN;
+  const cullTop    = ship.y - HEIGHT / 2 - CULL_MARGIN;
+  const cullBottom = ship.y + HEIGHT / 2 + CULL_MARGIN;
 
   // Starfield (fillRect is much faster than arc for small shapes)
   for (const star of stars) {
@@ -1699,7 +1709,7 @@ function render(dt = 1 / 60) {
 
   // Floating items in space — thin white glow for ore-type (3D) pellets
   for (const item of floatingItems) {
-    if (!FLOATING_ORE_ITEMS.includes(item.item)) continue;
+    if (!FLOATING_ORE_ITEMS.has(item.item)) continue;
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -30 || x > WIDTH + 30 || y < -30 || y > HEIGHT + 30) continue;
     const r = 14;
@@ -1713,7 +1723,7 @@ function render(dt = 1 / 60) {
     ctx.fill();
   }
   for (const item of floatingItems) {
-    if (FLOATING_ORE_ITEMS.includes(item.item)) continue; // ore-type items rendered as 3D only
+    if (FLOATING_ORE_ITEMS.has(item.item)) continue; // ore-type items rendered as 3D only
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
     // Draw small glowing circle - same fill/stroke as ore type
@@ -1860,23 +1870,27 @@ function render(dt = 1 / 60) {
     ctx.fillRect(x - p.size / 2, y - p.size / 2, p.size, p.size);
   }
 
-  // Update 3D asteroid positions (camera-follow coordinates; negate Y to match 2D canvas)
+  // Update 3D asteroid positions (camera-follow; skip off-screen)
   for (const ast of asteroids) {
-    if (ast._mesh) {
-      ast._mesh.position.set(ast.x - ship.x, -(ast.y - ship.y), 0);
-      const spin = (ast._spinSpeed ?? 0.3) * (ast._spinDirection ?? 1) * dt;
-      if (ast._spinAxis === 0) ast._mesh.rotation.x += spin;
-      else if (ast._spinAxis === 1) ast._mesh.rotation.y += spin;
-      else ast._mesh.rotation.z += spin;
-    }
+    if (!ast._mesh) continue;
+    const onScreen = ast.x > cullLeft && ast.x < cullRight && ast.y > cullTop && ast.y < cullBottom;
+    ast._mesh.visible = onScreen;
+    if (!onScreen) continue;
+    ast._mesh.position.set(ast.x - ship.x, -(ast.y - ship.y), 0);
+    const spin = (ast._spinSpeed ?? 0.3) * (ast._spinDirection ?? 1) * dt;
+    if (ast._spinAxis === 0) ast._mesh.rotation.x += spin;
+    else if (ast._spinAxis === 1) ast._mesh.rotation.y += spin;
+    else ast._mesh.rotation.z += spin;
   }
 
-  // Update 3D structure positions (camera-follow coordinates; negate Y to match 2D canvas)
+  // Update 3D structure positions (camera-follow; skip off-screen)
   for (const st of structures) {
-    if (st._mesh) {
-      const yOff = st.type === 'shop' ? 4 : 0;
-      st._mesh.position.set(st.x - ship.x, -(st.y - ship.y) + yOff, 0);
-    }
+    if (!st._mesh) continue;
+    const onScreen = st.x > cullLeft && st.x < cullRight && st.y > cullTop && st.y < cullBottom;
+    st._mesh.visible = onScreen;
+    if (!onScreen) continue;
+    const yOff = st.type === 'shop' ? 4 : 0;
+    st._mesh.position.set(st.x - ship.x, -(st.y - ship.y) + yOff, 0);
   }
 
   // Update 3D pirate positions
@@ -2141,6 +2155,7 @@ canvas.addEventListener('wheel', (e) => {
   } else {
     selectedSlot = (selectedSlot - 1 + 9) % 9;
   }
+  markHUDDirty();
 });
 
 function isShipInWarpGate() {
@@ -2235,7 +2250,7 @@ function getSlotHTML(it) {
   let html = '';
   if (it) {
     const imgPath = getItemImagePath(it.item);
-    const oreIconUrl = FLOATING_ORE_ITEMS.includes(it.item) ? ORE_ICON_DATA_URLS[it.item] : null;
+    const oreIconUrl = FLOATING_ORE_ITEMS.has(it.item) ? ORE_ICON_DATA_URLS[it.item] : null;
     if (oreIconUrl) {
       html += `<div class="slot-icon slot-icon-ore-wrap"><img src="${oreIconUrl}" class="slot-icon-ore-bg" alt=""><span class="slot-icon-ore-letter">${getItemLabel(it)}</span></div>`;
     } else if (imgPath) {
@@ -2391,25 +2406,40 @@ function syncShopBuyArea() {
 }
 
 
-function updateHUD() {
-  // Sync Hotbar
+// Cached HUD DOM references (populated once, avoids querySelector per frame)
+const _hudSlots = [];
+let _hudCreditsVal = null;
+let _hudShopCredits = null;
+function _cacheHUDElements() {
   for (let i = 0; i < 9; i++) {
-    const el = document.querySelector(`#hotbar .slot[data-slot="${i}"]`);
+    _hudSlots[i] = document.querySelector(`#hotbar .slot[data-slot="${i}"]`);
+  }
+  _hudCreditsVal = document.querySelector('.credits-value');
+  _hudShopCredits = document.getElementById('shop-credits-display');
+}
+
+function markHUDDirty() { hudDirty = true; }
+
+function updateHUD() {
+  hudDirty = true; // Mark dirty so the gameLoop flushes it (keeps existing call-sites working)
+}
+
+function _flushHUD() {
+  if (!hudDirty) return;
+  hudDirty = false;
+  if (_hudSlots.length === 0 || !_hudSlots[0]) _cacheHUDElements();
+  for (let i = 0; i < 9; i++) {
+    const el = _hudSlots[i];
     if (!el) continue;
     const it = hotbar[i];
     el.classList.toggle('has-item', !!it);
     el.classList.toggle('selected', i === selectedSlot);
-    
     let html = `<span class="slot-num">${i + 1}</span>`;
     html += getSlotHTML(it);
     el.innerHTML = html;
   }
-  
-  // Sync Credits
-  const valueEl = document.querySelector('.credits-value');
-  if (valueEl) valueEl.textContent = player.credits;
-  const shopCreditsEl = document.getElementById('shop-credits-display');
-  if (shopCreditsEl) shopCreditsEl.textContent = `You have ${player.credits} credits`;
+  if (_hudCreditsVal) _hudCreditsVal.textContent = player.credits;
+  if (_hudShopCredits) _hudShopCredits.textContent = `You have ${player.credits} credits`;
 }
 
 // Alias for compatibility if needed, or I can replace calls
@@ -2472,6 +2502,7 @@ window.addEventListener('keydown', (e) => {
   // Hotbar slot selection (1-9)
   if (e.key >= '1' && e.key <= '9') {
     selectedSlot = parseInt(e.key) - 1;
+    markHUDDirty();
   }
   // Key in E position (KeyE): close shop, or open warp gate/shop menu when inside
   if (e.code === 'KeyE') {
@@ -3608,7 +3639,7 @@ function gameLoop(now) {
 
   if (!gamePaused) update(dt);
   render(gamePaused ? 0 : dt);
-  updateHUD(); // Sync HUD every frame (or could optimize to only when changed)
+  _flushHUD(); // Only re-renders DOM when hudDirty is true
 
   requestAnimationFrame(gameLoop);
 }
