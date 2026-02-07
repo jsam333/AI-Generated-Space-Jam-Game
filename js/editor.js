@@ -481,6 +481,8 @@ function updatePropertiesPanel() {
       renderPirateBaseProperties(content, obj);
     } else if (obj.type === 'warpgate') {
       renderWarpGateProperties(content, obj);
+    } else if (obj.type === 'refinery') {
+      renderRefineryProperties(content, obj);
     }
   }
 }
@@ -685,6 +687,33 @@ function renderShopProperties(parent, obj) {
   parent.appendChild(priceDiv);
 }
 
+// Master list of all items available for crafting recipe dropdowns
+const ALL_ITEM_NAMES = [
+  'mining laser', 'medium mining laser', 'light blaster',
+  'small energy cell', 'medium energy cell',
+  'oxygen canister', 'large oxygen canister',
+  'fuel tank', 'large fuel tank',
+  'health pack', 'large health pack',
+  'cuprite', 'hematite', 'aurite', 'diamite', 'platinite',
+  'copper', 'iron', 'gold', 'diamond', 'platinum',
+  'scrap', 'warp key'
+];
+
+function createItemSelect(selectedValue) {
+  const sel = document.createElement('select');
+  sel.style.fontSize = '10px';
+  sel.style.flex = '1';
+  sel.style.minWidth = '0';
+  ALL_ITEM_NAMES.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    if (name === selectedValue) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  return sel;
+}
+
 function renderCraftingProperties(parent, obj) {
   if (!obj.recipes) obj.recipes = [];
 
@@ -693,6 +722,7 @@ function renderCraftingProperties(parent, obj) {
   recipesDiv.innerHTML = `<label>Recipes</label>`;
   const recipesList = document.createElement('div');
   recipesList.className = 'prop-list';
+  recipesList.style.maxHeight = '400px';
   
   const renderRecipes = () => {
     recipesList.innerHTML = '';
@@ -701,75 +731,85 @@ function renderCraftingProperties(parent, obj) {
       row.className = 'prop-list-item';
       row.style.flexDirection = 'column';
       row.style.alignItems = 'stretch';
+      row.style.padding = '6px';
+      row.style.marginBottom = '6px';
       
-      // Inputs
-      const inputsDiv = document.createElement('div');
-      inputsDiv.style.display = 'flex';
-      inputsDiv.style.flexWrap = 'wrap';
-      inputsDiv.style.gap = '4px';
-      inputsDiv.innerHTML = '<span style="font-size:10px;width:100%;">In:</span>';
-      
-      recipe.inputs.forEach((inp, iIdx) => {
-        const iSpan = document.createElement('span');
-        iSpan.style.fontSize = '10px';
-        iSpan.style.background = '#444';
-        iSpan.style.padding = '2px';
-        iSpan.textContent = `${inp.quantity}x ${inp.item}`;
-        inputsDiv.appendChild(iSpan);
-      });
-      
-      // Add Input Button (simplified for space)
-      const addInputBtn = document.createElement('button');
-      addInputBtn.textContent = '+';
-      addInputBtn.style.fontSize = '10px';
-      addInputBtn.onclick = () => {
-        const item = prompt('Item name (e.g. scrap, cuprite):', 'scrap');
-        if (item) {
-          const qty = parseInt(prompt('Quantity:', '1')) || 1;
-          recipe.inputs.push({ item, quantity: qty });
-          saveLevel();
-          renderRecipes();
-        }
-      };
-      inputsDiv.appendChild(addInputBtn);
-
-      // Output
-      const outputDiv = document.createElement('div');
-      outputDiv.style.display = 'flex';
-      outputDiv.style.alignItems = 'center';
-      outputDiv.style.marginTop = '4px';
-      outputDiv.innerHTML = '<span style="font-size:10px;margin-right:4px;">Out:</span>';
-      
-      const outSpan = document.createElement('span');
-      outSpan.style.fontSize = '10px';
-      outSpan.style.background = '#445';
-      outSpan.style.padding = '2px';
-      outSpan.textContent = `${recipe.output.quantity}x ${recipe.output.item}`;
-      outSpan.onclick = () => {
-        const item = prompt('Output Item:', recipe.output.item);
-        if (item) {
-          const qty = parseInt(prompt('Output Quantity:', recipe.output.quantity)) || 1;
-          recipe.output = { item, quantity: qty };
-          saveLevel();
-          renderRecipes();
-        }
-      };
-      outputDiv.appendChild(outSpan);
-
-      // Delete Recipe
+      // --- Recipe header with delete ---
+      const headerDiv = document.createElement('div');
+      headerDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
+      const headerLabel = document.createElement('span');
+      headerLabel.style.cssText = 'font-size:11px;font-weight:bold;color:#ccc;';
+      headerLabel.textContent = `Recipe ${idx + 1}`;
       const delBtn = document.createElement('button');
-      delBtn.textContent = 'Delete Recipe';
-      delBtn.style.marginTop = '4px';
-      delBtn.style.background = '#844';
-      delBtn.onclick = () => {
-        obj.recipes.splice(idx, 1);
-        saveLevel();
-        renderRecipes();
-      };
+      delBtn.textContent = '×';
+      delBtn.style.cssText = 'background:#844;font-size:12px;padding:1px 5px;';
+      delBtn.onclick = () => { obj.recipes.splice(idx, 1); saveLevel(); renderRecipes(); };
+      headerDiv.appendChild(headerLabel);
+      headerDiv.appendChild(delBtn);
+      row.appendChild(headerDiv);
 
-      row.appendChild(inputsDiv);
-      row.appendChild(outputDiv);
-      row.appendChild(delBtn);
+      // --- Inputs section ---
+      const inputsLabel = document.createElement('span');
+      inputsLabel.style.cssText = 'font-size:10px;color:#aaa;margin-bottom:2px;';
+      inputsLabel.textContent = 'Inputs:';
+      row.appendChild(inputsLabel);
+
+      recipe.inputs.forEach((inp, iIdx) => {
+        const inputRow = document.createElement('div');
+        inputRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:3px;';
+
+        const itemSel = createItemSelect(inp.item);
+        itemSel.onchange = () => { inp.item = itemSel.value; saveLevel(); };
+
+        const qtyInput = document.createElement('input');
+        qtyInput.type = 'number';
+        qtyInput.min = '1';
+        qtyInput.value = inp.quantity;
+        qtyInput.style.cssText = 'width:40px;font-size:10px;';
+        qtyInput.onchange = () => { inp.quantity = Math.max(1, parseInt(qtyInput.value) || 1); saveLevel(); };
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = '×';
+        removeBtn.style.cssText = 'font-size:10px;padding:1px 4px;background:#a33;';
+        removeBtn.onclick = () => { recipe.inputs.splice(iIdx, 1); saveLevel(); renderRecipes(); };
+
+        inputRow.appendChild(itemSel);
+        inputRow.appendChild(qtyInput);
+        inputRow.appendChild(removeBtn);
+        row.appendChild(inputRow);
+      });
+
+      // Add input button
+      const addInputBtn = document.createElement('button');
+      addInputBtn.textContent = '+ Add Input';
+      addInputBtn.className = 'add-btn';
+      addInputBtn.style.cssText = 'font-size:10px;padding:3px 6px;margin-bottom:6px;';
+      addInputBtn.onclick = () => { recipe.inputs.push({ item: 'scrap', quantity: 1 }); saveLevel(); renderRecipes(); };
+      row.appendChild(addInputBtn);
+
+      // --- Output section ---
+      const outputLabel = document.createElement('span');
+      outputLabel.style.cssText = 'font-size:10px;color:#aaa;margin-bottom:2px;';
+      outputLabel.textContent = 'Output:';
+      row.appendChild(outputLabel);
+
+      const outputRow = document.createElement('div');
+      outputRow.style.cssText = 'display:flex;gap:4px;align-items:center;';
+
+      const outSel = createItemSelect(recipe.output.item);
+      outSel.onchange = () => { recipe.output.item = outSel.value; saveLevel(); };
+
+      const outQty = document.createElement('input');
+      outQty.type = 'number';
+      outQty.min = '1';
+      outQty.value = recipe.output.quantity;
+      outQty.style.cssText = 'width:40px;font-size:10px;';
+      outQty.onchange = () => { recipe.output.quantity = Math.max(1, parseInt(outQty.value) || 1); saveLevel(); };
+
+      outputRow.appendChild(outSel);
+      outputRow.appendChild(outQty);
+      row.appendChild(outputRow);
+
       recipesList.appendChild(row);
     });
   };
@@ -905,6 +945,44 @@ function renderWarpGateProperties(parent, obj) {
   parent.appendChild(destDiv);
 }
 
+const RAW_ORE_TYPES = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite'];
+const REFINED_ORE_NAMES = { cuprite: 'Copper', hematite: 'Iron', aurite: 'Gold', diamite: 'Diamond', platinite: 'Platinum' };
+
+function renderRefineryProperties(parent, obj) {
+  if (!obj.acceptedOres) obj.acceptedOres = ['cuprite'];
+
+  const oreDiv = document.createElement('div');
+  oreDiv.className = 'prop-group';
+  oreDiv.innerHTML = `<label>Accepted Ores (raw -> refined at 2:1)</label>`;
+
+  RAW_ORE_TYPES.forEach(ore => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = obj.acceptedOres.includes(ore);
+    cb.onchange = () => {
+      if (cb.checked) {
+        if (!obj.acceptedOres.includes(ore)) obj.acceptedOres.push(ore);
+      } else {
+        obj.acceptedOres = obj.acceptedOres.filter(o => o !== ore);
+      }
+      saveLevel();
+    };
+
+    const label = document.createElement('span');
+    label.style.fontSize = '12px';
+    label.textContent = `${ore.charAt(0).toUpperCase() + ore.slice(1)} → ${REFINED_ORE_NAMES[ore]}`;
+
+    row.appendChild(cb);
+    row.appendChild(label);
+    oreDiv.appendChild(row);
+  });
+
+  parent.appendChild(oreDiv);
+}
+
 function handlePlaceObject(world) {
   if (state.tool.selected.startsWith('asteroid_')) {
     const oreType = state.tool.selected.replace('asteroid_', '');
@@ -928,6 +1006,9 @@ function handlePlaceObject(world) {
     }
     if (type === 'shipyard') {
       st.availableShips = ['scout', 'cutter', 'transport'];
+    }
+    if (type === 'refinery') {
+      st.acceptedOres = ['cuprite'];
     }
     state.level.structures.push(st);
   }

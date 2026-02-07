@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure } from './constants.js';
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED, RAW_ORE_TYPES } from './constants.js';
 import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity, raycastCircle } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
@@ -123,10 +123,14 @@ let tutorialTextTimer = 0; // Time remaining for tutorial text (seconds)
 let tutorialTextTimerStarted = false; // True after player thrusts for the first time
 let tutorialTextWorldX = 0; // World X position of tutorial text
 let tutorialTextWorldY = 0; // World Y position of tutorial text
+let refineryMenuOpen = false;
 let activeShopStructure = null;
 let activeCraftingStructure = null;
 const craftingInputSlots = [null, null, null, null];
 let craftingOutputSlot = null;
+let activeRefineryStructure = null;
+const refineryInputSlots = [null, null, null, null];
+let refineryOutputSlot = null;
 
 // Start screen overlay (click to start). Keep rendering/asset loading running behind it.
 const startOverlayEl = document.getElementById('start-menu-overlay');
@@ -138,7 +142,7 @@ if (startOverlayEl) {
     startOverlayEl.style.display = 'none';
     startScreenOpen = false;
     // Unpause unless another menu is open (shouldn't be at boot)
-    gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+    gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
     // Clear latched inputs so the click doesn't immediately fire/thrust
     input.leftMouseDown = false;
     input.rightMouseDown = false;
@@ -724,8 +728,8 @@ function applyOreEmissiveMaterial(mesh, oreType) {
 }
 
 // Floating ore drops: self-lit like asteroids with ore-colored emissive tint
-const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key']);
-const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A };
+const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key', 'copper', 'iron', 'gold', 'diamond', 'platinum']);
+const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A, copper: 0xB87333, iron: 0x696969, gold: 0xFFD700, diamond: 0xB9F2FF, platinum: 0xE5E4E2 };
 const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
 
 function applyFloatingOreMaterial(mesh, itemKey) {
@@ -1347,7 +1351,7 @@ function update(dt) {
   // Bullets (movement + bullet-asteroid collision)
   const BULLET_DAMAGE = 4;            // pirate bullet damage to player
   const BULLET_DAMAGE_PIRATE = 3;    // light blaster damage per pellet to pirates
-  const BULLET_DAMAGE_ASTEROID = 0.25; // pellets deal only 0.25 to asteroids
+  const BULLET_DAMAGE_ASTEROID = 0.5; // pellets deal 0.5 damage to asteroids
   const VIEWPORT_HALF_W = WIDTH / 2;
   const VIEWPORT_HALF_H = HEIGHT / 2;
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -1370,6 +1374,7 @@ function update(dt) {
         if (dist < ast.radius) {
           if (b.owner === 'player') ast.health -= BULLET_DAMAGE_ASTEROID;
           remove = true;
+          spawnSparks(b.x, b.y, 3);
           break;
         }
       }
@@ -1738,8 +1743,8 @@ function render(dt = 1 / 60) {
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
     // Draw small glowing circle - same fill/stroke as ore type
-    const oreFill = { cuprite: '#665544', hematite: '#8B4513', aurite: '#B8860B', diamite: '#787878', platinite: '#D3D3D3', scrap: '#888888', 'warp key': '#B8860B' };
-    const oreStroke = { cuprite: '#998877', hematite: '#A0522D', aurite: '#FFD700', diamite: '#909090', platinite: '#E5E4E2', scrap: '#aaaaaa', 'warp key': '#DAA520' };
+    const oreFill = { cuprite: '#665544', hematite: '#8B4513', aurite: '#B8860B', diamite: '#787878', platinite: '#D3D3D3', scrap: '#888888', 'warp key': '#B8860B', copper: '#B87333', iron: '#696969', gold: '#FFD700', diamond: '#B9F2FF', platinum: '#E5E4E2' };
+    const oreStroke = { cuprite: '#998877', hematite: '#A0522D', aurite: '#FFD700', diamite: '#909090', platinite: '#E5E4E2', scrap: '#aaaaaa', 'warp key': '#DAA520', copper: '#D4915E', iron: '#8A8A8A', gold: '#FFE44D', diamond: '#DFFFFF', platinum: '#F0F0F0' };
     ctx.fillStyle = item.energy != null ? '#448844' :
                     (item.fuel != null ? '#886622' :
                     (item.oxygen != null ? '#446688' :
@@ -1789,7 +1794,7 @@ function render(dt = 1 / 60) {
   const STRUCTURE_SIZE = 40;
   const WARP_GATE_DASHED_EXTRA = 80;
   const SHOP_DASHED_EXTRA = 80;
-  const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', warpgate: '#6644aa', piratebase: '#884422' };
+  const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', crafting: '#886644', warpgate: '#6644aa', piratebase: '#884422' };
   for (const st of structures) {
     if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
     const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'piratebase';
@@ -2038,13 +2043,16 @@ function render(dt = 1 / 60) {
     ctx.stroke();
   }
 
-  // Interaction prompt for nearby interactable structures (shop, warpgate)
+  // Interaction prompt for nearby interactable structures (shop, warpgate, crafting, refinery)
   {
+    const INTERACTABLE_TYPES = new Set(['shop', 'warpgate', 'crafting', 'refinery', 'shipyard']);
+    const INTERACT_LABELS = { shop: 'Shop', warpgate: 'Warp Gate', crafting: 'Crafting Station', refinery: 'Refinery', shipyard: 'Shipyard' };
     let nearestInteractable = null;
     let nearestDist = Infinity;
-    if (!shopMenuOpen) {
+    if (!shopMenuOpen && !craftingMenuOpen && !refineryMenuOpen && !shipyardMenuOpen) {
       for (const st of structures) {
-        if (st.type !== 'shop' && st.type !== 'warpgate') continue;
+        if (!INTERACTABLE_TYPES.has(st.type)) continue;
+        if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
         const dx = ship.x - st.x;
         const dy = ship.y - st.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -2065,7 +2073,7 @@ function render(dt = 1 / 60) {
     // Draw with alpha (above the 3D model)
     if (interactPromptAlpha > 0 && interactPromptTarget) {
       const { x, y } = worldToScreen(interactPromptTarget.x, interactPromptTarget.y);
-      const label = interactPromptTarget.type === 'shop' ? 'Shop' : 'Warp Gate';
+      const label = INTERACT_LABELS[interactPromptTarget.type] || interactPromptTarget.type;
       const a = interactPromptAlpha;
       const topY = y - 95; // Above 3D model (radius ~54 + padding)
       ctx.font = 'bold 14px Oxanium';
@@ -2183,6 +2191,39 @@ function isShipInWarpGate() {
 function isShipInShop() {
   for (const st of structures) {
     if (st.type !== 'shop') continue;
+    const dx = ship.x - st.x;
+    const dy = ship.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < INTERACT_RADIUS) return st;
+  }
+  return null;
+}
+
+function isShipInCrafting() {
+  for (const st of structures) {
+    if (st.type !== 'crafting') continue;
+    const dx = ship.x - st.x;
+    const dy = ship.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < INTERACT_RADIUS) return st;
+  }
+  return null;
+}
+
+function isShipInRefinery() {
+  for (const st of structures) {
+    if (st.type !== 'refinery') continue;
+    const dx = ship.x - st.x;
+    const dy = ship.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < INTERACT_RADIUS) return st;
+  }
+  return null;
+}
+
+function isShipInShipyard() {
+  for (const st of structures) {
+    if (st.type !== 'shipyard') continue;
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -2502,12 +2543,21 @@ function returnSellAreaToHotbar() {
 window.addEventListener('keydown', (e) => {
   if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
+  // Allow E to close any open menu
   if (shopMenuOpen) {
-    // Allow E to close shop, ignore other gameplay inputs while paused in menu
-    if (e.code === 'KeyE') {
-      e.preventDefault();
-      closeShopMenu();
-    }
+    if (e.code === 'KeyE') { e.preventDefault(); closeShopMenu(); }
+    return;
+  }
+  if (craftingMenuOpen) {
+    if (e.code === 'KeyE') { e.preventDefault(); closeCraftingMenu(); }
+    return;
+  }
+  if (refineryMenuOpen) {
+    if (e.code === 'KeyE') { e.preventDefault(); closeRefineryMenu(); }
+    return;
+  }
+  if (shipyardMenuOpen) {
+    if (e.code === 'KeyE') { e.preventDefault(); closeShipyardMenu(); }
     return;
   }
   // Hotbar slot selection (1-9)
@@ -2515,9 +2565,9 @@ window.addEventListener('keydown', (e) => {
     selectedSlot = parseInt(e.key) - 1;
     markHUDDirty();
   }
-  // Key in E position (KeyE): close shop, or open warp gate/shop menu when inside
+  // Key in E position (KeyE): open warp gate/shop/crafting/refinery/shipyard menu when inside
   if (e.code === 'KeyE') {
-    if (!warpMenuOpen && !gamePaused && isShipInWarpGate()) {
+    if (!gamePaused && isShipInWarpGate()) {
       e.preventDefault();
       input.leftMouseDown = false;
       input.rightMouseDown = false;
@@ -2528,7 +2578,7 @@ window.addEventListener('keydown', (e) => {
       if (overlay) overlay.style.display = 'flex';
       const payBtn = document.getElementById('warp-pay-btn');
       if (payBtn) payBtn.disabled = player.credits < 3000;
-    } else if (!warpMenuOpen && !gamePaused) {
+    } else if (!gamePaused) {
       const shopSt = isShipInShop();
       if (shopSt) {
         e.preventDefault();
@@ -2536,6 +2586,33 @@ window.addEventListener('keydown', (e) => {
         input.rightMouseDown = false;
         input.ctrlBrake = false;
         openShopMenu(shopSt);
+      } else {
+        const craftSt = isShipInCrafting();
+        if (craftSt) {
+          e.preventDefault();
+          input.leftMouseDown = false;
+          input.rightMouseDown = false;
+          input.ctrlBrake = false;
+          openCraftingMenu(craftSt);
+        } else {
+          const refSt = isShipInRefinery();
+          if (refSt) {
+            e.preventDefault();
+            input.leftMouseDown = false;
+            input.rightMouseDown = false;
+            input.ctrlBrake = false;
+            openRefineryMenu(refSt);
+          } else {
+            const shipSt = isShipInShipyard();
+            if (shipSt) {
+              e.preventDefault();
+              input.leftMouseDown = false;
+              input.rightMouseDown = false;
+              input.ctrlBrake = false;
+              openShipyardMenu(shipSt);
+            }
+          }
+        }
       }
     }
   }
@@ -2543,7 +2620,7 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
-  if (shopMenuOpen) return;
+  if (shopMenuOpen || craftingMenuOpen || refineryMenuOpen || shipyardMenuOpen) return;
 });
 
 // Default shop inventory generator
@@ -2749,7 +2826,7 @@ fetch(KNOWN_LEVELS[initialLevelIdx].path + '?t=' + Date.now())
 
 function closeWarpMenu() {
   warpMenuOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   const overlay = document.getElementById('warp-menu-overlay');
   if (overlay) overlay.style.display = 'none';
 }
@@ -2802,7 +2879,7 @@ function openShopMenu(shopStructure) {
 function closeShopMenu() {
   returnSellAreaToHotbar();
   shopMenuOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   inventoryDrag = null;
   activeShopStructure = null;
   const overlay = document.getElementById('shop-menu-overlay');
@@ -2900,7 +2977,7 @@ function closeCraftingMenu() {
   }
   
   craftingMenuOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   activeCraftingStructure = null;
   const overlay = document.getElementById('crafting-menu-overlay');
   if (overlay) overlay.style.display = 'none';
@@ -3026,6 +3103,182 @@ if (craftingCloseBtn) {
   craftingCloseBtn.addEventListener('click', () => closeCraftingMenu());
 }
 
+// ============ Refinery Menu Logic ============
+
+function openRefineryMenu(structure) {
+  if (refineryMenuOpen) return;
+  activeRefineryStructure = structure;
+  refineryMenuOpen = true;
+  gamePaused = true;
+
+  // Clear slots
+  for (let i = 0; i < 4; i++) refineryInputSlots[i] = null;
+  refineryOutputSlot = null;
+
+  // Show accepted ores label
+  const acceptedOres = structure.acceptedOres || [];
+  const acceptedLabel = document.getElementById('refinery-accepted-label');
+  if (acceptedLabel) {
+    const names = acceptedOres.map(o => ITEM_DISPLAY_NAMES[o] || o);
+    acceptedLabel.textContent = 'Accepts: ' + (names.length > 0 ? names.join(', ') : 'None');
+  }
+
+  const overlay = document.getElementById('refinery-menu-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  syncRefineryUI();
+}
+
+function closeRefineryMenu() {
+  // Return unprocessed items to inventory or drop them
+  for (let i = 0; i < 4; i++) {
+    if (refineryInputSlots[i]) {
+      if (!inventory.add(refineryInputSlots[i].item, refineryInputSlots[i].quantity)) {
+        // Drop if full
+        const it = refineryInputSlots[i];
+        const angle = Math.random() * Math.PI * 2;
+        floatingItems.push({
+          x: ship.x + Math.cos(angle) * 30,
+          y: ship.y + Math.sin(angle) * 30,
+          vx: Math.cos(angle) * 40,
+          vy: Math.sin(angle) * 40,
+          item: it.item,
+          quantity: it.quantity
+        });
+      }
+      refineryInputSlots[i] = null;
+    }
+  }
+  // Return output
+  if (refineryOutputSlot && refineryOutputSlot.real) {
+    if (!inventory.add(refineryOutputSlot.item, refineryOutputSlot.quantity)) {
+      const angle = Math.random() * Math.PI * 2;
+      floatingItems.push({
+        x: ship.x + Math.cos(angle) * 30,
+        y: ship.y + Math.sin(angle) * 30,
+        vx: Math.cos(angle) * 40,
+        vy: Math.sin(angle) * 40,
+        item: refineryOutputSlot.item,
+        quantity: refineryOutputSlot.quantity
+      });
+    }
+    refineryOutputSlot = null;
+  }
+
+  refineryMenuOpen = false;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  activeRefineryStructure = null;
+  const overlay = document.getElementById('refinery-menu-overlay');
+  if (overlay) overlay.style.display = 'none';
+  inventoryDrag = null;
+  hudDirty = true;
+}
+
+function syncRefineryUI() {
+  // Sync input slots
+  for (let i = 0; i < 4; i++) {
+    const el = document.querySelector(`.refinery-input-slot[data-refinery-input="${i}"]`);
+    if (el) {
+      el.innerHTML = getSlotHTML(refineryInputSlots[i]);
+      el.classList.toggle('has-item', !!refineryInputSlots[i]);
+    }
+  }
+  // Sync output slot
+  const outEl = document.getElementById('refinery-output-slot');
+  if (outEl) {
+    outEl.innerHTML = getSlotHTML(refineryOutputSlot);
+    outEl.classList.toggle('has-item', !!refineryOutputSlot && refineryOutputSlot.real);
+    if (refineryOutputSlot && !refineryOutputSlot.real) outEl.style.opacity = '0.5';
+    else outEl.style.opacity = '1';
+  }
+
+  checkRefineryRecipe();
+}
+
+function checkRefineryRecipe() {
+  if (!activeRefineryStructure) return;
+  const acceptedOres = activeRefineryStructure.acceptedOres || [];
+
+  // If output is real (already refined but not taken), disable button
+  if (refineryOutputSlot && refineryOutputSlot.real) {
+    const btn = document.getElementById('refine-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Output Full'; }
+    return;
+  }
+
+  // Aggregate input ores, only counting accepted ores
+  let totalOre = 0;
+  let oreType = null;
+  let mixedTypes = false;
+  for (const slot of refineryInputSlots) {
+    if (!slot) continue;
+    if (!acceptedOres.includes(slot.item)) {
+      // Non-accepted ore - can't refine
+      mixedTypes = true;
+      break;
+    }
+    if (oreType === null) oreType = slot.item;
+    else if (slot.item !== oreType) { mixedTypes = true; break; }
+    totalOre += slot.quantity;
+  }
+
+  const btn = document.getElementById('refine-btn');
+  if (!mixedTypes && oreType && totalOre >= 2 && RAW_TO_REFINED[oreType]) {
+    const refinedName = RAW_TO_REFINED[oreType];
+    const outputQty = Math.floor(totalOre / 2);
+    refineryOutputSlot = { item: refinedName, quantity: outputQty, real: false };
+    const payload = getItemPayload(refinedName);
+    Object.assign(refineryOutputSlot, payload);
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Refine';
+      btn.onclick = () => refineOre(oreType, totalOre, refinedName, outputQty);
+    }
+  } else {
+    refineryOutputSlot = null;
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = totalOre > 0 && mixedTypes ? 'Single ore type only' : totalOre === 1 ? 'Need 2+ ore' : 'Refine';
+      btn.onclick = null;
+    }
+  }
+
+  // Update output preview
+  const outEl = document.getElementById('refinery-output-slot');
+  if (outEl) {
+    outEl.innerHTML = getSlotHTML(refineryOutputSlot);
+    if (refineryOutputSlot && !refineryOutputSlot.real) outEl.style.opacity = '0.5';
+    else outEl.style.opacity = '1';
+  }
+}
+
+function refineOre(oreType, totalOre, refinedName, outputQty) {
+  if (refineryOutputSlot && refineryOutputSlot.real) return;
+
+  // Consume input ores: consume outputQty * 2 ores
+  let toConsume = outputQty * 2;
+  for (let i = 0; i < 4; i++) {
+    if (!refineryInputSlots[i] || refineryInputSlots[i].item !== oreType) continue;
+    const take = Math.min(toConsume, refineryInputSlots[i].quantity);
+    refineryInputSlots[i].quantity -= take;
+    toConsume -= take;
+    if (refineryInputSlots[i].quantity <= 0) refineryInputSlots[i] = null;
+    if (toConsume <= 0) break;
+  }
+
+  // Mark output as real
+  if (refineryOutputSlot) {
+    refineryOutputSlot.real = true;
+  }
+  syncRefineryUI();
+}
+
+const refineryCloseBtn = document.getElementById('refinery-close-btn');
+if (refineryCloseBtn) {
+  refineryCloseBtn.addEventListener('click', () => closeRefineryMenu());
+}
+
+// ============ End Refinery Menu Logic ============
 
 let currentShipType = 'scout';
 
@@ -3079,7 +3332,7 @@ function openShipyardMenu(structure) {
 
 function closeShipyardMenu() {
   shipyardMenuOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   const overlay = document.getElementById('shipyard-menu-overlay');
   if (overlay) overlay.style.display = 'none';
 }
@@ -3335,7 +3588,7 @@ function endDrag(clientX, clientY) {
   }
 
   // Handle Jettison if dropped outside of UI and shop is closed
-  if (!targetSlotEl && !shopMenuOpen && !craftingMenuOpen && !shipyardMenuOpen && drag.kind === 'hotbar') {
+  if (!targetSlotEl && !shopMenuOpen && !craftingMenuOpen && !shipyardMenuOpen && !refineryMenuOpen && drag.kind === 'hotbar') {
     // Drop into space
     const from = drag.fromSlot;
     const it = hotbar[from];
@@ -3395,8 +3648,10 @@ function endDrag(clientX, clientY) {
   const isHotbar = targetSlotEl.classList.contains('slot');
   const isSell = targetSlotEl.classList.contains('shop-sell-slot');
   const isBuy = targetSlotEl.classList.contains('shop-buy-slot'); // Can't drop onto buy slots generally
-  const isCraftInput = targetSlotEl.classList.contains('input-slot');
-  const isCraftOutput = targetSlotEl.classList.contains('output-slot');
+  const isCraftInput = targetSlotEl.classList.contains('input-slot') && !targetSlotEl.classList.contains('refinery-input-slot');
+  const isCraftOutput = targetSlotEl.classList.contains('output-slot') && !targetSlotEl.closest('#refinery-output-area');
+  const isRefineryInput = targetSlotEl.classList.contains('refinery-input-slot');
+  const isRefineryOutput = !!targetSlotEl.closest('#refinery-output-area');
 
   if (drag.kind === 'hotbar') {
     const from = drag.fromSlot;
@@ -3420,6 +3675,19 @@ function endDrag(clientX, clientY) {
         updateHUD();
         syncCraftingUI();
         return;
+      }
+    } else if (isRefineryInput && refineryMenuOpen) {
+      const idx = parseInt(targetSlotEl.dataset.refineryInput, 10);
+      if (idx >= 0 && !refineryInputSlots[idx]) {
+        // Only allow accepted ores
+        const accepted = activeRefineryStructure && activeRefineryStructure.acceptedOres || [];
+        if (accepted.includes(it.item)) {
+          refineryInputSlots[idx] = { ...it };
+          hotbar[from] = null;
+          updateHUD();
+          syncRefineryUI();
+          return;
+        }
       }
     } else if (isHotbar) {
       const to = parseInt(targetSlotEl.dataset.slot, 10);
@@ -3509,6 +3777,44 @@ function endDrag(clientX, clientY) {
         return;
       }
     }
+  } else if (drag.kind === 'refineryInput') {
+    const from = drag.fromRefineryInput;
+    const it = refineryInputSlots[from];
+    if (!it) return;
+
+    if (isHotbar) {
+      const to = parseInt(targetSlotEl.dataset.slot, 10);
+      if (to >= 0 && !hotbar[to]) {
+        hotbar[to] = { ...it };
+        refineryInputSlots[from] = null;
+        updateHUD();
+        syncRefineryUI();
+        return;
+      }
+    } else if (isRefineryInput) {
+      const to = parseInt(targetSlotEl.dataset.refineryInput, 10);
+      if (to >= 0 && to !== from) {
+        const tmp = refineryInputSlots[to];
+        refineryInputSlots[to] = refineryInputSlots[from];
+        refineryInputSlots[from] = tmp;
+        syncRefineryUI();
+        return;
+      }
+    }
+  } else if (drag.kind === 'refineryOutput') {
+    const it = refineryOutputSlot;
+    if (!it || !it.real) return;
+
+    if (isHotbar) {
+      const to = parseInt(targetSlotEl.dataset.slot, 10);
+      if (to >= 0 && !hotbar[to]) {
+        hotbar[to] = { ...it };
+        refineryOutputSlot = null;
+        updateHUD();
+        syncRefineryUI();
+        return;
+      }
+    }
   }
 }
 
@@ -3520,8 +3826,10 @@ window.addEventListener('mousedown', (e) => {
   const hotbarSlotEl = t.closest && t.closest('#hotbar .slot');
   const buySlotEl = t.closest && t.closest('.shop-buy-slot');
   const sellSlotEl = t.closest && t.closest('.shop-sell-slot');
-  const craftInputEl = t.closest && t.closest('.crafting-slot.input-slot');
-  const craftOutputEl = t.closest && t.closest('.crafting-slot.output-slot');
+  const craftInputEl = t.closest && t.closest('.crafting-slot.input-slot:not(.refinery-input-slot)');
+  const craftOutputEl = t.closest && t.closest('#crafting-work-area .crafting-slot.output-slot');
+  const refineryInputEl = t.closest && t.closest('.refinery-input-slot');
+  const refineryOutputEl = t.closest && t.closest('#refinery-output-area .crafting-slot.output-slot');
   
   if (hotbarSlotEl) {
     const slotIndex = parseInt(hotbarSlotEl.dataset.slot, 10);
@@ -3548,6 +3856,21 @@ window.addEventListener('mousedown', (e) => {
           hotbar[slotIndex] = null;
           syncCraftingUI();
           updateHUD();
+        }
+        return;
+      }
+      // Shift+click (with refinery open): transfer accepted ore to first empty input slot
+      if (e.shiftKey && refineryMenuOpen) {
+        const it = hotbar[slotIndex];
+        const accepted = activeRefineryStructure && activeRefineryStructure.acceptedOres || [];
+        if (accepted.includes(it.item)) {
+          const firstEmpty = refineryInputSlots.findIndex(s => !s);
+          if (firstEmpty >= 0) {
+            refineryInputSlots[firstEmpty] = { ...it };
+            hotbar[slotIndex] = null;
+            syncRefineryUI();
+            updateHUD();
+          }
         }
         return;
       }
@@ -3623,6 +3946,55 @@ window.addEventListener('mousedown', (e) => {
       return;
     }
   }
+
+  if (refineryMenuOpen) {
+    if (refineryInputEl) {
+      const idx = parseInt(refineryInputEl.dataset.refineryInput, 10);
+      if (idx >= 0 && refineryInputSlots[idx]) {
+        e.preventDefault();
+        // Shift+click: return to inventory
+        if (e.shiftKey) {
+          if (inventory.add(refineryInputSlots[idx].item, refineryInputSlots[idx].quantity)) {
+            refineryInputSlots[idx] = null;
+            syncRefineryUI();
+            updateHUD();
+          }
+          return;
+        }
+        // Drag
+        hideShopTooltip();
+        const it = refineryInputSlots[idx];
+        inventoryDrag = { kind: 'refineryInput', fromRefineryInput: idx };
+        const qty = it.quantity != null ? String(it.quantity) : '';
+        setDragGhostContent(it, getItemLabel(it), qty);
+        setDragGhostPos(e.clientX, e.clientY);
+        setDragGhostVisible(true);
+      }
+      return;
+    }
+    if (refineryOutputEl) {
+      if (refineryOutputSlot && refineryOutputSlot.real) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          if (inventory.add(refineryOutputSlot.item, refineryOutputSlot.quantity)) {
+            refineryOutputSlot = null;
+            syncRefineryUI();
+            updateHUD();
+          }
+          return;
+        }
+        // Drag
+        hideShopTooltip();
+        const it = refineryOutputSlot;
+        inventoryDrag = { kind: 'refineryOutput' };
+        const qty = it.quantity != null ? String(it.quantity) : '';
+        setDragGhostContent(it, getItemLabel(it), qty);
+        setDragGhostPos(e.clientX, e.clientY);
+        setDragGhostVisible(true);
+      }
+      return;
+    }
+  }
 });
 
 window.addEventListener('mousemove', (e) => {
@@ -3642,6 +4014,10 @@ window.addEventListener('mousemove', (e) => {
       it = craftingInputSlots[inventoryDrag.fromCraftInput];
     } else if (inventoryDrag.kind === 'craftOutput') {
       it = craftingOutputSlot;
+    } else if (inventoryDrag.kind === 'refineryInput') {
+      it = refineryInputSlots[inventoryDrag.fromRefineryInput];
+    } else if (inventoryDrag.kind === 'refineryOutput') {
+      it = refineryOutputSlot;
     }
     
     const isOverFuel = under && under.closest('#fuel-bar-drop-zone');

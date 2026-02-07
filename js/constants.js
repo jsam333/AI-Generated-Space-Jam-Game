@@ -39,7 +39,17 @@ export const OXYGEN_DEPLETION_RATE = 1 / 25;
 export const FUEL_DEPLETION_RATE = 1 / 3;
 
 export const MAX_ORE_STACK = 10;
-export const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap'];
+export const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'copper', 'iron', 'gold', 'diamond', 'platinum'];
+
+// --- Raw ore -> Refined ore mapping (used by Refinery) ---
+export const RAW_TO_REFINED = {
+  'cuprite': 'copper',
+  'hematite': 'iron',
+  'aurite': 'gold',
+  'diamite': 'diamond',
+  'platinite': 'platinum'
+};
+export const RAW_ORE_TYPES = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite'];
 
 export const STRUCTURE_SIZE = 40;
 export const STRUCTURE_RADIUS_3D = 54;
@@ -83,7 +93,12 @@ export const ITEM_USAGE = {
   'diamite': 'Precious ore. High value.',
   'platinite': 'Extremely rare ore. Most valuable.',
   'scrap': 'Salvaged material. Can be sold for credits.',
-  'warp key': 'Required to activate warp gates.'
+  'warp key': 'Required to activate warp gates.',
+  'copper': 'Refined copper. More valuable than raw cuprite.',
+  'iron': 'Refined iron. More valuable than raw hematite.',
+  'gold': 'Refined gold. More valuable than raw aurite.',
+  'diamond': 'Refined diamond. More valuable than raw diamite.',
+  'platinum': 'Refined platinum. Most valuable refined ore.'
 };
 
 export const ITEM_DISPLAY_NAMES = {
@@ -104,7 +119,12 @@ export const ITEM_DISPLAY_NAMES = {
   'diamite': 'Diamite',
   'platinite': 'Platinite',
   'scrap': 'Scrap',
-  'warp key': 'Warp Key'
+  'warp key': 'Warp Key',
+  'copper': 'Copper',
+  'iron': 'Iron',
+  'gold': 'Gold',
+  'diamond': 'Diamond',
+  'platinum': 'Platinum'
 };
 
 // --- Collision constants ---
@@ -166,7 +186,12 @@ export const ITEM_LABELS = {
   'diamite': 'D',
   'platinite': 'P',
   'scrap': 'S',
-  'warp key': 'K'
+  'warp key': 'K',
+  'copper': 'Cu',
+  'iron': 'Fe',
+  'gold': 'Au',
+  'diamond': 'Di',
+  'platinum': 'Pt'
 };
 
 // --- Item default payloads (used when buying/creating items) ---
@@ -199,12 +224,13 @@ export const ITEM_BUY_PRICE = {
 
 export const ITEM_SELL_PRICE = {
   cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60,
+  copper: 25, iron: 50, gold: 75, diamond: 100, platinum: 150,
   scrap: 40, 'warp key': 500, 'mining laser': 300,
   'light blaster': 500, 'medium mining laser': 750
 };
 
 // --- Collidable structure types ---
-const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'crafting', 'shipyard']);
+const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'crafting', 'shipyard', 'refinery']);
 
 /** Returns true if a structure should participate in physics collision checks. */
 export function isCollidableStructure(st) {
@@ -215,6 +241,18 @@ export function isCollidableStructure(st) {
 
 // --- Weapons that display a heat bar in HUD slots ---
 export const HEAT_WEAPONS = ['mining laser', 'medium mining laser', 'light blaster'];
+
+// --- Master item list (used by editor dropdowns for crafting recipes, etc.) ---
+export const ALL_ITEM_NAMES = [
+  'mining laser', 'medium mining laser', 'light blaster',
+  'small energy cell', 'medium energy cell',
+  'oxygen canister', 'large oxygen canister',
+  'fuel tank', 'large fuel tank',
+  'health pack', 'large health pack',
+  'cuprite', 'hematite', 'aurite', 'diamite', 'platinite',
+  'copper', 'iron', 'gold', 'diamond', 'platinum',
+  'scrap', 'warp key'
+];
 
 // --- Resource bar drop configuration (used by endDrag) ---
 export const RESOURCE_BAR_CONFIG = {

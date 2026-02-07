@@ -370,6 +370,112 @@ textarea {
   opacity: 0.5;
 }
 
+/* --- Refinery Menu --- */
+#refinery-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1200px;
+  height: 900px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  z-index: 10;
+  pointer-events: auto;
+  cursor: default;
+}
+
+#refinery-menu {
+  background: rgba(30, 30, 30, 0.95);
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #666;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+#refinery-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#refinery-header span {
+  color: #eee;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 18px;
+}
+
+#refinery-header button {
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #444;
+  color: #fff;
+}
+
+#refinery-accepted-label {
+  color: #aaa;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 12px;
+}
+
+#refinery-main {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+#refinery-input-area,
+#refinery-output-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.refinery-section-title {
+  color: #bbb;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+#refinery-input-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 50px);
+  gap: 4px;
+}
+
+#refine-btn {
+  width: 100%;
+  padding: 10px;
+  background: #6a8a3a;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Oxanium', Arial, sans-serif;
+  font-size: 14px;
+}
+
+#refine-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 #shipyard-menu-overlay {
   position: absolute;
   left: 0;

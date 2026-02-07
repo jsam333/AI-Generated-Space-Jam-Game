@@ -69,6 +69,32 @@
         <div id="shipyard-credits">You have 0 credits</div>
       </div>
     </div>
+    <div id="refinery-menu-overlay" style="display: none;">
+      <div id="refinery-menu">
+        <div id="refinery-header">
+          <span>Refinery</span>
+          <button type="button" id="refinery-close-btn">Close</button>
+        </div>
+        <div id="refinery-accepted-label">Accepts: ---</div>
+        <div id="refinery-main">
+          <div id="refinery-input-area">
+            <div class="refinery-section-title">Raw Ore Input</div>
+            <div id="refinery-input-grid">
+              <div class="crafting-slot refinery-input-slot" data-refinery-input="0"></div>
+              <div class="crafting-slot refinery-input-slot" data-refinery-input="1"></div>
+              <div class="crafting-slot refinery-input-slot" data-refinery-input="2"></div>
+              <div class="crafting-slot refinery-input-slot" data-refinery-input="3"></div>
+            </div>
+          </div>
+          <div class="crafting-arrow">➜</div>
+          <div id="refinery-output-area">
+            <div class="refinery-section-title">Refined Output</div>
+            <div id="refinery-output-slot" class="crafting-slot output-slot"></div>
+          </div>
+        </div>
+        <button id="refine-btn">Refine</button>
+      </div>
+    </div>
     <div id="shop-menu-overlay" style="display: none;">
       <div id="shop-item-tooltip" style="display: none;"></div>
       <div id="shop-menu">
