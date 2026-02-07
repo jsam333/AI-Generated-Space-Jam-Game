@@ -1168,12 +1168,14 @@ function update(dt) {
   if (miningLaser && laserStats && miningLaser.heat != null) {
     if (miningLaser.heat >= 1) miningLaser.overheated = true;
     if (miningLaser.heat <= 0) miningLaser.overheated = false;
+    if (miningLaser.heat > 0) hudDirty = true;
 
     const canFire = !miningLaser.overheated;
     if (miningLaser && input.leftMouseDown && hasEnergy && canFire) {
       miningLaser.heat = Math.min(1, miningLaser.heat + laserStats.heatRate * dt);
+      hudDirty = true;
       const cell = inventory.getFirstChargedCell();
-      if (cell) cell.energy = Math.max(0, cell.energy - laserStats.energyDrain * dt);
+      if (cell) { cell.energy = Math.max(0, cell.energy - laserStats.energyDrain * dt); }
 
       const dx = input.mouseX - WIDTH / 2;
       const dy = input.mouseY - HEIGHT / 2;
@@ -1286,6 +1288,7 @@ function update(dt) {
   if (blaster && blaster.heat != null) {
     if (blaster.heat >= 1) blaster.overheated = true;
     if (blaster.heat <= 0) blaster.overheated = false;
+    if (blaster.heat > 0) hudDirty = true;
     const blasterCanFire = !blaster.overheated;
     const hasBlasterEnergy = inventory.getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT) != null;
     if (blasterCanFire && input.leftMouseDown && hasBlasterEnergy) {
@@ -1297,6 +1300,7 @@ function update(dt) {
         c.energy = Math.max(0, c.energy - BLASTER_ENERGY_PER_SHOT);
         blaster.heat = Math.min(1, blaster.heat + BLASTER_HEAT_PER_SHOT);
         fireBlasterPellet();
+        hudDirty = true;
       }
     } else {
       blaster.heat = Math.max(0, blaster.heat - BLASTER_COOL_RATE * dt);
@@ -1509,6 +1513,11 @@ function update(dt) {
   }
 
   // Create/update 3D mesh for ore-type floating items (skip off-screen position updates)
+  const CULL_MARGIN_UPDATE = 350;
+  const cullLeftU   = ship.x - WIDTH / 2 - CULL_MARGIN_UPDATE;
+  const cullRightU  = ship.x + WIDTH / 2 + CULL_MARGIN_UPDATE;
+  const cullTopU    = ship.y - HEIGHT / 2 - CULL_MARGIN_UPDATE;
+  const cullBottomU = ship.y + HEIGHT / 2 + CULL_MARGIN_UPDATE;
   if (floatingOreContainer && (oreModel || scrapModel)) {
     for (const item of floatingItems) {
       if (!FLOATING_ORE_ITEMS.has(item.item)) continue;
@@ -1524,7 +1533,7 @@ function update(dt) {
         item._spinDirection = Math.random() < 0.5 ? -1 : 1;
         item._spinSpeed = 0.5 + Math.random() * 0.4;
       }
-      const onScreen = item.x > cullLeft && item.x < cullRight && item.y > cullTop && item.y < cullBottom;
+      const onScreen = item.x > cullLeftU && item.x < cullRightU && item.y > cullTopU && item.y < cullBottomU;
       item._mesh.visible = onScreen;
       if (!onScreen) continue;
       item._mesh.position.set(item.x - ship.x, -(item.y - ship.y), 0);
@@ -1536,6 +1545,7 @@ function update(dt) {
   }
 
   // Pickup floating items only when within ship collision radius
+  const prevFloatingCount = floatingItems.length;
   for (let i = floatingItems.length - 1; i >= 0; i--) {
     const item = floatingItems[i];
     const dx = item.x - ship.x;
@@ -1628,6 +1638,7 @@ function update(dt) {
       }
     }
   }
+  if (floatingItems.length !== prevFloatingCount) hudDirty = true;
 
   // Death: show overlay + pause game (one-shot)
   if (!deathScreenOpen && player.health <= 0) {
@@ -2556,8 +2567,11 @@ let levelSpawnSettings = {
   waveSizeMax: 4
 };
 
+let currentLevelIdx = 0;
+
 // Load level from JSON file
-function loadLevel(levelData) {
+function loadLevel(levelData, levelIdx) {
+  if (levelIdx !== undefined) currentLevelIdx = levelIdx;
   // Reset ship position and velocity
   ship.x = 0;
   ship.y = 0;
@@ -2669,6 +2683,26 @@ function loadLevel(levelData) {
   tutorialTextTimerStarted = false;
   tutorialTextWorldX = ship.x;
   tutorialTextWorldY = ship.y - 80; // Above the ship
+
+  // Per-level starting inventory
+  if (currentLevelIdx === 1) {
+    // Level 2: give player upgraded loadout
+    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+    inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
+    inventory.set(1, { item: 'light blaster', heat: 0, overheated: false });
+    inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+    inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+    selectedSlot = 0;
+    hudDirty = true;
+  } else {
+    // Default loadout (Level 1 / Debug)
+    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+    inventory.set(0, { item: 'mining laser', heat: 0, overheated: false });
+    inventory.set(1, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+    inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+    selectedSlot = 0;
+    hudDirty = true;
+  }
 }
 
 // Level select: scan known levels and populate dropdown
@@ -2678,6 +2712,7 @@ const KNOWN_LEVELS = [
   { name: 'Debug', path: 'levels/debug.json' }
 ];
 
+const LEVEL_STORAGE_KEY = 'lastSelectedLevel';
 const levelSelect = document.getElementById('level-select');
 if (levelSelect) {
   KNOWN_LEVELS.forEach((lev, i) => {
@@ -2687,20 +2722,29 @@ if (levelSelect) {
     levelSelect.appendChild(opt);
   });
   levelSelect.addEventListener('change', () => {
-    const lev = KNOWN_LEVELS[levelSelect.value];
+    const idx = levelSelect.value;
+    const lev = KNOWN_LEVELS[idx];
     if (lev) {
+      try { localStorage.setItem(LEVEL_STORAGE_KEY, idx); } catch (_) {}
       fetch(lev.path + '?t=' + Date.now())
         .then(res => res.json())
-        .then(level => loadLevel(level))
+        .then(level => loadLevel(level, Number(idx)))
         .catch(err => console.error('Failed to load ' + lev.path, err));
     }
   });
 }
 
-// Load initial level (Level 1)
-fetch(KNOWN_LEVELS[0].path + '?t=' + Date.now())
+// Restore last selected level from cache, falling back to 0
+let initialLevelIdx = 0;
+try {
+  const saved = localStorage.getItem(LEVEL_STORAGE_KEY);
+  if (saved !== null && KNOWN_LEVELS[Number(saved)]) initialLevelIdx = Number(saved);
+} catch (_) {}
+if (levelSelect) levelSelect.value = initialLevelIdx;
+
+fetch(KNOWN_LEVELS[initialLevelIdx].path + '?t=' + Date.now())
   .then(res => res.json())
-  .then(level => loadLevel(level))
+  .then(level => loadLevel(level, initialLevelIdx))
   .catch(() => {});
 
 function closeWarpMenu() {
