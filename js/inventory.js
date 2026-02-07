@@ -58,6 +58,20 @@ export class Inventory {
     return null;
   }
 
+  /** Resize inventory. Returns array of excess items that no longer fit (when shrinking). */
+  resize(newSize) {
+    const excess = [];
+    if (newSize > this.slots.length) {
+      while (this.slots.length < newSize) this.slots.push(null);
+    } else if (newSize < this.slots.length) {
+      for (let i = newSize; i < this.slots.length; i++) {
+        if (this.slots[i]) excess.push(this.slots[i]);
+      }
+      this.slots.length = newSize;
+    }
+    return excess;
+  }
+
   getFirstCellWithMinEnergy(min) {
     for (let i = 0; i < this.slots.length; i++) {
       const cell = this.slots[i];

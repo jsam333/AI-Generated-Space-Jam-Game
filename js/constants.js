@@ -70,9 +70,9 @@ export const STRUCTURE_STYLES = {
 };
 
 export const SHIP_STATS = {
-  'scout': { name: 'Scout', price: 0, health: 50, fuel: 25, oxygen: 30, speed: 175, desc: 'Standard issue scout ship.' },
-  'cutter': { name: 'Cutter', price: 5000, health: 80, fuel: 40, oxygen: 40, speed: 150, desc: 'Sturdy mining vessel with reinforced hull.' },
-  'transport': { name: 'Transport', price: 12000, health: 120, fuel: 80, oxygen: 60, speed: 120, desc: 'Heavy transport with massive capacity.' }
+  'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 9,  collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, desc: 'Standard issue scout ship.' },
+  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 150, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.2, desc: 'Sturdy mining vessel. 20% bonus weapon damage.' },
+  'transport': { name: 'Transport', price: 5000, health: 50, fuel: 50, oxygen: 50, speed: 120, slots: 18, collisionRadius: 14, shipScale: 1.6, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
 };
 
 export const ITEM_USAGE = {

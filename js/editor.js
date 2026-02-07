@@ -1337,6 +1337,48 @@ document.getElementById('paste-btn').addEventListener('click', () => {
   }
 });
 
+document.getElementById('remove-overlaps-btn').addEventListener('click', () => {
+  const asts = state.level.asteroids;
+  if (asts.length < 2) return;
+
+  // Build a set of indices to remove: for every pair where one asteroid is
+  // fully inside the other, randomly pick one to keep and mark the other.
+  const remove = new Set();
+  for (let i = 0; i < asts.length; i++) {
+    if (remove.has(i)) continue;
+    for (let j = i + 1; j < asts.length; j++) {
+      if (remove.has(j)) continue;
+      const dx = asts[i].x - asts[j].x;
+      const dy = asts[i].y - asts[j].y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const ri = asts[i].radius;
+      const rj = asts[j].radius;
+      // Check if i is fully inside j  (dist + ri <= rj)
+      // or if j is fully inside i      (dist + rj <= ri)
+      const iInsideJ = dist + ri <= rj;
+      const jInsideI = dist + rj <= ri;
+      if (iInsideJ || jInsideI) {
+        // Randomly pick which one to remove
+        if (Math.random() < 0.5) {
+          remove.add(i);
+        } else {
+          remove.add(j);
+        }
+      }
+    }
+  }
+
+  if (remove.size === 0) {
+    alert('No fully overlapping asteroids found.');
+    return;
+  }
+
+  state.level.asteroids = asts.filter((_, idx) => !remove.has(idx));
+  saveLevel();
+  render();
+  alert(`Removed ${remove.size} fully overlapping asteroid(s).`);
+});
+
 document.getElementById('import-file').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
