@@ -60,13 +60,20 @@
     <div id="shipyard-menu-overlay" style="display: none;">
       <div id="shipyard-menu">
         <div id="shipyard-header">
-          <span>Shipyard</span>
+          <span class="shipyard-title-row">
+            <span>Shipyard</span>
+            <span id="shipyard-credits">0 credits</span>
+          </span>
           <button type="button" id="shipyard-close-btn">Close</button>
         </div>
-        <div id="shipyard-list">
-          <!-- Ships injected here -->
+        <div id="shipyard-for-sale-section" style="display:none;">
+          <div class="shipyard-section-label">For Sale</div>
+          <div id="shipyard-for-sale" class="shipyard-cards"></div>
         </div>
-        <div id="shipyard-credits">You have 0 credits</div>
+        <div id="shipyard-owned-section" style="display:none;">
+          <div class="shipyard-section-label">Your Ships</div>
+          <div id="shipyard-owned" class="shipyard-cards"></div>
+        </div>
       </div>
     </div>
     <div id="refinery-menu-overlay" style="display: none;">

@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED } from './constants.js';
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, BLASTER_STATS, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED } from './constants.js';
 import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity, raycastCircle } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
@@ -69,9 +69,12 @@ const laserImg = new Image();
 laserImg.src = 'assets/laser.png';
 ITEM_IMAGES['mining laser'] = laserImg;
 ITEM_IMAGES['medium mining laser'] = laserImg;
+ITEM_IMAGES['large mining laser'] = laserImg;
 const blasterImg = new Image();
 blasterImg.src = 'assets/blaster.png';
 ITEM_IMAGES['light blaster'] = blasterImg;
+ITEM_IMAGES['medium blaster'] = blasterImg;
+ITEM_IMAGES['large blaster'] = blasterImg;
 
 
 
@@ -277,7 +280,7 @@ function fireBullet() {
   }
 }
 
-function fireBlasterPellet() {
+function fireBlasterPellet(pirateDmg, asteroidDmg) {
   const dx = input.mouseX - WIDTH / 2;
   const dy = input.mouseY - HEIGHT / 2;
   const dir = normalize(dx, dy);
@@ -288,7 +291,9 @@ function fireBlasterPellet() {
     vx: dir.x * BULLET_SPEED + ship.vx,
     vy: dir.y * BULLET_SPEED + ship.vy,
     lifespan: 4,
-    owner: 'player'
+    owner: 'player',
+    pirateDmg: pirateDmg,
+    asteroidDmg: asteroidDmg
   });
 }
 
@@ -359,7 +364,7 @@ function drawCrosshairAndHeatBar() {
   uiCtx.lineTo(crosshairX + armLen, crosshairY);
   uiCtx.stroke();
   const equipped = hotbar[selectedSlot];
-  const hasHeatWeapon = equipped && equipped.heat != null && equipped.heat > 0 && (MINING_LASER_STATS[equipped.item] || equipped.item === 'light blaster');
+  const hasHeatWeapon = equipped && equipped.heat != null && equipped.heat > 0 && (MINING_LASER_STATS[equipped.item] || BLASTER_STATS[equipped.item]);
   if (hasHeatWeapon) {
     const barW = 16;
     const barH = 4;
@@ -1315,27 +1320,28 @@ function update(dt) {
     }
   }
 
-  // Light blaster: 5 pellets/sec, 0.5 energy per pellet, 0.09 heat per pellet, cool 1/3 per sec
-  const blaster = hotbar[selectedSlot] && hotbar[selectedSlot].item === 'light blaster' ? hotbar[selectedSlot] : null;
-  if (blaster && blaster.heat != null) {
-    if (blaster.heat >= 1) blaster.overheated = true;
-    if (blaster.heat <= 0) blaster.overheated = false;
-    if (blaster.heat > 0) hudDirty = true;
-    const blasterCanFire = !blaster.overheated;
-    const hasBlasterEnergy = inventory.getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT) != null;
+  // Blasters (light / medium / large): unified logic via BLASTER_STATS
+  const blasterItem = hotbar[selectedSlot] && BLASTER_STATS[hotbar[selectedSlot].item] ? hotbar[selectedSlot] : null;
+  const bStats = blasterItem ? BLASTER_STATS[blasterItem.item] : null;
+  if (blasterItem && bStats && blasterItem.heat != null) {
+    if (blasterItem.heat >= 1) blasterItem.overheated = true;
+    if (blasterItem.heat <= 0) blasterItem.overheated = false;
+    if (blasterItem.heat > 0) hudDirty = true;
+    const blasterCanFire = !blasterItem.overheated;
+    const hasBlasterEnergy = inventory.getFirstCellWithMinEnergy(bStats.energyPerShot) != null;
     if (blasterCanFire && input.leftMouseDown && hasBlasterEnergy) {
-      blasterFireAccum += BLASTER_FIRE_RATE * dt;
+      blasterFireAccum += bStats.fireRate * dt;
       while (blasterFireAccum >= 1) {
         blasterFireAccum -= 1;
-        const c = inventory.getFirstCellWithMinEnergy(BLASTER_ENERGY_PER_SHOT);
+        const c = inventory.getFirstCellWithMinEnergy(bStats.energyPerShot);
         if (!c) break;
-        c.energy = Math.max(0, c.energy - BLASTER_ENERGY_PER_SHOT);
-        blaster.heat = Math.min(1, blaster.heat + BLASTER_HEAT_PER_SHOT);
-        fireBlasterPellet();
+        c.energy = Math.max(0, c.energy - bStats.energyPerShot);
+        blasterItem.heat = Math.min(1, blasterItem.heat + bStats.heatPerShot);
+        fireBlasterPellet(bStats.pirateDmg, bStats.asteroidDmg);
         hudDirty = true;
       }
     } else {
-      blaster.heat = Math.max(0, blaster.heat - BLASTER_COOL_RATE * dt);
+      blasterItem.heat = Math.max(0, blasterItem.heat - bStats.coolRate * dt);
     }
   }
 
@@ -1378,8 +1384,8 @@ function update(dt) {
 
   // Bullets (movement + bullet-asteroid collision)
   const BULLET_DAMAGE = 4;            // pirate bullet damage to player
-  const BULLET_DAMAGE_PIRATE = 3;    // light blaster damage per pellet to pirates
-  const BULLET_DAMAGE_ASTEROID = 0.5; // pellets deal 0.5 damage to asteroids
+  const BULLET_DAMAGE_PIRATE = 3;    // fallback blaster damage per pellet to pirates
+  const BULLET_DAMAGE_ASTEROID = 0.5; // fallback pellet damage to asteroids
   const VIEWPORT_HALF_W = WIDTH / 2;
   const VIEWPORT_HALF_H = HEIGHT / 2;
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -1400,7 +1406,7 @@ function update(dt) {
         const dy = b.y - ast.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ast.radius) {
-          if (b.owner === 'player') ast.health -= BULLET_DAMAGE_ASTEROID;
+          if (b.owner === 'player') ast.health -= (b.asteroidDmg ?? BULLET_DAMAGE_ASTEROID);
           remove = true;
           spawnSparks(b.x, b.y, 3);
           break;
@@ -1415,7 +1421,7 @@ function update(dt) {
           const dy = b.y - st.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < PIRATE_BASE_HIT_RADIUS) {
-            st.health -= BULLET_DAMAGE_PIRATE * shipDamageMult;
+            st.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
             st.aggroed = true;
             remove = true;
             spawnSparks(b.x, b.y, 4);
@@ -1432,7 +1438,7 @@ function update(dt) {
             const dy = b.y - p.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
             if (dist < shipCollisionRadius + 4) {
-                p.health -= BULLET_DAMAGE_PIRATE * shipDamageMult;
+                p.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
                 if (p.defendingBase) p.defendingBase.aggroed = true;
                 remove = true;
                 spawnSparks(b.x, b.y, 2);
@@ -1625,34 +1631,8 @@ function update(dt) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
-      } else if (item.item === 'mining laser' && item.heat != null) {
-        // Mining laser: restore heat/overheated
-        let added = false;
-        for (let j = 0; j < hotbar.length; j++) {
-          if (!hotbar[j]) {
-            hotbar[j] = { item: item.item, heat: item.heat, overheated: !!item.overheated };
-            added = true;
-            break;
-          }
-        }
-        if (added) {
-          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
-        }
-      } else if (item.item === 'medium mining laser' && item.heat != null) {
-        let added = false;
-        for (let j = 0; j < hotbar.length; j++) {
-          if (!hotbar[j]) {
-            hotbar[j] = { item: item.item, heat: item.heat, overheated: !!item.overheated };
-            added = true;
-            break;
-          }
-        }
-        if (added) {
-          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
-          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
-        }
-      } else if (item.item === 'light blaster' && item.heat != null) {
+      } else if ((MINING_LASER_STATS[item.item] || BLASTER_STATS[item.item]) && item.heat != null) {
+        // Heat weapon (any mining laser or blaster): restore heat/overheated
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
           if (!hotbar[j]) {
@@ -1776,13 +1756,13 @@ function render(dt = 1 / 60) {
     ctx.fillStyle = item.energy != null ? '#448844' :
                     (item.fuel != null ? '#886622' :
                     (item.oxygen != null ? '#446688' :
-                    (item.item === 'light blaster' ? '#6644aa' :
+                    (BLASTER_STATS[item.item] ? '#6644aa' :
                     (item.heat != null ? '#884422' :
                     (oreFill[item.item] || '#aa8844')))));
     ctx.beginPath();
     ctx.arc(x, y, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (item.item === 'light blaster' ? '#8866dd' : (item.heat != null ? '#cc6633' : (oreStroke[item.item] || '#ccaa66')))));
+    ctx.strokeStyle = item.energy != null ? '#66cc66' : (item.fuel != null ? '#cc8844' : (item.oxygen != null ? '#6699cc' : (BLASTER_STATS[item.item] ? '#8866dd' : (item.heat != null ? '#cc6633' : (oreStroke[item.item] || '#ccaa66')))));
     ctx.lineWidth = 2;
     ctx.stroke();
     // Item icon: image for fuel/energy/oxygen, else letter fallback
@@ -2262,7 +2242,7 @@ function hasEmptyHotbarSlot() {
 
 // Can we accept this floating item (for magnet: don't attract if inventory can't take it)
 function canAcceptFloatingItem(item) {
-  if (item.energy != null || item.fuel != null || item.oxygen != null || (item.item === 'mining laser' && item.heat != null) || (item.item === 'medium mining laser' && item.heat != null) || (item.item === 'light blaster' && item.heat != null)) {
+  if (item.energy != null || item.fuel != null || item.oxygen != null || ((MINING_LASER_STATS[item.item] || BLASTER_STATS[item.item]) && item.heat != null)) {
     return hasEmptyHotbarSlot();
   }
   const qty = item.quantity != null ? item.quantity : 1;
@@ -2308,7 +2288,8 @@ function getShopItemPayload(itemKey) {
 
 function getWeaponTierLetter(itemKey) {
   if (itemKey === 'light blaster' || itemKey === 'mining laser') return 'L';
-  if (itemKey === 'medium mining laser') return 'M';
+  if (itemKey === 'medium mining laser' || itemKey === 'medium blaster') return 'M';
+  if (itemKey === 'large mining laser' || itemKey === 'large blaster') return 'XL';
   return null;
 }
 
@@ -2440,7 +2421,10 @@ function syncShopBuyArea() {
       'health pack': 'Health Pack',
       'large health pack': 'Large Health Pack',
       'light blaster': 'Light Blaster',
+      'medium blaster': 'Medium Blaster',
+      'large blaster': 'Large Blaster',
       'medium mining laser': 'Medium Mining Laser',
+      'large mining laser': 'Large Mining Laser',
       cuprite: 'Cuprite',
       hematite: 'Hematite',
       aurite: 'Aurite',
@@ -3413,97 +3397,256 @@ function switchShip(type) {
   updateHUD();
 }
 
-// Shipyard Menu Logic
+// Shipyard Menu Logic — Card-based UI with 3D ship previews
+let shipyardPreviews = []; // Array of { renderer, scene, camera, model, canvas, animId }
+
+function cleanupShipyardPreviews() {
+  for (const p of shipyardPreviews) {
+    if (p.animId) cancelAnimationFrame(p.animId);
+    if (p.renderer) p.renderer.dispose();
+  }
+  shipyardPreviews = [];
+}
+
+function createShipPreview(container, shipType) {
+  const PREVIEW_W = 200;
+  const PREVIEW_H = 100;
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  const cvs = document.createElement('canvas');
+  cvs.width = PREVIEW_W * DPR;
+  cvs.height = PREVIEW_H * DPR;
+  container.appendChild(cvs);
+
+  const renderer = new THREE.WebGLRenderer({ canvas: cvs, antialias: true, alpha: true });
+  renderer.setPixelRatio(DPR);
+  renderer.setSize(PREVIEW_W, PREVIEW_H);
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  // Top-down orthographic camera matching the in-game perspective
+  const aspect = PREVIEW_W / PREVIEW_H;
+  const viewSize = 3.0;
+  const camera = new THREE.OrthographicCamera(
+    -viewSize * aspect / 2, viewSize * aspect / 2,
+    viewSize / 2, -viewSize / 2,
+    0.1, 100
+  );
+  // Camera looks straight down the Z axis (same as in-game)
+  camera.position.set(0, 0, 20);
+  camera.lookAt(0, 0, 0);
+
+  // Lighting — strong top light + ambient to match game appearance
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const topLight = new THREE.DirectionalLight(0xffffff, 2.0);
+  topLight.position.set(0, 0, 50);
+  scene.add(topLight);
+  const sideLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  sideLight.position.set(20, 20, 30);
+  scene.add(sideLight);
+
+  // Wrapper group: we rotate this group around Z to spin the ship in the top-down plane
+  const spinGroup = new THREE.Group();
+  scene.add(spinGroup);
+
+  const previewObj = { renderer, scene, camera, model: null, spinGroup, canvas: cvs, animId: null };
+
+  // Load ship model
+  const LoaderClass = (window.GLTFLoader || (THREE && THREE.GLTFLoader));
+  if (LoaderClass) {
+    const loader = new LoaderClass();
+    const glbUrl = new URL('assets/scout-ship.glb', window.location.href).toString();
+    loader.load(glbUrl, (gltf) => {
+      const model = gltf.scene.clone(true);
+      const stats = SHIP_STATS[shipType];
+      const box = new THREE.Box3().setFromObject(model);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      // Scale to fit the preview, adjusted by ship type scale (20% smaller)
+      const fitScale = 1.76 / (maxDim > 0 ? maxDim : 1);
+      const displayScale = fitScale * (stats ? stats.shipScale : 1.0);
+      model.scale.setScalar(displayScale);
+      model.position.sub(center.multiplyScalar(displayScale));
+      // Same orientation as in-game: glTF Y-up → top-down XY view
+      model.rotation.x = -Math.PI / 2;
+      // Small upward nudge for visual centering
+      model.position.y += displayScale * 0.15;
+
+      model.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material = child.material.clone();
+        }
+      });
+
+      spinGroup.add(model);
+      previewObj.model = model;
+    });
+  }
+
+  // Animate: rotate the wrapper group around Z (yaw in top-down view, like turning in game)
+  // Frame-rate independent at ~0.5 rad/s
+  const SHIPYARD_SPIN_SPEED = 0.24; // radians per second (half of previous ~0.48)
+  let lastTime = performance.now();
+  function animate() {
+    previewObj.animId = requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+    previewObj.spinGroup.rotation.z += SHIPYARD_SPIN_SPEED * dt;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  shipyardPreviews.push(previewObj);
+  return previewObj;
+}
+
 function openShipyardMenu(structure) {
   if (shipyardMenuOpen) return;
   shipyardMenuOpen = true;
   activeShipyardStructure = structure;
   gamePaused = true;
 
-  renderShipyardList(structure);
+  renderShipyardCards(structure);
 
   const creditsEl = document.getElementById('shipyard-credits');
-  if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+  if (creditsEl) creditsEl.textContent = `${player.credits} credits`;
 
   const overlay = document.getElementById('shipyard-menu-overlay');
   if (overlay) overlay.style.display = 'flex';
 }
 
-function renderShipyardList(structure) {
-  const list = document.getElementById('shipyard-list');
-  if (!list) return;
-  list.innerHTML = '';
+function renderShipyardCards(structure) {
+  cleanupShipyardPreviews();
+
+  const forSaleContainer = document.getElementById('shipyard-for-sale');
+  const ownedContainer = document.getElementById('shipyard-owned');
+  const forSaleSection = document.getElementById('shipyard-for-sale-section');
+  const ownedSection = document.getElementById('shipyard-owned-section');
+  if (!forSaleContainer || !ownedContainer) return;
+  forSaleContainer.innerHTML = '';
+  ownedContainer.innerHTML = '';
+
   const available = structure.availableShips || ['scout'];
 
-  // Helper to build a ship row
-  function makeShipRow(type, mode) {
+  function makeCard(type, mode) {
     const stats = SHIP_STATS[type];
     if (!stats) return null;
-    const div = document.createElement('div');
-    div.className = 'ship-item';
-    const info = document.createElement('div');
-    info.className = 'ship-info';
-    const slotsText = stats.slots > 9 ? ` | Slots: ${stats.slots}` : '';
-    const dmgText = stats.damageMult > 1 ? ` | +${Math.round((stats.damageMult - 1) * 100)}% Wpn Dmg` : '';
-    info.innerHTML = `<h4>${stats.name}</h4><p>${stats.desc}</p><p>HP: ${stats.health} | Fuel: ${stats.fuel} | O2: ${stats.oxygen} | Spd: ${stats.speed}${slotsText}${dmgText}</p>`;
+
+    const card = document.createElement('div');
+    card.className = 'shipyard-card' + (mode === 'current' ? ' current' : '');
+
+    // 3D Preview area
+    const previewDiv = document.createElement('div');
+    previewDiv.className = 'shipyard-card-preview';
+    createShipPreview(previewDiv, type);
+    card.appendChild(previewDiv);
+
+    // Card body
+    const body = document.createElement('div');
+    body.className = 'shipyard-card-body';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'shipyard-card-name';
+    nameEl.textContent = stats.name;
+    body.appendChild(nameEl);
+
+    const descEl = document.createElement('div');
+    descEl.className = 'shipyard-card-desc';
+    descEl.textContent = stats.desc;
+    body.appendChild(descEl);
+
+    // Stats grid
+    const statsGrid = document.createElement('div');
+    statsGrid.className = 'shipyard-card-stats';
+    const statEntries = [
+      ['HP', stats.health],
+      ['Fuel', stats.fuel],
+      ['O2', stats.oxygen],
+      ['Speed', stats.speed],
+      ['Slots', stats.slots],
+    ];
+    if (stats.damageMult > 1) {
+      statEntries.push(['Wpn Dmg', `+${Math.round((stats.damageMult - 1) * 100)}%`]);
+    }
+    for (const [label, value] of statEntries) {
+      const lbl = document.createElement('span');
+      lbl.className = 'shipyard-stat-label';
+      lbl.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'shipyard-stat-value';
+      val.textContent = value;
+      statsGrid.appendChild(lbl);
+      statsGrid.appendChild(val);
+    }
+    body.appendChild(statsGrid);
+
+    // Action button
+    const actionDiv = document.createElement('div');
+    actionDiv.className = 'shipyard-card-action';
     const btn = document.createElement('button');
-    btn.className = 'ship-buy-btn';
+    btn.className = 'shipyard-card-btn';
+
     if (mode === 'current') {
-      btn.textContent = 'Current';
-      btn.classList.add('owned');
+      btn.classList.add('current-ship');
+      btn.textContent = 'Current Ship';
       btn.disabled = true;
     } else if (mode === 'swap') {
+      btn.classList.add('swap');
       btn.textContent = 'Swap (Free)';
       btn.onclick = () => {
         switchShip(type);
-        renderShipyardList(structure);
+        renderShipyardCards(structure);
         const creditsEl = document.getElementById('shipyard-credits');
-        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+        if (creditsEl) creditsEl.textContent = `${player.credits} credits`;
       };
     } else {
-      btn.textContent = `Buy (${stats.price} cr)`;
+      btn.classList.add('buy');
+      btn.textContent = `Buy — ${stats.price} cr`;
       if (player.credits < stats.price) btn.disabled = true;
       btn.onclick = () => {
         switchShip(type);
-        renderShipyardList(structure);
+        renderShipyardCards(structure);
         const creditsEl = document.getElementById('shipyard-credits');
-        if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
+        if (creditsEl) creditsEl.textContent = `${player.credits} credits`;
       };
     }
-    div.appendChild(info);
-    div.appendChild(btn);
-    return div;
+    actionDiv.appendChild(btn);
+    body.appendChild(actionDiv);
+
+    card.appendChild(body);
+    return card;
   }
 
-  // --- For-sale section (only unowned ships) ---
+  // For-sale section (unowned ships available here)
   const forSale = available.filter(t => !ownedShips.has(t));
   if (forSale.length > 0) {
-    const hdr = document.createElement('div');
-    hdr.style.cssText = 'color:#aaa;font-size:12px;text-transform:uppercase;margin-bottom:4px;';
-    hdr.textContent = 'For Sale';
-    list.appendChild(hdr);
+    forSaleSection.style.display = '';
     forSale.forEach(type => {
-      const row = makeShipRow(type, 'buy');
-      if (row) list.appendChild(row);
+      const card = makeCard(type, 'buy');
+      if (card) forSaleContainer.appendChild(card);
     });
+  } else {
+    forSaleSection.style.display = 'none';
   }
 
-  // --- Owned ships section (all owned ships, even those not for sale here) ---
+  // Owned ships section
   const ownedArr = [...ownedShips];
   if (ownedArr.length > 0) {
-    const hdr = document.createElement('div');
-    hdr.style.cssText = 'color:#aaa;font-size:12px;text-transform:uppercase;margin-top:10px;margin-bottom:4px;border-top:1px solid #444;padding-top:8px;';
-    hdr.textContent = 'Your Ships';
-    list.appendChild(hdr);
+    ownedSection.style.display = '';
     ownedArr.forEach(type => {
       const mode = type === currentShipType ? 'current' : 'swap';
-      const row = makeShipRow(type, mode);
-      if (row) list.appendChild(row);
+      const card = makeCard(type, mode);
+      if (card) ownedContainer.appendChild(card);
     });
+  } else {
+    ownedSection.style.display = 'none';
   }
 }
 
 function closeShipyardMenu() {
+  cleanupShipyardPreviews();
   shipyardMenuOpen = false;
   activeShipyardStructure = null;
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;

@@ -17,6 +17,11 @@ const CONSTANTS = {
   ASTEROID_SIZE_STEP: 10
 };
 
+// --- Editor tool tuning ---
+// Eraser is a screen-space brush (same pixel size at any zoom)
+const ERASER_RADIUS_PX = 14;
+const ERASE_SAVE_INTERVAL_MS = 200;
+
 const COLORS = {
   BACKGROUND: '#0a0a12',
   GRID: '#222',
@@ -45,6 +50,12 @@ const STRUCTURE_STYLES = {
   piratebase: { fill: '#884422', stroke: '#aa6644' }
 };
 
+// Interact radius matches game: STRUCTURE_SIZE_COLL (54) + SHOP_DASHED_EXTRA_3D (108) = 162
+const INTERACT_RADIUS = 162;
+const INTERACTABLE_TYPES = new Set(['shop', 'warpgate', 'crafting', 'refinery', 'shipyard']);
+// Pirate base aggro radius matches game constants.js
+const PIRATE_BASE_AGGRO_RADIUS = 300;
+
 // --- State ---
 const state = {
   level: {
@@ -64,6 +75,9 @@ const state = {
     y: 0,
     inCanvas: false,
     isPanning: false,
+    isErasing: false,
+    eraseNeedsSave: false,
+    eraseLastSaveAt: 0,
     panStart: { x: 0, y: 0 },
     panCamStart: { x: 0, y: 0 }
   },
@@ -163,6 +177,41 @@ function drawStructure(ctx, x, y, type, isPreview = false) {
   const s = worldToScreen(x, y);
   const r = CONSTANTS.STRUCTURE_SIZE * state.camera.zoom;
   const style = STRUCTURE_STYLES[type] || STRUCTURE_STYLES.shop;
+
+  // Draw interact/aggro radius rings (bright dashed)
+  // - interactables: bright using structure stroke color
+  // - piratebase: red aggro ring
+  {
+    const z = state.camera.zoom;
+    const dashA = Math.max(2, 7 * z);
+    const dashB = Math.max(2, 5 * z);
+
+    if (INTERACTABLE_TYPES.has(type)) {
+      const ir = INTERACT_RADIUS * z;
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = isPreview ? 0.65 : 0.95;
+      ctx.setLineDash([dashA, dashB]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, ir, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+
+    if (type === 'piratebase') {
+      const ar = PIRATE_BASE_AGGRO_RADIUS * z;
+      ctx.strokeStyle = '#ff3333';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = isPreview ? 0.6 : 0.95;
+      ctx.setLineDash([dashA, dashB]);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, ar, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+  }
   
   ctx.fillStyle = isPreview ? style.fill + '99' : style.fill;
   ctx.strokeStyle = style.stroke;
@@ -268,7 +317,7 @@ function drawOverlay() {
   
   if (state.tool.selected === 'eraser') {
     // Draw eraser cursor (circle with X)
-    const r = 14;
+    const r = ERASER_RADIUS_PX;
     ctx.strokeStyle = '#ff4444';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -389,7 +438,67 @@ function handleMouseMove(e) {
     state.camera.y = state.mouse.panCamStart.y - (state.mouse.y - state.mouse.panStart.y) / state.camera.zoom;
   }
 
+  // Eraser brush: continuously erase while held
+  if (state.mouse.isErasing && state.tool.selected === 'eraser') {
+    const world = screenToWorld(state.mouse.x, state.mouse.y);
+    eraseBrushAt(world);
+  }
+
   render();
+}
+
+function flushEraseSave(force = false) {
+  if (!state.mouse.eraseNeedsSave) return;
+  const now = performance.now();
+  if (!force && now - state.mouse.eraseLastSaveAt < ERASE_SAVE_INTERVAL_MS) return;
+  saveLevel();
+  state.mouse.eraseNeedsSave = false;
+  state.mouse.eraseLastSaveAt = now;
+}
+
+function eraseBrushAt(world) {
+  const radiusWorld = ERASER_RADIUS_PX / state.camera.zoom;
+  let removedAny = false;
+  let removedSelected = false;
+
+  // Asteroids: erase if brush intersects asteroid circle
+  for (let i = state.level.asteroids.length - 1; i >= 0; i--) {
+    const a = state.level.asteroids[i];
+    const dx = a.x - world.x;
+    const dy = a.y - world.y;
+    if (Math.sqrt(dx * dx + dy * dy) <= a.radius + radiusWorld) {
+      if (state.selectedObject === a) removedSelected = true;
+      state.level.asteroids.splice(i, 1);
+      removedAny = true;
+    }
+  }
+
+  // Structures: erase if brush intersects structure rect
+  const hw = CONSTANTS.STRUCTURE_SIZE;
+  const hh = CONSTANTS.STRUCTURE_SIZE * 0.6;
+  for (let i = state.level.structures.length - 1; i >= 0; i--) {
+    const st = state.level.structures[i];
+    const dx = Math.abs(st.x - world.x) - hw;
+    const dy = Math.abs(st.y - world.y) - hh;
+    const ax = Math.max(dx, 0);
+    const ay = Math.max(dy, 0);
+    if (Math.sqrt(ax * ax + ay * ay) <= radiusWorld) {
+      if (state.selectedObject === st) removedSelected = true;
+      state.level.structures.splice(i, 1);
+      removedAny = true;
+    }
+  }
+
+  if (!removedAny) return false;
+
+  if (removedSelected) {
+    state.selectedObject = null;
+    updatePropertiesPanel();
+  }
+
+  state.mouse.eraseNeedsSave = true;
+  flushEraseSave(false);
+  return true;
 }
 
 function handleSelectObject(world) {
@@ -597,7 +706,7 @@ function renderShopProperties(parent, obj) {
   addItemDiv.style.display = 'flex';
   addItemDiv.style.gap = '5px';
   const itemSelect = document.createElement('select');
-  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium mining laser'].forEach(i => {
+  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium blaster', 'large blaster', 'medium mining laser', 'large mining laser'].forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
@@ -665,7 +774,7 @@ function renderShopProperties(parent, obj) {
   addPriceDiv.style.gap = '5px';
   const priceSelect = document.createElement('select');
   // Add common items to price override list
-  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium mining laser', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'].forEach(i => {
+  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium blaster', 'large blaster', 'medium mining laser', 'large mining laser', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'].forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
@@ -689,7 +798,8 @@ function renderShopProperties(parent, obj) {
 
 // Master list of all items available for crafting recipe dropdowns
 const ALL_ITEM_NAMES = [
-  'mining laser', 'medium mining laser', 'light blaster',
+  'mining laser', 'medium mining laser', 'large mining laser',
+  'light blaster', 'medium blaster', 'large blaster',
   'small energy cell', 'medium energy cell',
   'oxygen canister', 'large oxygen canister',
   'fuel tank', 'large fuel tank',
@@ -1089,7 +1199,8 @@ function handleMouseDown(e) {
     if (state.tool.selected === 'select') {
       handleSelectObject(world);
     } else if (state.tool.selected === 'eraser') {
-      handleRemoveObject(world);
+      state.mouse.isErasing = true;
+      eraseBrushAt(world);
     } else {
       handlePlaceObject(world);
     }
@@ -1137,6 +1248,12 @@ canvas.addEventListener('mousemove', handleMouseMove);
 canvas.addEventListener('mousedown', handleMouseDown);
 canvas.addEventListener('mouseup', (e) => {
   if (e.button === 1) state.mouse.isPanning = false;
+  if (e.button === 0) {
+    if (state.mouse.isErasing) {
+      state.mouse.isErasing = false;
+      flushEraseSave(true);
+    }
+  }
   if (e.button === 0 && state.copySelect && state.copySelectMode) {
     // Finalize copy selection rectangle
     const world = screenToWorld(state.mouse.x, state.mouse.y);
@@ -1187,7 +1304,15 @@ canvas.addEventListener('mouseup', (e) => {
   }
 });
 canvas.addEventListener('mouseenter', () => { state.mouse.inCanvas = true; render(); });
-canvas.addEventListener('mouseleave', () => { state.mouse.inCanvas = false; state.mouse.isPanning = false; render(); });
+canvas.addEventListener('mouseleave', () => {
+  state.mouse.inCanvas = false;
+  state.mouse.isPanning = false;
+  if (state.mouse.isErasing) {
+    state.mouse.isErasing = false;
+    flushEraseSave(true);
+  }
+  render();
+});
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('wheel', handleWheel);
 
@@ -1228,6 +1353,16 @@ window.addEventListener('keydown', (e) => {
       render();
     }
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    // If the user is typing in a form control, don't treat Backspace/Delete as "delete selected object"
+    const ae = document.activeElement;
+    const tag = ae && ae.tagName ? ae.tagName.toUpperCase() : '';
+    const isTyping =
+      tag === 'INPUT' ||
+      tag === 'TEXTAREA' ||
+      tag === 'SELECT' ||
+      (ae && ae.isContentEditable);
+    if (isTyping) return;
+
     // Delete selected object
     if (state.selectedObject) {
       e.preventDefault();

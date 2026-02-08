@@ -27,13 +27,20 @@ export const WEAPON_ENERGY_DRAIN = 1;
 
 export const MINING_LASER_STATS = {
   'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 7, energyDrain: 1 },
-  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.5 }
+  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.2 },
+  'large mining laser':  { heatRate: 1 / 2.2, coolRate: 1 / 3, dps: 16, energyDrain: 1.5 }
 };
 
 export const BLASTER_ENERGY_PER_SHOT = 0.2;
 export const BLASTER_HEAT_PER_SHOT = 0.09;
 export const BLASTER_COOL_RATE = 1 / 3;
 export const BLASTER_FIRE_RATE = 10;
+
+export const BLASTER_STATS = {
+  'light blaster':  { energyPerShot: 0.2, heatPerShot: 0.09, coolRate: 1 / 3, fireRate: 10, pirateDmg: 3, asteroidDmg: 0.5 },
+  'medium blaster': { energyPerShot: 0.3, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 5, asteroidDmg: 1 },
+  'large blaster':  { energyPerShot: 0.5, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 9, asteroidDmg: 2 }
+};
 
 export const OXYGEN_DEPLETION_RATE = 1 / 25;
 export const FUEL_DEPLETION_RATE = 1 / 3;
@@ -71,8 +78,8 @@ export const STRUCTURE_STYLES = {
 
 export const SHIP_STATS = {
   'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 9,  collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, desc: 'Standard issue scout ship.' },
-  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 150, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.2, desc: 'Sturdy mining vessel. 20% bonus weapon damage.' },
-  'transport': { name: 'Transport', price: 5000, health: 50, fuel: 50, oxygen: 50, speed: 120, slots: 18, collisionRadius: 14, shipScale: 1.6, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
+  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.2, desc: 'Sturdy mining vessel. 20% bonus weapon damage.' },
+  'transport': { name: 'Transport', price: 5000, health: 50, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 14, shipScale: 1.6, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
 };
 
 export const ITEM_USAGE = {
@@ -85,8 +92,11 @@ export const ITEM_USAGE = {
   'health pack': 'Drag to health bar to repair ship.',
   'large health pack': 'Large capacity repair kit.',
   'light blaster': 'Select and left-click to fire rapid projectiles at enemies.',
+  'medium blaster': 'Medium blaster. Higher damage per shot.',
+  'large blaster': 'Heavy blaster. Devastating damage per shot.',
   'mining laser': 'Select and left-click to mine asteroids for ore.',
   'medium mining laser': 'Upgraded laser that mines faster.',
+  'large mining laser': 'High-power laser. Mines the fastest.',
   'cuprite': 'Common ore. Sell at shops for credits.',
   'hematite': 'Uncommon ore. Worth more than cuprite.',
   'aurite': 'Rare golden ore. Valuable at shops.',
@@ -111,8 +121,11 @@ export const ITEM_DISPLAY_NAMES = {
   'health pack': 'Health Pack',
   'large health pack': 'Large Health Pack',
   'light blaster': 'Light Blaster',
+  'medium blaster': 'Medium Blaster',
+  'large blaster': 'Large Blaster',
   'mining laser': 'Mining Laser',
   'medium mining laser': 'Medium Mining Laser',
+  'large mining laser': 'Large Mining Laser',
   'cuprite': 'Cuprite',
   'hematite': 'Hematite',
   'aurite': 'Aurite',
@@ -164,14 +177,20 @@ export const ITEM_IMAGE_PATHS = {
   'medium energy cell': 'assets/energy-cell.png',
   'mining laser': 'assets/laser.png',
   'medium mining laser': 'assets/laser.png',
-  'light blaster': 'assets/blaster.png'
+  'large mining laser': 'assets/laser.png',
+  'light blaster': 'assets/blaster.png',
+  'medium blaster': 'assets/blaster.png',
+  'large blaster': 'assets/blaster.png'
 };
 
 // --- Item short labels (for HUD slot display) ---
 export const ITEM_LABELS = {
   'mining laser': 'L',
   'medium mining laser': 'M',
+  'large mining laser': 'XL',
   'light blaster': 'B',
+  'medium blaster': 'MB',
+  'large blaster': 'LB',
   'small energy cell': 'E',
   'medium energy cell': 'M',
   'oxygen canister': 'O',
@@ -205,7 +224,10 @@ export const ITEM_DEFAULTS = {
   'health pack':          { health: 10 },
   'large health pack':    { health: 30 },
   'light blaster':        { heat: 0, overheated: false },
-  'medium mining laser':  { heat: 0, overheated: false }
+  'medium blaster':       { heat: 0, overheated: false },
+  'large blaster':        { heat: 0, overheated: false },
+  'medium mining laser':  { heat: 0, overheated: false },
+  'large mining laser':   { heat: 0, overheated: false }
 };
 
 // --- Shop prices ---
@@ -215,7 +237,10 @@ export const ITEM_BUY_PRICE = {
   'oxygen canister': 500,
   'fuel tank': 300,
   'light blaster': 1000,
+  'medium blaster': 2500,
+  'large blaster': 5000,
   'medium mining laser': 1500,
+  'large mining laser': 3000,
   'health pack': 400,
   'large health pack': 1000,
   'large fuel tank': 750,
@@ -226,7 +251,8 @@ export const ITEM_SELL_PRICE = {
   cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60,
   copper: 25, iron: 50, gold: 75, diamond: 100, platinum: 150,
   scrap: 40, 'warp key': 500, 'mining laser': 300,
-  'light blaster': 500, 'medium mining laser': 750
+  'light blaster': 500, 'medium blaster': 1250, 'large blaster': 2500,
+  'medium mining laser': 750, 'large mining laser': 1500
 };
 
 // --- Collidable structure types ---
@@ -240,11 +266,12 @@ export function isCollidableStructure(st) {
 }
 
 // --- Weapons that display a heat bar in HUD slots ---
-export const HEAT_WEAPONS = ['mining laser', 'medium mining laser', 'light blaster'];
+export const HEAT_WEAPONS = ['mining laser', 'medium mining laser', 'large mining laser', 'light blaster', 'medium blaster', 'large blaster'];
 
 // --- Master item list (used by editor dropdowns for crafting recipes, etc.) ---
 export const ALL_ITEM_NAMES = [
-  'mining laser', 'medium mining laser', 'light blaster',
+  'mining laser', 'medium mining laser', 'large mining laser',
+  'light blaster', 'medium blaster', 'large blaster',
   'small energy cell', 'medium energy cell',
   'oxygen canister', 'large oxygen canister',
   'fuel tank', 'large fuel tank',
