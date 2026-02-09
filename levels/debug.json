@@ -524,12 +524,36 @@
     {
       "x": 1310.491680381487,
       "y": -2162.3112726294535,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      }
     },
     {
       "x": 2104.9772616127634,
       "y": -1679.0674654887803,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      }
     },
     {
       "x": 993.4741168946478,

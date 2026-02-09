@@ -12842,6 +12842,18 @@
       "x": -3.1546071384400487,
       "y": -3234.6082909316033,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "scrap",
@@ -12856,6 +12868,18 @@
       "x": 2105.595917514832,
       "y": 2359.6222346412865,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "cuprite",
@@ -12870,6 +12894,18 @@
       "x": 2015.0775340700911,
       "y": 1746.2037906960295,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "cuprite",
@@ -12999,6 +13035,18 @@
       "x": 2539.0102782666168,
       "y": 1987.0845089778209,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "cuprite",
@@ -13036,6 +13084,18 @@
       "x": -1938.9426122595892,
       "y": 3183.532209804798,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "scrap",
@@ -13050,6 +13110,18 @@
       "x": 4107.190564218403,
       "y": -4567.294249215078,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "fuel tank",
@@ -13134,13 +13206,23 @@
     "waveIntervalMax": 70,
     "waveSizeMin": 1,
     "waveSizeMax": 2,
+    "pirateTypePercentages": {
+      "normal": 100,
+      "sturdy": 0,
+      "fast": 0
+    },
     "tiers": [
       {
         "startTime": 300,
         "waveIntervalMin": 30,
         "waveIntervalMax": 60,
         "waveSizeMin": 1,
-        "waveSizeMax": 3
+        "waveSizeMax": 3,
+        "pirateTypePercentages": {
+          "normal": 100,
+          "sturdy": 0,
+          "fast": 0
+        }
       }
     ]
   }

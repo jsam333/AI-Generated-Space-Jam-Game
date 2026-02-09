@@ -55,6 +55,100 @@ const INTERACT_RADIUS = 162;
 const INTERACTABLE_TYPES = new Set(['shop', 'warpgate', 'crafting', 'refinery', 'shipyard']);
 // Pirate base aggro radius matches game constants.js
 const PIRATE_BASE_AGGRO_RADIUS = 300;
+const PIRATE_TYPE_KEYS = ['normal', 'sturdy', 'fast'];
+const PIRATE_TYPE_LABELS = { normal: 'Normal', sturdy: 'Sturdy', fast: 'Fast' };
+const DEFAULT_PIRATE_TYPE_PERCENTAGES = { normal: 100, sturdy: 0, fast: 0 };
+
+function normalizePirateBaseTier(tier) {
+  const n = Number(tier);
+  if (!Number.isFinite(n)) return 2;
+  return Math.min(5, Math.max(1, Math.round(n)));
+}
+
+function getPirateBaseTierScale(tier) {
+  return 0.6 + (normalizePirateBaseTier(tier) * 0.2);
+}
+
+function getStructureDrawScale(type, tier) {
+  return type === 'piratebase' ? getPirateBaseTierScale(tier) : 1;
+}
+
+function normalizePirateTypePercentages(mix) {
+  const out = { normal: 0, sturdy: 0, fast: 0 };
+  for (const key of PIRATE_TYPE_KEYS) {
+    const value = Number(mix?.[key]);
+    out[key] = Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+  const total = out.normal + out.sturdy + out.fast;
+  if (total <= 0) return { ...DEFAULT_PIRATE_TYPE_PERCENTAGES };
+  return out;
+}
+
+function ensureSpawnSettingsDefaults(spawnSettings) {
+  const s = spawnSettings || {};
+  if (!Array.isArray(s.tiers)) s.tiers = [];
+  s.initialDelay = Number.isFinite(Number(s.initialDelay)) ? Number(s.initialDelay) : 120;
+  s.waveIntervalMin = Number.isFinite(Number(s.waveIntervalMin)) ? Number(s.waveIntervalMin) : 60;
+  s.waveIntervalMax = Number.isFinite(Number(s.waveIntervalMax)) ? Number(s.waveIntervalMax) : 100;
+  s.waveSizeMin = Number.isFinite(Number(s.waveSizeMin)) ? Number(s.waveSizeMin) : 2;
+  s.waveSizeMax = Number.isFinite(Number(s.waveSizeMax)) ? Number(s.waveSizeMax) : 4;
+  s.pirateTypePercentages = normalizePirateTypePercentages(s.pirateTypePercentages);
+  for (const tier of s.tiers) {
+    tier.startTime = Number.isFinite(Number(tier.startTime)) ? Number(tier.startTime) : 300;
+    tier.waveIntervalMin = Number.isFinite(Number(tier.waveIntervalMin)) ? Number(tier.waveIntervalMin) : 45;
+    tier.waveIntervalMax = Number.isFinite(Number(tier.waveIntervalMax)) ? Number(tier.waveIntervalMax) : 80;
+    tier.waveSizeMin = Number.isFinite(Number(tier.waveSizeMin)) ? Number(tier.waveSizeMin) : 3;
+    tier.waveSizeMax = Number.isFinite(Number(tier.waveSizeMax)) ? Number(tier.waveSizeMax) : 6;
+    tier.pirateTypePercentages = normalizePirateTypePercentages(tier.pirateTypePercentages);
+  }
+  return s;
+}
+
+function ensurePirateBaseSpawnDefaults(obj) {
+  obj.defenseTypePercentages = normalizePirateTypePercentages(obj.defenseTypePercentages);
+  obj.waveSpawnTypePercentages = normalizePirateTypePercentages(obj.waveSpawnTypePercentages);
+  obj.waveSpawnCount = Math.max(1, Math.round(Number(obj.waveSpawnCount) || 4));
+}
+
+function renderPirateTypePercentagesEditor(parent, labelText, mixObj, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'prop-group';
+  wrap.innerHTML = `<label>${labelText}</label>`;
+  for (const type of PIRATE_TYPE_KEYS) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin:4px 0;';
+    const name = document.createElement('span');
+    name.style.cssText = 'font-size:11px;color:#ccc;min-width:55px;';
+    name.textContent = PIRATE_TYPE_LABELS[type];
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '0';
+    input.max = '100';
+    input.step = '1';
+    input.value = mixObj[type];
+    input.oninput = (e) => {
+      mixObj[type] = Math.max(0, Number(e.target.value) || 0);
+      onChange();
+    };
+    row.appendChild(name);
+    row.appendChild(input);
+    wrap.appendChild(row);
+  }
+  const note = document.createElement('div');
+  note.style.cssText = 'font-size:10px;color:#888;margin-top:4px;';
+  note.textContent = 'Percentages are weighted and auto-normalized in-game.';
+  wrap.appendChild(note);
+  parent.appendChild(wrap);
+}
+
+function normalizeStructure(st) {
+  const out = { ...st };
+  if (out.type === 'piratebase') {
+    out.tier = normalizePirateBaseTier(out.tier);
+    ensurePirateBaseSpawnDefaults(out);
+  }
+  return out;
+}
 
 // --- State ---
 const state = {
@@ -83,7 +177,8 @@ const state = {
   },
   tool: {
     selected: 'asteroid_cuprite',
-    asteroidSize: 40
+    asteroidSize: 40,
+    piratebaseTier: 2
   },
   selectedObject: null,
   clipboard: null, // { asteroids: [...], structures: [...] } with positions relative to center
@@ -116,14 +211,16 @@ function loadLevel() {
     state.level.height = levelData.height || CONSTANTS.DEFAULT_LEVEL_SIZE;
     state.level.seed = levelData.seed != null ? (levelData.seed >>> 0) : CONSTANTS.DEFAULT_SEED;
     state.level.asteroids = levelData.asteroids || [];
-    state.level.structures = levelData.structures || [];
-    state.level.spawnSettings = levelData.spawnSettings || {
+    state.level.structures = (levelData.structures || []).map(normalizeStructure);
+    state.level.spawnSettings = ensureSpawnSettingsDefaults(levelData.spawnSettings || {
       initialDelay: 120,
       waveIntervalMin: 60,
       waveIntervalMax: 100,
       waveSizeMin: 2,
-      waveSizeMax: 4
-    };
+      waveSizeMax: 4,
+      pirateTypePercentages: { ...DEFAULT_PIRATE_TYPE_PERCENTAGES },
+      tiers: []
+    });
     
     // Update UI inputs
     document.getElementById('level-width').value = state.level.width;
@@ -173,9 +270,10 @@ function drawAsteroid(ctx, x, y, radius, type, isPreview = false) {
   ctx.stroke();
 }
 
-function drawStructure(ctx, x, y, type, isPreview = false) {
+function drawStructure(ctx, x, y, type, isPreview = false, tier = 2) {
   const s = worldToScreen(x, y);
-  const r = CONSTANTS.STRUCTURE_SIZE * state.camera.zoom;
+  const scale = getStructureDrawScale(type, tier);
+  const r = CONSTANTS.STRUCTURE_SIZE * scale * state.camera.zoom;
   const style = STRUCTURE_STYLES[type] || STRUCTURE_STYLES.shop;
 
   // Draw interact/aggro radius rings (bright dashed)
@@ -200,7 +298,7 @@ function drawStructure(ctx, x, y, type, isPreview = false) {
     }
 
     if (type === 'piratebase') {
-      const ar = PIRATE_BASE_AGGRO_RADIUS * z;
+      const ar = PIRATE_BASE_AGGRO_RADIUS * getPirateBaseTierScale(tier) * z;
       ctx.strokeStyle = '#ff3333';
       ctx.lineWidth = 2;
       ctx.globalAlpha = isPreview ? 0.6 : 0.95;
@@ -229,7 +327,7 @@ function drawStructure(ctx, x, y, type, isPreview = false) {
   
   let label = type.charAt(0).toUpperCase();
   if (type === 'warpgate') label = 'W';
-  if (type === 'piratebase') label = 'P';
+  if (type === 'piratebase') label = `P${normalizePirateBaseTier(tier)}`;
   
   ctx.fillText(label, s.x, s.y);
 }
@@ -295,7 +393,7 @@ function drawWorldObjects() {
   
   // Draw structures
   for (const st of state.level.structures) {
-    drawStructure(ctx, st.x, st.y, st.type);
+    drawStructure(ctx, st.x, st.y, st.type, false, st.tier);
   }
 }
 
@@ -333,7 +431,7 @@ function drawOverlay() {
     const type = state.tool.selected.replace('asteroid_', '');
     drawAsteroid(ctx, world.x, world.y, state.tool.asteroidSize, type, true);
   } else if (STRUCTURE_STYLES[state.tool.selected]) {
-    drawStructure(ctx, world.x, world.y, state.tool.selected, true);
+    drawStructure(ctx, world.x, world.y, state.tool.selected, true, state.tool.piratebaseTier);
   }
 
   // Draw selection highlight
@@ -342,7 +440,7 @@ function drawOverlay() {
     const s = worldToScreen(sel.x, sel.y);
     let r = 20;
     if (sel.radius) r = sel.radius * state.camera.zoom + 10;
-    else r = CONSTANTS.STRUCTURE_SIZE * state.camera.zoom + 10;
+    else r = (CONSTANTS.STRUCTURE_SIZE * getStructureDrawScale(sel.type, sel.tier) * state.camera.zoom) + 10;
     
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
@@ -387,7 +485,7 @@ function drawOverlay() {
       drawAsteroid(ctx, cx + a.rx, cy + a.ry, a.radius, type, true);
     }
     for (const s of state.clipboard.structures) {
-      drawStructure(ctx, cx + s.rx, cy + s.ry, s.type, true);
+      drawStructure(ctx, cx + s.rx, cy + s.ry, s.type, true, s.tier);
     }
     ctx.globalAlpha = 1.0;
 
@@ -506,9 +604,10 @@ function handleSelectObject(world) {
   let bestObj = null;
 
   // Check structures first (priority)
-  const structHalfW = CONSTANTS.STRUCTURE_SIZE;
-  const structHalfH = CONSTANTS.STRUCTURE_SIZE * 0.6;
   for (const st of state.level.structures) {
+    const scale = getStructureDrawScale(st.type, st.tier);
+    const structHalfW = CONSTANTS.STRUCTURE_SIZE * scale;
+    const structHalfH = CONSTANTS.STRUCTURE_SIZE * 0.6 * scale;
     const dx = st.x - world.x;
     const dy = st.y - world.y;
     if (Math.abs(dx) < structHalfW && Math.abs(dy) < structHalfH) {
@@ -983,9 +1082,29 @@ function renderShipyardProperties(parent, obj) {
 }
 
 function renderPirateBaseProperties(parent, obj) {
+  obj.tier = normalizePirateBaseTier(obj.tier);
+  ensurePirateBaseSpawnDefaults(obj);
+  const tierDiv = document.createElement('div');
+  tierDiv.className = 'prop-group';
+  tierDiv.innerHTML = `<label>Tier</label>`;
+  const tierSelect = document.createElement('select');
+  for (let i = 1; i <= 5; i++) {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `Tier ${i}`;
+    opt.selected = obj.tier === i;
+    tierSelect.appendChild(opt);
+  }
+  tierSelect.onchange = (e) => { obj.tier = normalizePirateBaseTier(e.target.value); saveLevel(); render(); };
+  tierDiv.appendChild(tierSelect);
+  parent.appendChild(tierDiv);
+
   addPropInput(parent, 'Health', obj.health || 150, (v) => { obj.health = parseInt(v); saveLevel(); });
   addPropInput(parent, 'Defense Count', obj.defenseCount || 8, (v) => { obj.defenseCount = parseInt(v); saveLevel(); });
+  renderPirateTypePercentagesEditor(parent, 'Defense Type Percentages', obj.defenseTypePercentages, () => { saveLevel(); });
   addPropInput(parent, 'Spawn Rate (s)', obj.spawnRate || 30, (v) => { obj.spawnRate = parseInt(v); saveLevel(); });
+  addPropInput(parent, 'Wave Spawn Count', obj.waveSpawnCount || 4, (v) => { obj.waveSpawnCount = Math.max(1, parseInt(v) || 1); saveLevel(); });
+  renderPirateTypePercentagesEditor(parent, 'Wave Spawn Type Percentages', obj.waveSpawnTypePercentages, () => { saveLevel(); });
   
   // Drops
   if (!obj.drops) obj.drops = [];
@@ -1120,6 +1239,10 @@ function handlePlaceObject(world) {
     if (type === 'refinery') {
       st.acceptedOres = ['cuprite'];
     }
+    if (type === 'piratebase') {
+      st.tier = normalizePirateBaseTier(state.tool.piratebaseTier);
+      ensurePirateBaseSpawnDefaults(st);
+    }
     state.level.structures.push(st);
   }
   saveLevel();
@@ -1139,10 +1262,11 @@ function handleRemoveObject(world) {
   }
   
   // Check structures
-  const structHalfW = CONSTANTS.STRUCTURE_SIZE;
-  const structHalfH = CONSTANTS.STRUCTURE_SIZE * 0.6;
   for (let i = state.level.structures.length - 1; i >= 0; i--) {
     const st = state.level.structures[i];
+    const scale = getStructureDrawScale(st.type, st.tier);
+    const structHalfW = CONSTANTS.STRUCTURE_SIZE * scale;
+    const structHalfH = CONSTANTS.STRUCTURE_SIZE * 0.6 * scale;
     const dx = st.x - world.x;
     const dy = st.y - world.y;
     if (Math.abs(dx) < structHalfW && Math.abs(dy) < structHalfH) {
@@ -1390,9 +1514,22 @@ document.getElementById('asteroid-size').addEventListener('input', (e) => {
   updateAsteroidSize(parseInt(e.target.value));
 });
 
+const pirateTierSelect = document.getElementById('piratebase-tier-select');
+if (pirateTierSelect) {
+  pirateTierSelect.value = String(state.tool.piratebaseTier);
+  pirateTierSelect.addEventListener('change', (e) => {
+    state.tool.piratebaseTier = normalizePirateBaseTier(e.target.value);
+    pirateTierSelect.value = String(state.tool.piratebaseTier);
+    render();
+  });
+}
+
 document.querySelectorAll('.palette-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     state.tool.selected = btn.dataset.tool;
+    if (state.tool.selected === 'piratebase' && pirateTierSelect) {
+      state.tool.piratebaseTier = normalizePirateBaseTier(pirateTierSelect.value);
+    }
     document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
     render();
@@ -1525,14 +1662,16 @@ document.getElementById('import-file').addEventListener('change', (e) => {
       state.level.height = levelData.height || CONSTANTS.DEFAULT_LEVEL_SIZE;
       state.level.seed = levelData.seed != null ? (levelData.seed >>> 0) : CONSTANTS.DEFAULT_SEED;
       state.level.asteroids = levelData.asteroids || [];
-      state.level.structures = levelData.structures || [];
-      state.level.spawnSettings = levelData.spawnSettings || {
+      state.level.structures = (levelData.structures || []).map(normalizeStructure);
+      state.level.spawnSettings = ensureSpawnSettingsDefaults(levelData.spawnSettings || {
         initialDelay: 120,
         waveIntervalMin: 60,
         waveIntervalMax: 100,
         waveSizeMin: 2,
-        waveSizeMax: 4
-      };
+        waveSizeMax: 4,
+        pirateTypePercentages: { ...DEFAULT_PIRATE_TYPE_PERCENTAGES },
+        tiers: []
+      });
       
       document.getElementById('level-width').value = state.level.width;
       document.getElementById('level-height').value = state.level.height;
@@ -1558,18 +1697,8 @@ document.getElementById('level-settings-btn').addEventListener('click', () => {
   content.innerHTML = '';
   
   // Render Spawn Settings
-  if (!state.level.spawnSettings) {
-    state.level.spawnSettings = {
-      initialDelay: 120,
-      waveIntervalMin: 60,
-      waveIntervalMax: 100,
-      waveSizeMin: 2,
-      waveSizeMax: 4,
-      tiers: []
-    };
-  }
+  state.level.spawnSettings = ensureSpawnSettingsDefaults(state.level.spawnSettings);
   const s = state.level.spawnSettings;
-  if (!s.tiers) s.tiers = [];
   
   const title = document.createElement('h4');
   title.textContent = 'Global Spawn Settings';
@@ -1589,6 +1718,7 @@ document.getElementById('level-settings-btn').addEventListener('click', () => {
   addPropInput(content, 'Max Wave Interval (s)', s.waveIntervalMax, (v) => { s.waveIntervalMax = parseInt(v); saveLevel(); });
   addPropInput(content, 'Min Wave Size', s.waveSizeMin, (v) => { s.waveSizeMin = parseInt(v); saveLevel(); });
   addPropInput(content, 'Max Wave Size', s.waveSizeMax, (v) => { s.waveSizeMax = parseInt(v); saveLevel(); });
+  renderPirateTypePercentagesEditor(content, 'Wave Pirate Type Percentages', s.pirateTypePercentages, () => { saveLevel(); });
 
   // Tiers
   const tiersTitle = document.createElement('h5');
@@ -1627,6 +1757,8 @@ document.getElementById('level-settings-btn').addEventListener('click', () => {
       addPropInput(tierBox, 'Max Interval (s)', tier.waveIntervalMax, (v) => { tier.waveIntervalMax = parseInt(v); saveLevel(); });
       addPropInput(tierBox, 'Min Size', tier.waveSizeMin, (v) => { tier.waveSizeMin = parseInt(v); saveLevel(); });
       addPropInput(tierBox, 'Max Size', tier.waveSizeMax, (v) => { tier.waveSizeMax = parseInt(v); saveLevel(); });
+      tier.pirateTypePercentages = normalizePirateTypePercentages(tier.pirateTypePercentages);
+      renderPirateTypePercentagesEditor(tierBox, 'Wave Pirate Type Percentages', tier.pirateTypePercentages, () => { saveLevel(); });
 
       tiersContainer.appendChild(tierBox);
     });
@@ -1643,7 +1775,8 @@ document.getElementById('level-settings-btn').addEventListener('click', () => {
       waveIntervalMin: 45,
       waveIntervalMax: 80,
       waveSizeMin: 3,
-      waveSizeMax: 6
+      waveSizeMax: 6,
+      pirateTypePercentages: { ...DEFAULT_PIRATE_TYPE_PERCENTAGES }
     });
     saveLevel();
     renderTiers();

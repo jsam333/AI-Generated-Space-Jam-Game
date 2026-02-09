@@ -80,32 +80,107 @@
     {
       "x": -1212.101691965775,
       "y": -216.87227127682002,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -823.7250567341275,
       "y": -42.91190341264456,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -459.6219612044579,
       "y": -281.6017104820947,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 5,
+      "drops": [],
+      "defenseTypePercentages": {
+        "normal": 25,
+        "sturdy": 25,
+        "fast": 50
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 2,
+      "spawnRate": 1,
+      "defenseCount": 8
     },
     {
       "x": -508.16904060841375,
       "y": -682.1151155647312,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -920.8192155420393,
       "y": -868.2122532798958,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -1256.6031814194014,
       "y": -649.750395962094,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -872.2721361380834,
@@ -116,28 +191,86 @@
       "x": -501.80765704685507,
       "y": 405.4950436797544,
       "type": "piratebase",
-      "drops": []
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -30.131032666177532,
       "y": 624.9881263123469,
       "type": "piratebase",
-      "drops": []
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": 548.9571002368325,
       "y": 270.06314162985694,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": -48.81129501788752,
       "y": -421.1065653834131,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     },
     {
       "x": 478.90611641792003,
       "y": -131.56249893190807,
-      "type": "piratebase"
+      "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
     }
   ],
   "spawnSettings": {
@@ -152,8 +285,18 @@
         "waveIntervalMin": 30,
         "waveIntervalMax": 60,
         "waveSizeMin": 1,
-        "waveSizeMax": 3
+        "waveSizeMax": 3,
+        "pirateTypePercentages": {
+          "normal": 100,
+          "sturdy": 0,
+          "fast": 0
+        }
       }
-    ]
+    ],
+    "pirateTypePercentages": {
+      "normal": 100,
+      "sturdy": 0,
+      "fast": 0
+    }
   }
 }

@@ -416,6 +416,18 @@
       "x": -514.7628738611028,
       "y": -1078.8865712431332,
       "type": "piratebase",
+      "tier": 2,
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
       "drops": [
         {
           "item": "scrap",
@@ -473,20 +485,35 @@
     "waveIntervalMax": 120,
     "waveSizeMin": 1,
     "waveSizeMax": 2,
+    "pirateTypePercentages": {
+      "normal": 100,
+      "sturdy": 0,
+      "fast": 0
+    },
     "tiers": [
       {
         "startTime": 400,
         "waveIntervalMin": 80,
         "waveIntervalMax": 110,
         "waveSizeMin": 2,
-        "waveSizeMax": 3
+        "waveSizeMax": 3,
+        "pirateTypePercentages": {
+          "normal": 100,
+          "sturdy": 0,
+          "fast": 0
+        }
       },
       {
         "startTime": 600,
         "waveIntervalMin": 70,
         "waveIntervalMax": 100,
         "waveSizeMin": 2,
-        "waveSizeMax": 5
+        "waveSizeMax": 5,
+        "pirateTypePercentages": {
+          "normal": 100,
+          "sturdy": 0,
+          "fast": 0
+        }
       }
     ]
   }

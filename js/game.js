@@ -253,7 +253,7 @@ function laserHitPirateBase(ox, oy, dx, dy, maxLen) {
   let closestDist = maxLen;
   for (const st of structures) {
     if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
-    const d = raycastCircle(ox, oy, dx, dy, st.x, st.y, PIRATE_BASE_HIT_RADIUS, closestDist);
+    const d = raycastCircle(ox, oy, dx, dy, st.x, st.y, getPirateBaseHitRadius(st), closestDist);
     if (d >= 0) { closest = st; closestDist = d; }
   }
   return closest ? { structure: closest, distance: closestDist } : null;
@@ -763,6 +763,189 @@ const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 
 const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A, copper: 0xB87333, iron: 0x696969, gold: 0xFFD700, diamond: 0xB9F2FF, platinum: 0xE5E4E2 };
 const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
 
+function normalizePirateBaseTier(tier) {
+  const n = Number(tier);
+  if (!Number.isFinite(n)) return 2;
+  return Math.min(5, Math.max(1, Math.round(n)));
+}
+
+function getPirateBaseTierScale(tier) {
+  return 0.6 + (normalizePirateBaseTier(tier) * 0.2);
+}
+
+function getPirateBaseHitRadius(st) {
+  return PIRATE_BASE_HIT_RADIUS * getPirateBaseTierScale(st?.tier);
+}
+
+function getPirateBaseVisualRadius(st) {
+  return STRUCTURE_RADIUS_3D * getPirateBaseTierScale(st?.tier);
+}
+
+function getPirateBaseAggroRadius(st) {
+  return PIRATE_BASE_AGGRO_RADIUS * getPirateBaseTierScale(st?.tier);
+}
+
+function getStructureCollisionRadius(st) {
+  if (st?.type === 'piratebase') return STRUCTURE_SIZE_COLL * getPirateBaseTierScale(st.tier);
+  return STRUCTURE_SIZE_COLL;
+}
+
+const PIRATE_TYPE_KEYS = ['normal', 'sturdy', 'fast'];
+const PIRATE_BASE_COLLISION_RADIUS = SHIP_COLLISION_RADIUS + 4;
+const DEFAULT_PIRATE_TYPE_PERCENTAGES = Object.freeze({ normal: 100, sturdy: 0, fast: 0 });
+const PIRATE_TYPE_CONFIG = Object.freeze({
+  normal: { health: PIRATE_HEALTH, speedMult: 1, sizeMult: 1, tint: 0xff6666, emissiveIntensity: 1.5 },
+  sturdy: { health: PIRATE_HEALTH * 2, speedMult: 0.7, sizeMult: 1.3, tint: 0xff6666, emissiveIntensity: 1.5 },
+  fast: { health: 15, speedMult: 1.3, sizeMult: 0.8, tint: 0xff6666, emissiveIntensity: 1.5 }
+});
+
+function normalizePirateType(type) {
+  return PIRATE_TYPE_KEYS.includes(type) ? type : 'normal';
+}
+
+function normalizePirateTypePercentages(percentages) {
+  const out = { normal: 0, sturdy: 0, fast: 0 };
+  for (const key of PIRATE_TYPE_KEYS) {
+    const value = Number(percentages?.[key]);
+    out[key] = Number.isFinite(value) ? Math.max(0, value) : 0;
+  }
+  const total = out.normal + out.sturdy + out.fast;
+  if (total <= 0) return { ...DEFAULT_PIRATE_TYPE_PERCENTAGES };
+  return out;
+}
+
+function pickPirateType(percentages) {
+  const mix = normalizePirateTypePercentages(percentages);
+  const total = mix.normal + mix.sturdy + mix.fast;
+  let roll = Math.random() * total;
+  for (const key of PIRATE_TYPE_KEYS) {
+    roll -= mix[key];
+    if (roll <= 0) return key;
+  }
+  return 'normal';
+}
+
+function shuffleWithSeed(arr, seed) {
+  const rng = createSeededRandom(seed >>> 0);
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function buildDeterministicPirateTypeSequence(count, percentages, shuffleSeed) {
+  const n = Math.max(0, Math.round(Number(count) || 0));
+  if (n <= 0) return [];
+  const mix = normalizePirateTypePercentages(percentages);
+  const total = mix.normal + mix.sturdy + mix.fast;
+  const counts = { normal: 0, sturdy: 0, fast: 0 };
+  const remainders = [];
+  let assigned = 0;
+  for (const key of PIRATE_TYPE_KEYS) {
+    const exact = (mix[key] / total) * n;
+    const base = Math.floor(exact);
+    counts[key] = base;
+    assigned += base;
+    remainders.push({ key, frac: exact - base });
+  }
+  // Allocate leftovers by largest remainder; stable tie-break by PIRATE_TYPE_KEYS order.
+  remainders.sort((a, b) => b.frac - a.frac);
+  for (let i = 0; i < (n - assigned); i++) {
+    counts[remainders[i % remainders.length].key] += 1;
+  }
+  const sequence = [];
+  for (const key of PIRATE_TYPE_KEYS) {
+    for (let i = 0; i < counts[key]; i++) sequence.push(key);
+  }
+  if (shuffleSeed != null && typeof shuffleSeed === 'number') {
+    return shuffleWithSeed(sequence, shuffleSeed >>> 0);
+  }
+  return sequence;
+}
+
+function createPirate({
+  x,
+  y,
+  vx = 0,
+  vy = 0,
+  pirateType = 'normal',
+  facingAngle = 0,
+  defendingBase,
+  orbitAngle,
+  orbitRadius,
+  fromBaseSpawn = false
+}) {
+  const resolvedType = normalizePirateType(pirateType);
+  const cfg = PIRATE_TYPE_CONFIG[resolvedType];
+  return {
+    x,
+    y,
+    vx,
+    vy,
+    health: cfg.health,
+    maxHealth: cfg.health,
+    state: 'chase',
+    stateTimer: Math.random() * 5,
+    cooldown: 1 + Math.random() * 2,
+    id: Math.random(),
+    facingAngle,
+    prevFacingAngle: facingAngle,
+    tilt: 0,
+    defendingBase,
+    orbitAngle,
+    orbitRadius,
+    fromBaseSpawn,
+    pirateType: resolvedType,
+    sizeMult: cfg.sizeMult,
+    accel: PIRATE_ACCEL * cfg.speedMult,
+    maxSpeed: PIRATE_MAX_SPEED * cfg.speedMult,
+    collisionRadius: PIRATE_BASE_COLLISION_RADIUS * cfg.sizeMult
+  };
+}
+
+function buildRadialSpawnOffsets(count, radius) {
+  const n = Math.max(1, Math.round(Number(count) || 1));
+  const offsets = [];
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2;
+    offsets.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+  }
+  return offsets;
+}
+
+function applyPirateVariantVisual(clone, pirateType, sizeMult) {
+  const resolvedType = normalizePirateType(pirateType);
+  const cfg = PIRATE_TYPE_CONFIG[resolvedType];
+  const baseVisualCfg = PIRATE_TYPE_CONFIG.normal;
+  const tintColor = new THREE.Color(baseVisualCfg.tint);
+  clone.scale.multiplyScalar(sizeMult || cfg.sizeMult || 1);
+  clone.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const applyTint = (oldMat) => {
+      const sourceColor = oldMat.color ? oldMat.color.clone() : new THREE.Color(0xee9999);
+      const sourceEmissive = oldMat.emissive ? oldMat.emissive.clone() : new THREE.Color(0xff6666);
+      sourceColor.lerp(tintColor, 0.35);
+      sourceEmissive.lerp(tintColor, 0.25);
+      return new THREE.MeshStandardMaterial({
+        color: sourceColor,
+        map: oldMat.map || null,
+        roughness: oldMat.roughness ?? 0.7,
+        metalness: oldMat.metalness ?? 0.3,
+        emissive: sourceEmissive,
+        emissiveMap: oldMat.emissiveMap || oldMat.map || null,
+        emissiveIntensity: baseVisualCfg.emissiveIntensity ?? oldMat.emissiveIntensity ?? 1.5
+      });
+    };
+    if (Array.isArray(child.material)) {
+      child.material = child.material.map((m) => applyTint(m));
+    } else {
+      child.material = applyTint(child.material);
+    }
+  });
+}
+
 function applyFloatingOreMaterial(mesh, itemKey) {
   const emissiveColor = FLOATING_ORE_EMISSIVE[itemKey] ?? 0x888888;
   mesh.traverse((child) => {
@@ -797,14 +980,15 @@ function refreshStructureMeshes() {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     const typeMult = scaleMultByType[st.type] ?? 1.0;
-    const scale = (STRUCTURE_DIAMETER / maxDim) * STRUCTURE_SCALE_MULT * typeMult;
+    const tierMult = st.type === 'piratebase' ? getPirateBaseTierScale(st.tier) : 1.0;
+    const scale = (STRUCTURE_DIAMETER / maxDim) * STRUCTURE_SCALE_MULT * typeMult * tierMult;
     clone.scale.setScalar(scale);
     st._mesh = clone;
     structureContainer.add(clone);
   }
 }
 
-function spawnPirateGroup(minCount, maxCount) {
+function spawnPirateGroup(minCount, maxCount, typePercentages = DEFAULT_PIRATE_TYPE_PERCENTAGES) {
   const count = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
   const angle = Math.random() * Math.PI * 2;
   const dist = 1100; // Just outside view
@@ -815,47 +999,31 @@ function spawnPirateGroup(minCount, maxCount) {
   for (let i = 0; i < count; i++) {
     const r = Math.random() * spreadRadius;
     const a = Math.random() * Math.PI * 2;
-    pirates.push({
+    pirates.push(createPirate({
       x: cx + Math.cos(a) * r,
       y: cy + Math.sin(a) * r,
-      vx: 0,
-      vy: 0,
-      health: PIRATE_HEALTH,
-      maxHealth: PIRATE_HEALTH,
-      state: 'chase',
-      stateTimer: Math.random() * 5,
-      cooldown: 1 + Math.random() * 2,
-      id: Math.random(),
       facingAngle: angle, // Face toward player initially
-      prevFacingAngle: angle,
-      tilt: 0
-    });
+      pirateType: pickPirateType(typePercentages)
+    }));
   }
 }
 
 
 function spawnBaseDefensePirates(st) {
-  const count = st.defenseCount !== undefined ? st.defenseCount : 8;
+  const count = Math.max(0, Math.round(Number(st.defenseCount ?? 8)));
+  const baseShuffleSeed = ((levelSeed ^ (Math.imul(Math.floor(st.x), 31) ^ Math.imul(Math.floor(st.y), 37))) >>> 0);
+  const defenseTypeSequence = buildDeterministicPirateTypeSequence(count, st.defenseTypePercentages, baseShuffleSeed);
   for (let i = 0; i < count; i++) {
     const orbitAngle = (i / count) * Math.PI * 2;
-    pirates.push({
+    pirates.push(createPirate({
       x: st.x + Math.cos(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
       y: st.y + Math.sin(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
-      vx: 0,
-      vy: 0,
-      health: PIRATE_HEALTH,
-      maxHealth: PIRATE_HEALTH,
-      state: 'chase',
-      stateTimer: Math.random() * 5,
-      cooldown: 1 + Math.random() * 2,
-      id: Math.random(),
       facingAngle: orbitAngle + Math.PI / 2,
-      prevFacingAngle: orbitAngle + Math.PI / 2,
-      tilt: 0,
+      pirateType: defenseTypeSequence[i] || 'normal',
       defendingBase: st,
       orbitAngle,
       orbitRadius: BASE_DEFENSE_ORBIT_RADIUS
-    });
+    }));
   }
 }
 
@@ -893,14 +1061,14 @@ function updatePirates(dt) {
   for (const st of structures) {
     if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
     const d = Math.sqrt((ship.x - st.x) ** 2 + (ship.y - st.y) ** 2);
-    if (d < PIRATE_BASE_AGGRO_RADIUS) st.aggroed = true;
+    if (d < getPirateBaseAggroRadius(st)) st.aggroed = true;
   }
 
   // Spawning logic using level settings
   // Spawn based on absolute schedule (no countdown reset between tiers/phases).
   if (levelIsDebug) {
     while (levelElapsedTime >= pirateNextWaveTime) {
-      spawnPirateGroup(6, 10);
+      spawnPirateGroup(6, 10, levelSpawnSettings.pirateTypePercentages);
       pirateNextWaveTime += 5;
     }
   } else {
@@ -926,8 +1094,9 @@ function updatePirates(dt) {
       const maxWave = activeTier ? activeTier.waveSizeMax : levelSpawnSettings.waveSizeMax;
       const minInt = activeTier ? activeTier.waveIntervalMin : levelSpawnSettings.waveIntervalMin;
       const maxInt = activeTier ? activeTier.waveIntervalMax : levelSpawnSettings.waveIntervalMax;
+      const typePercentages = activeTier?.pirateTypePercentages || levelSpawnSettings.pirateTypePercentages;
 
-      spawnPirateGroup(minWave, maxWave);
+      spawnPirateGroup(minWave, maxWave, typePercentages);
 
       // Schedule next wave (keep time moving forward even if dt is large)
       const rawInterval = minInt + Math.random() * (maxInt - minInt);
@@ -969,13 +1138,14 @@ function updatePirates(dt) {
 
       let ax = 0;
       let ay = 0;
+      const pirateAccel = p.accel ?? PIRATE_ACCEL;
       if (p.state === 'chase') {
-          ax += dirToPlayer.x * PIRATE_ACCEL;
-          ay += dirToPlayer.y * PIRATE_ACCEL;
+          ax += dirToPlayer.x * pirateAccel;
+          ay += dirToPlayer.y * pirateAccel;
       } else {
           const cw = (p.id > 0.5) ? 1 : -1;
-          ax += -dirToPlayer.y * cw * PIRATE_ACCEL;
-          ay += dirToPlayer.x * cw * PIRATE_ACCEL;
+          ax += -dirToPlayer.y * cw * pirateAccel;
+          ay += dirToPlayer.x * cw * pirateAccel;
       }
 
       const lookAhead = 150;
@@ -994,7 +1164,7 @@ function updatePirates(dt) {
          const sdx = st.x - p.x;
          const sdy = st.y - p.y;
          const sdist = Math.sqrt(sdx*sdx + sdy*sdy);
-         if (sdist < STRUCTURE_SIZE_COLL + lookAheadObstacle) {
+         if (sdist < getStructureCollisionRadius(st) + lookAheadObstacle) {
              ax -= (sdx / sdist) * 400;
              ay -= (sdy / sdist) * 400;
          }
@@ -1034,8 +1204,9 @@ function updatePirates(dt) {
       p.vy *= Math.max(0, 1 - PIRATE_FRICTION * dt);
 
       const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
-      if (speed > PIRATE_MAX_SPEED) {
-          const scale = PIRATE_MAX_SPEED / speed;
+      const pirateMaxSpeed = p.maxSpeed ?? PIRATE_MAX_SPEED;
+      if (speed > pirateMaxSpeed) {
+          const scale = pirateMaxSpeed / speed;
           p.vx *= scale;
           p.vy *= scale;
       }
@@ -1045,13 +1216,14 @@ function updatePirates(dt) {
     }
 
     // Physics Collisions (Bounce) – pirates do not damage asteroids
+    const pirateCollRadius = p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS;
     for (const ast of asteroids) {
-        const hit = pushOutOverlap(p, ast, shipCollisionRadius, ast.radius);
+        const hit = pushOutOverlap(p, ast, pirateCollRadius, ast.radius);
         if (hit) bounceEntity(p, hit.nx, hit.ny, BOUNCE_RESTITUTION);
     }
     for (const st of structures) {
         if (!isCollidableStructure(st)) continue;
-        const hit = pushOutOverlap(p, st, shipCollisionRadius, STRUCTURE_SIZE_COLL);
+        const hit = pushOutOverlap(p, st, pirateCollRadius, getStructureCollisionRadius(st));
         if (hit) bounceEntity(p, hit.nx, hit.ny, BOUNCE_RESTITUTION);
     }
 
@@ -1075,8 +1247,8 @@ function updatePirates(dt) {
          const fdir = (fdist > 0) ? {x: fdx/fdist, y: fdy/fdist} : {x:1, y:0};
          
          bullets.push({
-             x: p.x + fdir.x * SHIP_SIZE,
-             y: p.y + fdir.y * SHIP_SIZE,
+            x: p.x + fdir.x * SHIP_SIZE * (p.sizeMult || 1),
+            y: p.y + fdir.y * SHIP_SIZE * (p.sizeMult || 1),
              vx: fdir.x * PIRATE_BULLET_SPEED + p.vx,
              vy: fdir.y * PIRATE_BULLET_SPEED + p.vy,
              lifespan: 4,
@@ -1169,7 +1341,7 @@ function update(dt) {
   // Ship–structure collision
   for (const st of structures) {
     if (!isCollidableStructure(st)) continue;
-    const hit = pushOutOverlap(ship, st, shipCollisionRadius, STRUCTURE_SIZE_COLL);
+    const hit = pushOutOverlap(ship, st, shipCollisionRadius, getStructureCollisionRadius(st));
     if (hit) {
       const impactSpeed = bounceEntity(ship, hit.nx, hit.ny, BOUNCE_RESTITUTION);
       if (impactSpeed > 0) {
@@ -1234,7 +1406,7 @@ function update(dt) {
              const cx = ship.x + dir.x * t;
              const cy = ship.y + dir.y * t;
              const distSq = (p.x - cx)*(p.x - cx) + (p.y - cy)*(p.y - cy);
-             const r = shipCollisionRadius + 4;
+             const r = p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS;
              if (distSq < r*r) {
                  const offset = Math.sqrt(r*r - distSq);
                  const tHit = t - offset;
@@ -1347,37 +1519,25 @@ function update(dt) {
 
   updatePirates(dt);
 
-  // Pirate base: spawn 4 pirates every 30s when aggroed (orthogonal directions)
+  // Pirate base wave spawning while aggroed
   const BASE_SPAWN_OFFSET = 80;
   for (const st of structures) {
     if (st.type !== 'piratebase' || st.dead || st.health <= 0 || !st.aggroed) continue;
     st.spawnTimer -= dt;
     if (st.spawnTimer <= 0) {
       st.spawnTimer = st.spawnRate || 30; // Use instance spawn rate
-      const offsets = [
-        [BASE_SPAWN_OFFSET, 0],
-        [-BASE_SPAWN_OFFSET, 0],
-        [0, BASE_SPAWN_OFFSET],
-        [0, -BASE_SPAWN_OFFSET]
-      ];
+      const waveCount = Math.max(1, Math.round(Number(st.waveSpawnCount) || 4));
+      const spawnMix = normalizePirateTypePercentages(st.waveSpawnTypePercentages);
+      const offsets = buildRadialSpawnOffsets(waveCount, BASE_SPAWN_OFFSET);
       for (const [ox, oy] of offsets) {
         const angle = Math.atan2(ship.y - (st.y + oy), ship.x - (st.x + ox));
-        pirates.push({
+        pirates.push(createPirate({
           x: st.x + ox,
           y: st.y + oy,
-          vx: 0,
-          vy: 0,
-          health: PIRATE_HEALTH,
-          maxHealth: PIRATE_HEALTH,
-          state: 'chase',
-          stateTimer: Math.random() * 5,
-          cooldown: 1 + Math.random() * 2,
-          id: Math.random(),
           facingAngle: angle,
-          prevFacingAngle: angle,
-          tilt: 0,
+          pirateType: pickPirateType(spawnMix),
           fromBaseSpawn: true
-        });
+        }));
       }
     }
   }
@@ -1420,7 +1580,7 @@ function update(dt) {
           const dx = b.x - st.x;
           const dy = b.y - st.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < PIRATE_BASE_HIT_RADIUS) {
+          if (dist < getPirateBaseHitRadius(st)) {
             st.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
             st.aggroed = true;
             remove = true;
@@ -1437,7 +1597,7 @@ function update(dt) {
             const dx = b.x - p.x;
             const dy = b.y - p.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < shipCollisionRadius + 4) {
+            if (dist < (p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS)) {
                 p.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
                 if (p.defendingBase) p.defendingBase.aggroed = true;
                 remove = true;
@@ -1535,7 +1695,7 @@ function update(dt) {
     }
     for (const st of structures) {
       if (!isCollidableStructure(st)) continue;
-      pushOutOverlap(item, st, FLOAT_ITEM_RADIUS, STRUCTURE_SIZE_COLL);
+      pushOutOverlap(item, st, FLOAT_ITEM_RADIUS, getStructureCollisionRadius(st));
     }
 
     // Apply drag (exponential decay)
@@ -1724,10 +1884,11 @@ function render(dt = 1 / 60) {
           const barW = 32;
           const barH = 4;
           const pct = Math.max(0, p.health / p.maxHealth);
+          const yOffset = 25 * (p.sizeMult || 1);
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(x - barW/2, y - 25, barW, barH);
+          ctx.fillRect(x - barW/2, y - yOffset, barW, barH);
           ctx.fillStyle = '#ff3333';
-          ctx.fillRect(x - barW/2, y - 25, barW * pct, barH);
+          ctx.fillRect(x - barW/2, y - yOffset, barW * pct, barH);
       }
   }
 
@@ -1803,9 +1964,11 @@ function render(dt = 1 / 60) {
   for (const st of structures) {
     if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
     const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'piratebase';
-    const r = is3D ? STRUCTURE_RADIUS_3D : STRUCTURE_SIZE;
+    const r = is3D
+      ? (st.type === 'piratebase' ? getPirateBaseVisualRadius(st) : STRUCTURE_RADIUS_3D)
+      : STRUCTURE_SIZE;
     const isInteractable = INTERACTABLE_TYPES_SET.has(st.type);
-    const cullR = st.type === 'piratebase' ? PIRATE_BASE_AGGRO_RADIUS : (isInteractable ? INTERACT_RADIUS : r);
+    const cullR = st.type === 'piratebase' ? getPirateBaseAggroRadius(st) : (isInteractable ? INTERACT_RADIUS : r);
     const { x, y } = worldToScreen(st.x, st.y);
     if (x + cullR < 0 || x - cullR > WIDTH || y + cullR < 0 || y - cullR > HEIGHT) continue;
     ctx.strokeStyle = '#888';
@@ -1815,7 +1978,7 @@ function render(dt = 1 / 60) {
         ctx.strokeStyle = STRUCTURE_STYLES.piratebase;
         ctx.setLineDash([10, 10]);
         ctx.beginPath();
-        ctx.arc(x, y, PIRATE_BASE_AGGRO_RADIUS, 0, Math.PI * 2);
+        ctx.arc(x, y, getPirateBaseAggroRadius(st), 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
         // Health bar when damaged
@@ -1824,9 +1987,9 @@ function render(dt = 1 / 60) {
           const barH = 6;
           const pct = Math.max(0, st.health / st.maxHealth);
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(x - barW/2, y - STRUCTURE_RADIUS_3D - 20, barW, barH);
+          ctx.fillRect(x - barW/2, y - r - 20, barW, barH);
           ctx.fillStyle = '#ff3333';
-          ctx.fillRect(x - barW/2, y - STRUCTURE_RADIUS_3D - 20, barW * pct, barH);
+          ctx.fillRect(x - barW/2, y - r - 20, barW * pct, barH);
         }
       } else {
         // Shop, warpgate (3D) -- dashed interact ring
@@ -1906,6 +2069,7 @@ function render(dt = 1 / 60) {
   for (const p of pirates) {
     if (!p._mesh && pirateModel && pirateContainer) {
         const clone = pirateModel.clone(true);
+        applyPirateVariantVisual(clone, p.pirateType, p.sizeMult);
         pirateContainer.add(clone);
         p._mesh = clone;
     }
@@ -1982,8 +2146,8 @@ function render(dt = 1 / 60) {
         laserLength = Math.min(laserLength, Math.max(0, hit.distance - 10));
       }
       // Check pirates: ray-circle intersection, use closest hit
-      const pirateRadius = shipCollisionRadius + 4;
       for (const p of pirates) {
+        const pirateRadius = p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS;
         const fx = p.x - ship.x;
         const fy = p.y - ship.y;
         const t = fx * dir.x + fy * dir.y;
@@ -2710,6 +2874,10 @@ function loadLevel(levelData, levelIdx) {
       tiers: []
     };
   }
+  levelSpawnSettings.pirateTypePercentages = normalizePirateTypePercentages(levelSpawnSettings.pirateTypePercentages);
+  for (const tier of levelSpawnSettings.tiers) {
+    tier.pirateTypePercentages = normalizePirateTypePercentages(tier.pirateTypePercentages);
+  }
 
   // Health multipliers by ore type
   const oreHealthMult = { cuprite: 1, hematite: 3, aurite: 5, diamite: 8, platinite: 12 };
@@ -2734,6 +2902,7 @@ function loadLevel(levelData, levelIdx) {
     }
     
     if (st.type === 'piratebase') {
+      st.tier = normalizePirateBaseTier(st.tier);
       // Use config health or default 150
       const hp = st.health || 150;
       st.health = hp;
@@ -2744,6 +2913,10 @@ function loadLevel(levelData, levelIdx) {
       if (st.defenseCount === undefined) st.defenseCount = 8;
       // Default spawn rate if not set
       if (st.spawnRate === undefined) st.spawnRate = 30;
+      if (st.waveSpawnCount === undefined) st.waveSpawnCount = 4;
+      st.waveSpawnCount = Math.max(1, Math.round(Number(st.waveSpawnCount) || 4));
+      st.defenseTypePercentages = normalizePirateTypePercentages(st.defenseTypePercentages);
+      st.waveSpawnTypePercentages = normalizePirateTypePercentages(st.waveSpawnTypePercentages);
       // Default drops if not set
       if (!st.drops) st.drops = []; // Will fallback to default in onPirateBaseDeath if empty? No, better to pre-fill or handle empty logic. 
       // Actually, existing logic hardcoded drops. If st.drops is empty, we might want to default it?
@@ -2813,6 +2986,15 @@ function loadLevel(levelData, levelIdx) {
     inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
     inventory.set(1, { item: 'light blaster', heat: 0, overheated: false });
     inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+    inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+    selectedSlot = 0;
+    hudDirty = true;
+  } else if (currentLevelIdx === 2) {
+    // Level 3: med laser, med blaster, 2 medium energy cells
+    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+    inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
+    inventory.set(1, { item: 'medium blaster', heat: 0, overheated: false });
+    inventory.set(2, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
     inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
     selectedSlot = 0;
     hudDirty = true;
