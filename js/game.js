@@ -133,7 +133,7 @@ let tutorialTextWorldY = 0; // World Y position of tutorial text
 let refineryMenuOpen = false;
 let activeShopStructure = null;
 let activeCraftingStructure = null;
-const craftingInputSlots = [null, null, null, null];
+const craftingInputSlots = [null, null, null, null, null, null, null, null, null];
 let craftingOutputSlot = null;
 let activeRefineryStructure = null;
 const refineryInputSlots = [null, null, null, null];
@@ -2258,9 +2258,9 @@ function canAcceptFloatingItem(item) {
   return space >= qty;
 }
 
-// Shop: buy/sell 5x3 grid (15 slots)
-const shopBuySlots = Array(15).fill(null);
-const shopSellSlots = Array(15).fill(null);
+// Shop: buy/sell 6x4 grid (24 slots)
+const shopBuySlots = Array(24).fill(null);
+const shopSellSlots = Array(24).fill(null);
 
 function initShopBuySlots() {
   // Global init removed, handled per shop instance
@@ -2831,6 +2831,7 @@ function loadLevel(levelData, levelIdx) {
 const KNOWN_LEVELS = [
   { name: 'Level 1', path: 'levels/level1.json' },
   { name: 'Level 2', path: 'levels/level2.json' },
+  { name: 'Level 3', path: 'levels/level3.json' },
   { name: 'Debug', path: 'levels/debug.json' }
 ];
 
@@ -2974,7 +2975,7 @@ function openCraftingMenu(structure) {
   gamePaused = true;
   
   // Clear slots
-  for(let i=0; i<4; i++) craftingInputSlots[i] = null;
+  for(let i=0; i<craftingInputSlots.length; i++) craftingInputSlots[i] = null;
   craftingOutputSlot = null;
   
   // Render recipes list
@@ -2999,7 +3000,7 @@ function openCraftingMenu(structure) {
 
 function closeCraftingMenu() {
   // Return items to inventory or drop them
-  for(let i=0; i<4; i++) {
+  for(let i=0; i<craftingInputSlots.length; i++) {
     if (craftingInputSlots[i]) {
         if (!inventory.add(craftingInputSlots[i].item, craftingInputSlots[i].quantity)) {
              // Drop if full
@@ -3031,7 +3032,7 @@ function closeCraftingMenu() {
 
 function syncCraftingUI() {
     // Sync input slots
-    for(let i=0; i<4; i++) {
+    for(let i=0; i<craftingInputSlots.length; i++) {
         const el = document.querySelector(`.crafting-slot[data-craft-input="${i}"]`);
         if (el) {
             el.innerHTML = getSlotHTML(craftingInputSlots[i]);
@@ -3125,7 +3126,7 @@ function craftItem(recipe) {
     
     for (const req of inputsNeeded) {
         let needed = req.quantity;
-        for (let i=0; i<4; i++) {
+        for (let i=0; i<craftingInputSlots.length; i++) {
             if (craftingInputSlots[i] && craftingInputSlots[i].item === req.item) {
                 const take = Math.min(needed, craftingInputSlots[i].quantity);
                 craftingInputSlots[i].quantity -= take;

@@ -328,7 +328,7 @@ textarea {
 
 #crafting-input-grid {
   display: grid;
-  grid-template-columns: repeat(2, 50px);
+  grid-template-columns: repeat(3, 50px);
   gap: 4px;
 }
 
@@ -827,7 +827,7 @@ textarea {
 #shop-buy-slots,
 #shop-sell-slots {
   display: grid;
-  grid-template-columns: repeat(5, 40px);
+  grid-template-columns: repeat(6, 40px);
   gap: 0;
 }
 

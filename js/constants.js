@@ -26,26 +26,26 @@ export const LASER_COOL_RATE = 1 / 3;
 export const WEAPON_ENERGY_DRAIN = 1;
 
 export const MINING_LASER_STATS = {
-  'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 7, energyDrain: 1 },
-  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 1.2 },
-  'large mining laser':  { heatRate: 1 / 2.2, coolRate: 1 / 3, dps: 16, energyDrain: 1.5 }
+  'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 7, energyDrain: 0.75 },
+  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 0.9 },
+  'large mining laser':  { heatRate: 1 / 2.2, coolRate: 1 / 3, dps: 16, energyDrain: 1.125 }
 };
 
-export const BLASTER_ENERGY_PER_SHOT = 0.2;
+export const BLASTER_ENERGY_PER_SHOT = 0.15;
 export const BLASTER_HEAT_PER_SHOT = 0.09;
 export const BLASTER_COOL_RATE = 1 / 3;
 export const BLASTER_FIRE_RATE = 10;
 
 export const BLASTER_STATS = {
-  'light blaster':  { energyPerShot: 0.2, heatPerShot: 0.09, coolRate: 1 / 3, fireRate: 10, pirateDmg: 3, asteroidDmg: 0.5 },
-  'medium blaster': { energyPerShot: 0.3, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 5, asteroidDmg: 1 },
-  'large blaster':  { energyPerShot: 0.5, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 9, asteroidDmg: 2 }
+  'light blaster':  { energyPerShot: 0.15, heatPerShot: 0.09, coolRate: 1 / 3, fireRate: 10, pirateDmg: 3, asteroidDmg: 0.5 },
+  'medium blaster': { energyPerShot: 0.225, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 5, asteroidDmg: 1 },
+  'large blaster':  { energyPerShot: 0.375, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 9, asteroidDmg: 2 }
 };
 
 export const OXYGEN_DEPLETION_RATE = 1 / 25;
-export const FUEL_DEPLETION_RATE = 1 / 3;
+export const FUEL_DEPLETION_RATE = 1 / 4;
 
-export const MAX_ORE_STACK = 10;
+export const MAX_ORE_STACK = 20;
 export const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'copper', 'iron', 'gold', 'diamond', 'platinum'];
 
 // --- Raw ore -> Refined ore mapping (used by Refinery) ---
@@ -249,7 +249,7 @@ export const ITEM_BUY_PRICE = {
 
 export const ITEM_SELL_PRICE = {
   cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60,
-  copper: 25, iron: 50, gold: 75, diamond: 100, platinum: 150,
+  copper: 20, iron: 40, gold: 60, diamond: 80, platinum: 120,
   scrap: 40, 'warp key': 500, 'mining laser': 300,
   'light blaster': 500, 'medium blaster': 1250, 'large blaster': 2500,
   'medium mining laser': 750, 'large mining laser': 1500

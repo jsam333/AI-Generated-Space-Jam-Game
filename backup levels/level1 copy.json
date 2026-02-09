@@ -14,6 +14,11 @@
       "radius": 30
     },
     {
+      "x": -211.1761803418545,
+      "y": -357.0797231234994,
+      "radius": 30
+    },
+    {
       "x": -341.7214554622736,
       "y": -238.0531487489996,
       "radius": 30
@@ -21,6 +26,11 @@
     {
       "x": -426.1919275990154,
       "y": -299.48621939390273,
+      "radius": 30
+    },
+    {
+      "x": -380.11712461533807,
+      "y": -418.5127937684025,
       "radius": 30
     },
     {
@@ -46,6 +56,11 @@
     {
       "x": -334.04232163166074,
       "y": -506.82283282045074,
+      "radius": 30
+    },
+    {
+      "x": 46.074802983677344,
+      "y": -368.59842386941875,
       "radius": 30
     },
     {
@@ -334,48 +349,6 @@
       "y": -882.716433828952,
       "radius": 30,
       "oreType": "hematite"
-    },
-    {
-      "x": 13.670152204495139,
-      "y": 989.3394478660074,
-      "radius": 10,
-      "oreType": "cuprite"
-    },
-    {
-      "x": -63.358498715463156,
-      "y": 1143.3967497059239,
-      "radius": 10,
-      "oreType": "cuprite"
-    },
-    {
-      "x": 276.8513761810194,
-      "y": 1181.911075165903,
-      "radius": 10,
-      "oreType": "cuprite"
-    },
-    {
-      "x": -243.09201752869922,
-      "y": 1136.977695462594,
-      "radius": 10,
-      "oreType": "cuprite"
-    },
-    {
-      "x": -217.41580055537975,
-      "y": -365.0809974765932,
-      "radius": 20,
-      "oreType": "cuprite"
-    },
-    {
-      "x": -358.6349939086367,
-      "y": -422.85248566656196,
-      "radius": 20,
-      "oreType": "cuprite"
-    },
-    {
-      "x": 39.34636917781461,
-      "y": -397.1762686932425,
-      "radius": 20,
-      "oreType": "cuprite"
     }
   ],
   "structures": [
@@ -407,7 +380,7 @@
           "item": "fuel tank",
           "fuel": 5,
           "maxFuel": 5,
-          "quantity": 4
+          "quantity": 3
         }
       ],
       "prices": {}
@@ -419,7 +392,7 @@
       "drops": [
         {
           "item": "scrap",
-          "quantity": 40
+          "quantity": 50
         },
         {
           "item": "warp key",
@@ -452,7 +425,7 @@
         },
         {
           "item": "oxygen canister",
-          "quantity": 3,
+          "quantity": 2,
           "oxygen": 10,
           "maxOxygen": 10
         }
@@ -475,18 +448,18 @@
     "waveSizeMax": 2,
     "tiers": [
       {
-        "startTime": 400,
-        "waveIntervalMin": 80,
+        "startTime": 260,
+        "waveIntervalMin": 70,
         "waveIntervalMax": 110,
         "waveSizeMin": 2,
-        "waveSizeMax": 3
+        "waveSizeMax": 4
       },
       {
-        "startTime": 600,
-        "waveIntervalMin": 70,
+        "startTime": 500,
+        "waveIntervalMin": 60,
         "waveIntervalMax": 100,
-        "waveSizeMin": 2,
-        "waveSizeMax": 5
+        "waveSizeMin": 3,
+        "waveSizeMax": 6
       }
     ]
   }

@@ -706,7 +706,7 @@ function renderShopProperties(parent, obj) {
   addItemDiv.style.display = 'flex';
   addItemDiv.style.gap = '5px';
   const itemSelect = document.createElement('select');
-  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium blaster', 'large blaster', 'medium mining laser', 'large mining laser'].forEach(i => {
+  ALL_ITEM_NAMES.forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
@@ -774,7 +774,7 @@ function renderShopProperties(parent, obj) {
   addPriceDiv.style.gap = '5px';
   const priceSelect = document.createElement('select');
   // Add common items to price override list
-  ['small energy cell', 'medium energy cell', 'fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack', 'light blaster', 'medium blaster', 'large blaster', 'medium mining laser', 'large mining laser', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key'].forEach(i => {
+  ALL_ITEM_NAMES.forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
@@ -1019,7 +1019,7 @@ function renderPirateBaseProperties(parent, obj) {
   addDropDiv.style.display = 'flex';
   addDropDiv.style.gap = '5px';
   const dropSelect = document.createElement('select');
-  ['scrap', 'warp key', 'cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'fuel tank'].forEach(i => {
+  ALL_ITEM_NAMES.forEach(i => {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = i;
