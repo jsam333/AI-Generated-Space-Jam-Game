@@ -1,3 +1,15 @@
+import {
+  PIRATE_TYPE_KEYS,
+  DEFAULT_PIRATE_TYPE_PERCENTAGES,
+  PIRATE_ARCHETYPE_KEYS,
+  normalizePirateBaseTier,
+  getPirateBaseTierScale,
+  normalizePirateArchetype,
+  normalizePirateTypePercentages,
+  ensureSpawnSettingsDefaults,
+  ensurePirateBaseSpawnDefaults
+} from './pirateShared.js';
+
 const canvas = document.getElementById('editor-canvas');
 const ctx = canvas.getContext('2d');
 
@@ -55,10 +67,7 @@ const INTERACT_RADIUS = 162;
 const INTERACTABLE_TYPES = new Set(['shop', 'warpgate', 'crafting', 'refinery', 'shipyard']);
 // Pirate base aggro radius matches game constants.js
 const PIRATE_BASE_AGGRO_RADIUS = 300;
-const PIRATE_TYPE_KEYS = ['normal', 'sturdy', 'fast'];
 const PIRATE_TYPE_LABELS = { normal: 'Normal', sturdy: 'Sturdy', fast: 'Fast' };
-const DEFAULT_PIRATE_TYPE_PERCENTAGES = { normal: 100, sturdy: 0, fast: 0 };
-const PIRATE_ARCHETYPE_KEYS = ['standard', 'shotgun', 'slowing', 'breaching', 'drone'];
 const PIRATE_ARCHETYPE_LABELS = {
   standard: 'Standard',
   shotgun: 'Shotgun',
@@ -74,16 +83,6 @@ const PIRATE_ARCHETYPE_OUTLINE_COLORS = Object.freeze({
   drone: '#7db8ff'
 });
 
-function normalizePirateBaseTier(tier) {
-  const n = Number(tier);
-  if (!Number.isFinite(n)) return 2;
-  return Math.min(5, Math.max(1, Math.round(n)));
-}
-
-function getPirateBaseTierScale(tier) {
-  return 0.6 + (normalizePirateBaseTier(tier) * 0.2);
-}
-
 function getStructureDrawScale(type, tier) {
   return type === 'piratebase' ? getPirateBaseTierScale(tier) : 1;
 }
@@ -98,57 +97,15 @@ function getStructureStyle(type, pirateArchetype = 'standard') {
   };
 }
 
-function normalizePirateTypePercentages(mix) {
-  const out = { normal: 0, sturdy: 0, fast: 0 };
-  for (const key of PIRATE_TYPE_KEYS) {
-    const value = Number(mix?.[key]);
-    out[key] = Number.isFinite(value) ? Math.max(0, value) : 0;
-  }
-  const total = out.normal + out.sturdy + out.fast;
-  if (total <= 0) return { ...DEFAULT_PIRATE_TYPE_PERCENTAGES };
-  return out;
-}
-
-function normalizePirateArchetype(archetype) {
-  return PIRATE_ARCHETYPE_KEYS.includes(archetype) ? archetype : 'standard';
-}
-
-function ensureSpawnSettingsDefaults(spawnSettings) {
-  const s = spawnSettings || {};
-  if (!Array.isArray(s.tiers)) s.tiers = [];
-  s.initialDelay = Number.isFinite(Number(s.initialDelay)) ? Number(s.initialDelay) : 120;
-  s.waveIntervalMin = Number.isFinite(Number(s.waveIntervalMin)) ? Number(s.waveIntervalMin) : 60;
-  s.waveIntervalMax = Number.isFinite(Number(s.waveIntervalMax)) ? Number(s.waveIntervalMax) : 100;
-  s.waveSizeMin = Number.isFinite(Number(s.waveSizeMin)) ? Number(s.waveSizeMin) : 2;
-  s.waveSizeMax = Number.isFinite(Number(s.waveSizeMax)) ? Number(s.waveSizeMax) : 4;
-  s.pirateTypePercentages = normalizePirateTypePercentages(s.pirateTypePercentages);
-  for (const tier of s.tiers) {
-    tier.startTime = Number.isFinite(Number(tier.startTime)) ? Number(tier.startTime) : 300;
-    tier.waveIntervalMin = Number.isFinite(Number(tier.waveIntervalMin)) ? Number(tier.waveIntervalMin) : 45;
-    tier.waveIntervalMax = Number.isFinite(Number(tier.waveIntervalMax)) ? Number(tier.waveIntervalMax) : 80;
-    tier.waveSizeMin = Number.isFinite(Number(tier.waveSizeMin)) ? Number(tier.waveSizeMin) : 3;
-    tier.waveSizeMax = Number.isFinite(Number(tier.waveSizeMax)) ? Number(tier.waveSizeMax) : 6;
-    tier.pirateTypePercentages = normalizePirateTypePercentages(tier.pirateTypePercentages);
-  }
-  return s;
-}
-
-function ensurePirateBaseSpawnDefaults(obj) {
-  obj.pirateArchetype = normalizePirateArchetype(obj.pirateArchetype);
-  obj.defenseTypePercentages = normalizePirateTypePercentages(obj.defenseTypePercentages);
-  obj.waveSpawnTypePercentages = normalizePirateTypePercentages(obj.waveSpawnTypePercentages);
-  obj.waveSpawnCount = Math.max(1, Math.round(Number(obj.waveSpawnCount) || 4));
-}
-
 function renderPirateTypePercentagesEditor(parent, labelText, mixObj, onChange) {
   const wrap = document.createElement('div');
   wrap.className = 'prop-group';
   wrap.innerHTML = `<label>${labelText}</label>`;
   for (const type of PIRATE_TYPE_KEYS) {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin:4px 0;';
+    row.className = 'prop-inline-row';
     const name = document.createElement('span');
-    name.style.cssText = 'font-size:11px;color:#ccc;min-width:55px;';
+    name.className = 'prop-inline-label';
     name.textContent = PIRATE_TYPE_LABELS[type];
     const input = document.createElement('input');
     input.type = 'number';
@@ -165,7 +122,7 @@ function renderPirateTypePercentagesEditor(parent, labelText, mixObj, onChange) 
     wrap.appendChild(row);
   }
   const note = document.createElement('div');
-  note.style.cssText = 'font-size:10px;color:#888;margin-top:4px;';
+  note.className = 'prop-note';
   note.textContent = 'Percentages are weighted and auto-normalized in-game.';
   wrap.appendChild(note);
   parent.appendChild(wrap);
@@ -750,6 +707,24 @@ function addPropInput(parent, label, value, onChange) {
   parent.appendChild(div);
 }
 
+function buildShopInventoryItem(itemName) {
+  const item = { item: itemName, quantity: 1 };
+  if (itemName === 'small energy cell') { item.energy = 10; item.maxEnergy = 10; }
+  else if (itemName === 'medium energy cell') { item.energy = 30; item.maxEnergy = 30; }
+  else if (itemName === 'large energy cell') { item.energy = 60; item.maxEnergy = 60; }
+  else if (itemName === 'fuel tank') { item.fuel = 10; item.maxFuel = 10; }
+  else if (itemName === 'medium fuel tank') { item.fuel = 30; item.maxFuel = 30; }
+  else if (itemName === 'large fuel tank') { item.fuel = 60; item.maxFuel = 60; }
+  else if (itemName === 'oxygen canister') { item.oxygen = 10; item.maxOxygen = 10; }
+  else if (itemName === 'medium oxygen canister') { item.oxygen = 30; item.maxOxygen = 30; }
+  else if (itemName === 'large oxygen canister') { item.oxygen = 60; item.maxOxygen = 60; }
+  else if (itemName === 'health pack') { item.health = 10; }
+  else if (itemName === 'medium health pack') { item.health = 30; }
+  else if (itemName === 'large health pack') { item.health = 60; }
+  else if (itemName.includes('laser') || itemName.includes('blaster')) { item.heat = 0; item.overheated = false; }
+  return item;
+}
+
 function renderShopProperties(parent, obj) {
   if (!obj.inventory) obj.inventory = [];
   if (!obj.prices) obj.prices = {};
@@ -775,10 +750,9 @@ function renderShopProperties(parent, obj) {
       const dragHandle = document.createElement('span');
       dragHandle.className = 'drag-handle';
       dragHandle.textContent = '≡';
-      dragHandle.style.cssText = 'cursor:grab;margin-right:5px;color:#888;';
       
       const itemLabel = document.createElement('span');
-      itemLabel.style.cssText = 'font-size:10px;flex:1;';
+      itemLabel.className = 'item-label';
       itemLabel.textContent = item.item;
       
       const qtyInput = document.createElement('input');
@@ -845,8 +819,7 @@ function renderShopProperties(parent, obj) {
   
   // Add item
   const addItemDiv = document.createElement('div');
-  addItemDiv.style.display = 'flex';
-  addItemDiv.style.gap = '5px';
+  addItemDiv.className = 'prop-row-tight';
   const itemSelect = document.createElement('select');
   ALL_ITEM_NAMES.forEach(i => {
     const opt = document.createElement('option');
@@ -858,25 +831,7 @@ function renderShopProperties(parent, obj) {
   addBtn.className = 'add-btn';
   addBtn.textContent = 'Add Item';
   addBtn.onclick = () => {
-    // Default objects based on type - all items have quantity (count in shop)
-    const name = itemSelect.value;
-    let newItem = { item: name, quantity: 1 };
-    // Set full capacity for containers
-    if (name === 'small energy cell') { newItem.energy = 10; newItem.maxEnergy = 10; }
-    else if (name === 'medium energy cell') { newItem.energy = 30; newItem.maxEnergy = 30; }
-    else if (name === 'large energy cell') { newItem.energy = 60; newItem.maxEnergy = 60; }
-    else if (name === 'fuel tank') { newItem.fuel = 10; newItem.maxFuel = 10; }
-    else if (name === 'medium fuel tank') { newItem.fuel = 30; newItem.maxFuel = 30; }
-    else if (name === 'large fuel tank') { newItem.fuel = 60; newItem.maxFuel = 60; }
-    else if (name === 'oxygen canister') { newItem.oxygen = 10; newItem.maxOxygen = 10; }
-    else if (name === 'medium oxygen canister') { newItem.oxygen = 30; newItem.maxOxygen = 30; }
-    else if (name === 'large oxygen canister') { newItem.oxygen = 60; newItem.maxOxygen = 60; }
-    else if (name === 'health pack') { newItem.health = 10; }
-    else if (name === 'medium health pack') { newItem.health = 30; }
-    else if (name === 'large health pack') { newItem.health = 60; }
-    else if (name.includes('laser') || name.includes('blaster')) { newItem.heat = 0; newItem.overheated = false; }
-    
-    obj.inventory.push(newItem);
+    obj.inventory.push(buildShopInventoryItem(itemSelect.value));
     renderInvList();
     saveLevel();
   };
@@ -916,8 +871,7 @@ function renderShopProperties(parent, obj) {
   renderPriceList();
 
   const addPriceDiv = document.createElement('div');
-  addPriceDiv.style.display = 'flex';
-  addPriceDiv.style.gap = '5px';
+  addPriceDiv.className = 'prop-row-tight';
   const priceSelect = document.createElement('select');
   // Add common items to price override list
   ALL_ITEM_NAMES.forEach(i => {
@@ -957,9 +911,7 @@ const ALL_ITEM_NAMES = [
 
 function createItemSelect(selectedValue) {
   const sel = document.createElement('select');
-  sel.style.fontSize = '10px';
-  sel.style.flex = '1';
-  sel.style.minWidth = '0';
+  sel.className = 'recipe-item-select';
   ALL_ITEM_NAMES.forEach(name => {
     const opt = document.createElement('option');
     opt.value = name;
@@ -970,6 +922,87 @@ function createItemSelect(selectedValue) {
   return sel;
 }
 
+function createCraftingRecipeCard(recipe, idx, rerender) {
+  const row = document.createElement('div');
+  row.className = 'prop-list-item recipe-card';
+
+  const headerDiv = document.createElement('div');
+  headerDiv.className = 'recipe-header-row';
+  const headerLabel = document.createElement('span');
+  headerLabel.className = 'recipe-header-label';
+  headerLabel.textContent = `Recipe ${idx + 1}`;
+  const delBtn = document.createElement('button');
+  delBtn.textContent = '×';
+  delBtn.className = 'recipe-delete-btn';
+  delBtn.onclick = () => {
+    // parent rerender owns source recipe array; card just signals intent
+    rerender('deleteRecipe', idx);
+  };
+  headerDiv.appendChild(headerLabel);
+  headerDiv.appendChild(delBtn);
+  row.appendChild(headerDiv);
+
+  const inputsLabel = document.createElement('span');
+  inputsLabel.className = 'recipe-section-label';
+  inputsLabel.textContent = 'Inputs:';
+  row.appendChild(inputsLabel);
+
+  recipe.inputs.forEach((inp, iIdx) => {
+    const inputRow = document.createElement('div');
+    inputRow.className = 'recipe-input-row';
+
+    const itemSel = createItemSelect(inp.item);
+    itemSel.onchange = () => { inp.item = itemSel.value; saveLevel(); };
+
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number';
+    qtyInput.min = '1';
+    qtyInput.value = inp.quantity;
+    qtyInput.className = 'recipe-qty-input';
+    qtyInput.onchange = () => { inp.quantity = Math.max(1, parseInt(qtyInput.value) || 1); saveLevel(); };
+
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = '×';
+    removeBtn.className = 'recipe-remove-input-btn';
+    removeBtn.onclick = () => { recipe.inputs.splice(iIdx, 1); saveLevel(); rerender(); };
+
+    inputRow.appendChild(itemSel);
+    inputRow.appendChild(qtyInput);
+    inputRow.appendChild(removeBtn);
+    row.appendChild(inputRow);
+  });
+
+  const addInputBtn = document.createElement('button');
+  addInputBtn.textContent = '+ Add Input';
+  addInputBtn.className = 'add-btn recipe-add-input-btn';
+  addInputBtn.onclick = () => { recipe.inputs.push({ item: 'scrap', quantity: 1 }); saveLevel(); rerender(); };
+  row.appendChild(addInputBtn);
+
+  const outputLabel = document.createElement('span');
+  outputLabel.className = 'recipe-section-label';
+  outputLabel.textContent = 'Output:';
+  row.appendChild(outputLabel);
+
+  const outputRow = document.createElement('div');
+  outputRow.className = 'recipe-output-row';
+
+  const outSel = createItemSelect(recipe.output.item);
+  outSel.onchange = () => { recipe.output.item = outSel.value; saveLevel(); };
+
+  const outQty = document.createElement('input');
+  outQty.type = 'number';
+  outQty.min = '1';
+  outQty.value = recipe.output.quantity;
+  outQty.className = 'recipe-qty-input';
+  outQty.onchange = () => { recipe.output.quantity = Math.max(1, parseInt(outQty.value) || 1); saveLevel(); };
+
+  outputRow.appendChild(outSel);
+  outputRow.appendChild(outQty);
+  row.appendChild(outputRow);
+
+  return row;
+}
+
 function renderCraftingProperties(parent, obj) {
   if (!obj.recipes) obj.recipes = [];
 
@@ -977,95 +1010,20 @@ function renderCraftingProperties(parent, obj) {
   recipesDiv.className = 'prop-group';
   recipesDiv.innerHTML = `<label>Recipes</label>`;
   const recipesList = document.createElement('div');
-  recipesList.className = 'prop-list';
-  recipesList.style.maxHeight = '400px';
+  recipesList.className = 'prop-list recipe-list';
   
   const renderRecipes = () => {
     recipesList.innerHTML = '';
     obj.recipes.forEach((recipe, idx) => {
-      const row = document.createElement('div');
-      row.className = 'prop-list-item';
-      row.style.flexDirection = 'column';
-      row.style.alignItems = 'stretch';
-      row.style.padding = '6px';
-      row.style.marginBottom = '6px';
-      
-      // --- Recipe header with delete ---
-      const headerDiv = document.createElement('div');
-      headerDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;';
-      const headerLabel = document.createElement('span');
-      headerLabel.style.cssText = 'font-size:11px;font-weight:bold;color:#ccc;';
-      headerLabel.textContent = `Recipe ${idx + 1}`;
-      const delBtn = document.createElement('button');
-      delBtn.textContent = '×';
-      delBtn.style.cssText = 'background:#844;font-size:12px;padding:1px 5px;';
-      delBtn.onclick = () => { obj.recipes.splice(idx, 1); saveLevel(); renderRecipes(); };
-      headerDiv.appendChild(headerLabel);
-      headerDiv.appendChild(delBtn);
-      row.appendChild(headerDiv);
-
-      // --- Inputs section ---
-      const inputsLabel = document.createElement('span');
-      inputsLabel.style.cssText = 'font-size:10px;color:#aaa;margin-bottom:2px;';
-      inputsLabel.textContent = 'Inputs:';
-      row.appendChild(inputsLabel);
-
-      recipe.inputs.forEach((inp, iIdx) => {
-        const inputRow = document.createElement('div');
-        inputRow.style.cssText = 'display:flex;gap:4px;align-items:center;margin-bottom:3px;';
-
-        const itemSel = createItemSelect(inp.item);
-        itemSel.onchange = () => { inp.item = itemSel.value; saveLevel(); };
-
-        const qtyInput = document.createElement('input');
-        qtyInput.type = 'number';
-        qtyInput.min = '1';
-        qtyInput.value = inp.quantity;
-        qtyInput.style.cssText = 'width:40px;font-size:10px;';
-        qtyInput.onchange = () => { inp.quantity = Math.max(1, parseInt(qtyInput.value) || 1); saveLevel(); };
-
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = '×';
-        removeBtn.style.cssText = 'font-size:10px;padding:1px 4px;background:#a33;';
-        removeBtn.onclick = () => { recipe.inputs.splice(iIdx, 1); saveLevel(); renderRecipes(); };
-
-        inputRow.appendChild(itemSel);
-        inputRow.appendChild(qtyInput);
-        inputRow.appendChild(removeBtn);
-        row.appendChild(inputRow);
+      const row = createCraftingRecipeCard(recipe, idx, (action, actionIdx) => {
+        if (action === 'deleteRecipe') {
+          obj.recipes.splice(actionIdx, 1);
+          saveLevel();
+          renderRecipes();
+          return;
+        }
+        renderRecipes();
       });
-
-      // Add input button
-      const addInputBtn = document.createElement('button');
-      addInputBtn.textContent = '+ Add Input';
-      addInputBtn.className = 'add-btn';
-      addInputBtn.style.cssText = 'font-size:10px;padding:3px 6px;margin-bottom:6px;';
-      addInputBtn.onclick = () => { recipe.inputs.push({ item: 'scrap', quantity: 1 }); saveLevel(); renderRecipes(); };
-      row.appendChild(addInputBtn);
-
-      // --- Output section ---
-      const outputLabel = document.createElement('span');
-      outputLabel.style.cssText = 'font-size:10px;color:#aaa;margin-bottom:2px;';
-      outputLabel.textContent = 'Output:';
-      row.appendChild(outputLabel);
-
-      const outputRow = document.createElement('div');
-      outputRow.style.cssText = 'display:flex;gap:4px;align-items:center;';
-
-      const outSel = createItemSelect(recipe.output.item);
-      outSel.onchange = () => { recipe.output.item = outSel.value; saveLevel(); };
-
-      const outQty = document.createElement('input');
-      outQty.type = 'number';
-      outQty.min = '1';
-      outQty.value = recipe.output.quantity;
-      outQty.style.cssText = 'width:40px;font-size:10px;';
-      outQty.onchange = () => { recipe.output.quantity = Math.max(1, parseInt(outQty.value) || 1); saveLevel(); };
-
-      outputRow.appendChild(outSel);
-      outputRow.appendChild(outQty);
-      row.appendChild(outputRow);
-
       recipesList.appendChild(row);
     });
   };
@@ -1099,10 +1057,7 @@ function renderShipyardProperties(parent, obj) {
   
   shipTypes.forEach(type => {
     const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.alignItems = 'center';
-    row.style.gap = '8px';
-    row.style.marginBottom = '4px';
+    row.className = 'prop-inline-row';
     
     const cb = document.createElement('input');
     cb.type = 'checkbox';
@@ -1117,7 +1072,7 @@ function renderShipyardProperties(parent, obj) {
     };
     
     const label = document.createElement('span');
-    label.style.fontSize = '12px';
+    label.className = 'prop-small-label';
     label.textContent = type.charAt(0).toUpperCase() + type.slice(1);
     
     row.appendChild(cb);
@@ -1198,8 +1153,7 @@ function renderPirateBaseProperties(parent, obj) {
   renderDrops();
 
   const addDropDiv = document.createElement('div');
-  addDropDiv.style.display = 'flex';
-  addDropDiv.style.gap = '5px';
+  addDropDiv.className = 'prop-row-tight';
   const dropSelect = document.createElement('select');
   ALL_ITEM_NAMES.forEach(i => {
     const opt = document.createElement('option');
@@ -1249,7 +1203,7 @@ function renderRefineryProperties(parent, obj) {
 
   RAW_ORE_TYPES.forEach(ore => {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:4px;';
+    row.className = 'prop-inline-row';
 
     const cb = document.createElement('input');
     cb.type = 'checkbox';
@@ -1264,7 +1218,7 @@ function renderRefineryProperties(parent, obj) {
     };
 
     const label = document.createElement('span');
-    label.style.fontSize = '12px';
+    label.className = 'prop-small-label';
     label.textContent = `${ore.charAt(0).toUpperCase() + ore.slice(1)} → ${REFINED_ORE_NAMES[ore]}`;
 
     row.appendChild(cb);
@@ -1341,6 +1295,60 @@ function handleRemoveObject(world) {
   }
 }
 
+function stampClipboardAt(world) {
+  if (!state.clipboard) return;
+  for (const a of state.clipboard.asteroids) {
+    const clone = JSON.parse(JSON.stringify(a));
+    clone.x = world.x + a.rx;
+    clone.y = world.y + a.ry;
+    delete clone.rx;
+    delete clone.ry;
+    state.level.asteroids.push(clone);
+  }
+  for (const s of state.clipboard.structures) {
+    const clone = JSON.parse(JSON.stringify(s));
+    clone.x = world.x + s.rx;
+    clone.y = world.y + s.ry;
+    delete clone.rx;
+    delete clone.ry;
+    state.level.structures.push(clone);
+  }
+  saveLevel();
+}
+
+function startCopySelection(world) {
+  state.copySelect = { startX: world.x, startY: world.y };
+  state.copySelectScreen = { sx: state.mouse.x, sy: state.mouse.y };
+}
+
+function handleEditorToolLeftClick(world) {
+  if (state.tool.selected === 'select') {
+    handleSelectObject(world);
+  } else if (state.tool.selected === 'move') {
+    handleSelectObject(world);
+    if (state.selectedObject) {
+      state.mouse.isMoving = true;
+      state.mouse.moveStartWorld = { x: world.x, y: world.y };
+      state.mouse.moveOriginalX = state.selectedObject.x;
+      state.mouse.moveOriginalY = state.selectedObject.y;
+    }
+  } else if (state.tool.selected === 'eraser') {
+    state.mouse.isErasing = true;
+    eraseBrushAt(world);
+  } else {
+    handlePlaceObject(world);
+  }
+}
+
+function cancelCopyPasteModes() {
+  if (!state.copySelectMode && !state.pasteMode) return false;
+  state.copySelectMode = false;
+  state.copySelect = null;
+  state.copySelectScreen = null;
+  state.pasteMode = false;
+  return true;
+}
+
 function handleMouseDown(e) {
   e.preventDefault();
   canvas.focus();
@@ -1354,23 +1362,7 @@ function handleMouseDown(e) {
 
     // If in paste mode, stamp down the clipboard contents
     if (state.pasteMode && state.clipboard) {
-      for (const a of state.clipboard.asteroids) {
-        const clone = JSON.parse(JSON.stringify(a));
-        clone.x = world.x + a.rx;
-        clone.y = world.y + a.ry;
-        delete clone.rx;
-        delete clone.ry;
-        state.level.asteroids.push(clone);
-      }
-      for (const s of state.clipboard.structures) {
-        const clone = JSON.parse(JSON.stringify(s));
-        clone.x = world.x + s.rx;
-        clone.y = world.y + s.ry;
-        delete clone.rx;
-        delete clone.ry;
-        state.level.structures.push(clone);
-      }
-      saveLevel();
+      stampClipboardAt(world);
       state.pasteMode = false;
       render();
       return;
@@ -1378,36 +1370,15 @@ function handleMouseDown(e) {
 
     // If in copy-select mode, start the drag rectangle
     if (state.copySelectMode) {
-      state.copySelect = { startX: world.x, startY: world.y };
-      state.copySelectScreen = { sx: state.mouse.x, sy: state.mouse.y };
+      startCopySelection(world);
       render();
       return;
     }
 
-    if (state.tool.selected === 'select') {
-      handleSelectObject(world);
-    } else if (state.tool.selected === 'move') {
-      handleSelectObject(world);
-      if (state.selectedObject) {
-        state.mouse.isMoving = true;
-        state.mouse.moveStartWorld = { x: world.x, y: world.y };
-        state.mouse.moveOriginalX = state.selectedObject.x;
-        state.mouse.moveOriginalY = state.selectedObject.y;
-      }
-    } else if (state.tool.selected === 'eraser') {
-      state.mouse.isErasing = true;
-      eraseBrushAt(world);
-    } else {
-      handlePlaceObject(world);
-    }
+    handleEditorToolLeftClick(world);
     render();
   } else if (e.button === 2) { // Right click
-    // Cancel copy/paste modes on right click
-    if (state.copySelectMode || state.pasteMode) {
-      state.copySelectMode = false;
-      state.copySelect = null;
-      state.copySelectScreen = null;
-      state.pasteMode = false;
+    if (cancelCopyPasteModes()) {
       render();
       return;
     }

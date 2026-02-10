@@ -1,5 +1,7 @@
 import { getMaxStack } from './utils.js';
 
+const ENERGY_CELL_ITEMS = new Set(['small energy cell', 'medium energy cell', 'large energy cell']);
+
 export class Inventory {
   constructor(size = 9) {
     this.slots = new Array(size).fill(null);
@@ -50,12 +52,17 @@ export class Inventory {
     return this.slots[this.selectedSlot];
   }
 
-  getFirstChargedCell() {
+  findFirstEnergyCell(where) {
     for (let i = 0; i < this.slots.length; i++) {
       const cell = this.slots[i];
-      if (cell && (cell.item === 'small energy cell' || cell.item === 'medium energy cell') && cell.energy != null && cell.energy > 0) return cell;
+      if (!cell || !ENERGY_CELL_ITEMS.has(cell.item) || cell.energy == null) continue;
+      if (!where || where(cell)) return cell;
     }
     return null;
+  }
+
+  getFirstChargedCell() {
+    return this.findFirstEnergyCell((cell) => cell.energy > 0);
   }
 
   /** Resize inventory. Returns array of excess items that no longer fit (when shrinking). */
@@ -73,10 +80,6 @@ export class Inventory {
   }
 
   getFirstCellWithMinEnergy(min) {
-    for (let i = 0; i < this.slots.length; i++) {
-      const cell = this.slots[i];
-      if (cell && (cell.item === 'small energy cell' || cell.item === 'medium energy cell') && cell.energy != null && cell.energy >= min) return cell;
-    }
-    return null;
+    return this.findFirstEnergyCell((cell) => cell.energy >= min);
   }
 }

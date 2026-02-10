@@ -2,6 +2,18 @@ import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULL
 import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity, raycastCircle } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
+import {
+  PIRATE_TYPE_KEYS,
+  DEFAULT_PIRATE_TYPE_PERCENTAGES,
+  PIRATE_ARCHETYPE_KEYS,
+  normalizePirateBaseTier,
+  getPirateBaseTierScale,
+  normalizePirateType,
+  normalizePirateArchetype,
+  normalizePirateTypePercentages,
+  ensureSpawnSettingsDefaults,
+  ensurePirateBaseSpawnDefaults
+} from './pirateShared.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -861,16 +873,6 @@ const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 
 const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A, copper: 0xB87333, iron: 0x696969, gold: 0xFFD700, diamond: 0xB9F2FF, platinum: 0xE5E4E2 };
 const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
 
-function normalizePirateBaseTier(tier) {
-  const n = Number(tier);
-  if (!Number.isFinite(n)) return 2;
-  return Math.min(5, Math.max(1, Math.round(n)));
-}
-
-function getPirateBaseTierScale(tier) {
-  return 0.6 + (normalizePirateBaseTier(tier) * 0.2);
-}
-
 function getPirateBaseHitRadius(st) {
   return PIRATE_BASE_HIT_RADIUS * getPirateBaseTierScale(st?.tier);
 }
@@ -892,15 +894,12 @@ function getStructureCollisionRadius(st) {
   return STRUCTURE_SIZE_COLL;
 }
 
-const PIRATE_TYPE_KEYS = ['normal', 'sturdy', 'fast'];
 const PIRATE_BASE_COLLISION_RADIUS = SHIP_COLLISION_RADIUS + 4;
-const DEFAULT_PIRATE_TYPE_PERCENTAGES = Object.freeze({ normal: 100, sturdy: 0, fast: 0 });
 const PIRATE_TYPE_CONFIG = Object.freeze({
   normal: { health: PIRATE_HEALTH, speedMult: 1, sizeMult: 1, tint: 0xff6666, emissiveIntensity: 1.5 },
   sturdy: { health: PIRATE_HEALTH * 2, speedMult: 0.7, sizeMult: 1.3, tint: 0xff6666, emissiveIntensity: 1.5 },
   fast: { health: 15, speedMult: 1.5, sizeMult: 0.8, tint: 0xff6666, emissiveIntensity: 1.5 }
 });
-const PIRATE_ARCHETYPE_KEYS = ['standard', 'shotgun', 'slowing', 'breaching', 'drone'];
 const PIRATE_ARCHETYPE_CONFIG = Object.freeze({
   standard: { bonusHealthMult: 1, speedMult: 1, sizeMult: 1, fixedHealth: null, pelletCount: 1, pelletSpread: 0, bulletDamage: 3 },
   shotgun: { bonusHealthMult: 2, speedMult: 1, sizeMult: 1, fixedHealth: null, pelletCount: 3, pelletSpread: 0.06, bulletDamage: 2 },
@@ -915,25 +914,6 @@ const PIRATE_ARCHETYPE_BULLET_COLORS = Object.freeze({
   breaching: '#ffcc00',
   drone: '#ffcc00'
 });
-
-function normalizePirateType(type) {
-  return PIRATE_TYPE_KEYS.includes(type) ? type : 'normal';
-}
-
-function normalizePirateArchetype(archetype) {
-  return PIRATE_ARCHETYPE_KEYS.includes(archetype) ? archetype : 'standard';
-}
-
-function normalizePirateTypePercentages(percentages) {
-  const out = { normal: 0, sturdy: 0, fast: 0 };
-  for (const key of PIRATE_TYPE_KEYS) {
-    const value = Number(percentages?.[key]);
-    out[key] = Number.isFinite(value) ? Math.max(0, value) : 0;
-  }
-  const total = out.normal + out.sturdy + out.fast;
-  if (total <= 0) return { ...DEFAULT_PIRATE_TYPE_PERCENTAGES };
-  return out;
-}
 
 function pickPirateType(percentages) {
   const mix = normalizePirateTypePercentages(percentages);
@@ -2596,67 +2576,45 @@ canvas.addEventListener('wheel', (e) => {
   if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   if (shopMenuOpen) return;
+  const slotCount = inventory.slots.length;
+  if (slotCount <= 0) return;
   if (e.deltaY > 0) {
-    selectedSlot = (selectedSlot + 1) % 9;
+    selectedSlot = (selectedSlot + 1) % slotCount;
   } else {
-    selectedSlot = (selectedSlot - 1 + 9) % 9;
+    selectedSlot = (selectedSlot - 1 + slotCount) % slotCount;
   }
   markHUDDirty();
 });
 
-function isShipInWarpGate() {
+function getNearbyStructureByType(type) {
   for (const st of structures) {
-    if (st.type !== 'warpgate') continue;
+    if (st.type !== type) continue;
     const dx = ship.x - st.x;
     const dy = ship.y - st.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < INTERACT_RADIUS) return st;
   }
   return null;
+}
+
+function isShipInWarpGate() {
+  return getNearbyStructureByType('warpgate');
 }
 
 function isShipInShop() {
-  for (const st of structures) {
-    if (st.type !== 'shop') continue;
-    const dx = ship.x - st.x;
-    const dy = ship.y - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < INTERACT_RADIUS) return st;
-  }
-  return null;
+  return getNearbyStructureByType('shop');
 }
 
 function isShipInCrafting() {
-  for (const st of structures) {
-    if (st.type !== 'crafting') continue;
-    const dx = ship.x - st.x;
-    const dy = ship.y - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < INTERACT_RADIUS) return st;
-  }
-  return null;
+  return getNearbyStructureByType('crafting');
 }
 
 function isShipInRefinery() {
-  for (const st of structures) {
-    if (st.type !== 'refinery') continue;
-    const dx = ship.x - st.x;
-    const dy = ship.y - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < INTERACT_RADIUS) return st;
-  }
-  return null;
+  return getNearbyStructureByType('refinery');
 }
 
 function isShipInShipyard() {
-  for (const st of structures) {
-    if (st.type !== 'shipyard') continue;
-    const dx = ship.x - st.x;
-    const dy = ship.y - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < INTERACT_RADIUS) return st;
-  }
-  return null;
+  return getNearbyStructureByType('shipyard');
 }
 
 function hasCuprite() {
@@ -3141,24 +3099,15 @@ function loadLevel(levelData, levelIdx) {
   levelWidth = levelData.width || 10000;
   levelHeight = levelData.height || 10000;
   
-  if (levelData.spawnSettings) {
-    levelSpawnSettings = levelData.spawnSettings;
-    if (!levelSpawnSettings.tiers) levelSpawnSettings.tiers = [];
-  } else {
-    // Default
-    levelSpawnSettings = {
-      initialDelay: 120,
-      waveIntervalMin: 60,
-      waveIntervalMax: 100,
-      waveSizeMin: 2,
-      waveSizeMax: 4,
-      tiers: []
-    };
-  }
-  levelSpawnSettings.pirateTypePercentages = normalizePirateTypePercentages(levelSpawnSettings.pirateTypePercentages);
-  for (const tier of levelSpawnSettings.tiers) {
-    tier.pirateTypePercentages = normalizePirateTypePercentages(tier.pirateTypePercentages);
-  }
+  levelSpawnSettings = ensureSpawnSettingsDefaults(levelData.spawnSettings || {
+    initialDelay: 120,
+    waveIntervalMin: 60,
+    waveIntervalMax: 100,
+    waveSizeMin: 2,
+    waveSizeMax: 4,
+    pirateTypePercentages: { ...DEFAULT_PIRATE_TYPE_PERCENTAGES },
+    tiers: []
+  });
 
   // Health multipliers by ore type
   const oreHealthMult = { cuprite: 1, hematite: 3, aurite: 5, diamite: 8, platinite: 12 };
@@ -3184,7 +3133,6 @@ function loadLevel(levelData, levelIdx) {
     
     if (st.type === 'piratebase') {
       st.tier = normalizePirateBaseTier(st.tier);
-      st.pirateArchetype = normalizePirateArchetype(st.pirateArchetype);
       // Use config health or default 150
       const hp = st.health || 150;
       st.health = hp;
@@ -3195,10 +3143,7 @@ function loadLevel(levelData, levelIdx) {
       if (st.defenseCount === undefined) st.defenseCount = 8;
       // Default spawn rate if not set
       if (st.spawnRate === undefined) st.spawnRate = 30;
-      if (st.waveSpawnCount === undefined) st.waveSpawnCount = 4;
-      st.waveSpawnCount = Math.max(1, Math.round(Number(st.waveSpawnCount) || 4));
-      st.defenseTypePercentages = normalizePirateTypePercentages(st.defenseTypePercentages);
-      st.waveSpawnTypePercentages = normalizePirateTypePercentages(st.waveSpawnTypePercentages);
+      ensurePirateBaseSpawnDefaults(st);
       // Default drops if not set
       if (!st.drops) st.drops = []; // Will fallback to default in onPirateBaseDeath if empty? No, better to pre-fill or handle empty logic. 
       // Actually, existing logic hardcoded drops. If st.drops is empty, we might want to default it?
@@ -4307,34 +4252,39 @@ function beginDragFromSell(sellIndex, clientX, clientY) {
   setDragGhostVisible(true);
 }
 
-function endDrag(clientX, clientY) {
-  const drag = inventoryDrag;
-  inventoryDrag = null;
-  setDragGhostVisible(false);
-  // Remove fuel and O2 bar highlights
+function clearResourceBarHighlights() {
   const fuelBarEl = document.getElementById('fuel-bar-drop-zone');
   if (fuelBarEl) fuelBarEl.classList.remove('highlight');
   const oxygenBarEl = document.getElementById('oxygen-bar-drop-zone');
   if (oxygenBarEl) oxygenBarEl.classList.remove('highlight');
   const healthBarEl = document.getElementById('health-bar-drop-zone');
   if (healthBarEl) healthBarEl.classList.remove('highlight');
-  if (!drag) return;
+}
 
+function resolveDropTarget(clientX, clientY) {
   const under = document.elementFromPoint(clientX, clientY);
-  let targetSlotEl = null;
-  const isOverFuelBar = under && under.closest('#fuel-bar-drop-zone');
-  const isOverO2Bar = under && under.closest('#oxygen-bar-drop-zone');
-  const isOverHealthBar = under && under.closest('#health-bar-drop-zone');
-  if (under) {
-    targetSlotEl = under.closest('.slot') || under.closest('.shop-buy-slot') || under.closest('.shop-sell-slot') || under.closest('.crafting-slot') || under.closest('.refinery-input-slot');
-  }
+  const targetSlotEl = under
+    ? (under.closest('.slot') ||
+      under.closest('.shop-buy-slot') ||
+      under.closest('.shop-sell-slot') ||
+      under.closest('.crafting-slot') ||
+      under.closest('.refinery-input-slot'))
+    : null;
+  return {
+    targetSlotEl,
+    isOverFuelBar: !!(under && under.closest('#fuel-bar-drop-zone')),
+    isOverO2Bar: !!(under && under.closest('#oxygen-bar-drop-zone')),
+    isOverHealthBar: !!(under && under.closest('#health-bar-drop-zone'))
+  };
+}
 
-  // Handle drops on resource bars (O2, fuel, health) — hotbar or buy slot
+function tryHandleResourceBarDrop(drag, dropTarget) {
   const barChecks = [
-    { isOver: isOverO2Bar,      barType: 'oxygen' },
-    { isOver: isOverFuelBar,    barType: 'fuel' },
-    { isOver: isOverHealthBar,  barType: 'health' }
+    { isOver: dropTarget.isOverO2Bar, barType: 'oxygen' },
+    { isOver: dropTarget.isOverFuelBar, barType: 'fuel' },
+    { isOver: dropTarget.isOverHealthBar, barType: 'health' }
   ];
+
   for (const { isOver, barType } of barChecks) {
     if (!isOver) continue;
     const cfg = RESOURCE_BAR_CONFIG[barType];
@@ -4346,7 +4296,7 @@ function endDrag(clientX, clientY) {
         player[cfg.playerProp] = Math.min(player[cfg.maxProp], player[cfg.playerProp] + addAmount);
         hotbar[drag.fromSlot] = null;
         updateHUD();
-        return;
+        return true;
       }
     }
 
@@ -4365,243 +4315,293 @@ function endDrag(clientX, clientY) {
           const creditsEl = document.getElementById('shop-credits-display');
           if (creditsEl) creditsEl.textContent = `You have ${player.credits} credits`;
         }
-        return;
+        return true;
       }
     }
   }
 
-  // Handle Jettison if dropped outside of UI and shop is closed
-  if (!targetSlotEl && !shopMenuOpen && !craftingMenuOpen && !shipyardMenuOpen && !refineryMenuOpen && drag.kind === 'hotbar') {
-    // Drop into space
-    const from = drag.fromSlot;
-    const it = hotbar[from];
-    if (it) {
-      const dx = input.mouseX - WIDTH / 2;
-      const dy = input.mouseY - HEIGHT / 2;
-      const dir = normalize(dx, dy);
-      if (dir.x !== 0 || dir.y !== 0) {
-        const jettSpeed = 340;
-        const totalQty = it.quantity || 1;
-        const baseAngle = Math.atan2(dir.y, dir.x);
-        
-        for (let i = 0; i < totalQty; i++) {
-            // Small spread: +/- 0.25 rad (~14 deg) for burst effect
-            const spread = (Math.random() - 0.5) * 0.5; 
-            const angle = baseAngle + spread;
-            const speedVar = 0.8 + Math.random() * 0.4; // +/- 20% speed variation
-            const jVx = Math.cos(angle) * jettSpeed * speedVar;
-            const jVy = Math.sin(angle) * jettSpeed * speedVar;
+  return false;
+}
 
-            const floatItem = {
-              x: ship.x + Math.cos(angle) * 20,
-              y: ship.y + Math.sin(angle) * 20,
-              vx: jVx + ship.vx * 0.3,
-              vy: jVy + ship.vy * 0.3,
-              item: it.item,
-              quantity: 1
-            };
-            if (it.energy != null) {
-              floatItem.energy = it.energy;
-              floatItem.maxEnergy = it.maxEnergy;
-            }
-            if (it.fuel != null) {
-              floatItem.fuel = it.fuel;
-              floatItem.maxFuel = it.maxFuel;
-            }
-            if (it.oxygen != null) {
-              floatItem.oxygen = it.oxygen;
-              floatItem.maxOxygen = it.maxOxygen;
-            }
-            if (it.health != null) {
-              floatItem.health = it.health;
-              floatItem.maxHealth = it.maxHealth ?? it.health;
-            }
-            if (it.heat != null) {
-              floatItem.heat = it.heat;
-              floatItem.overheated = !!it.overheated;
-            }
-            floatingItems.push(floatItem);
-        }
-        hotbar[from] = null;
-        updateHUD();
-      }
-    }
-    return;
+function tryHandleJettisonDrop(drag, targetSlotEl) {
+  if (targetSlotEl || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen || drag.kind !== 'hotbar') {
+    return false;
   }
 
-  if (!targetSlotEl) return;
+  const from = drag.fromSlot;
+  const it = hotbar[from];
+  if (it) {
+    const dx = input.mouseX - WIDTH / 2;
+    const dy = input.mouseY - HEIGHT / 2;
+    const dir = normalize(dx, dy);
+    if (dir.x !== 0 || dir.y !== 0) {
+      const jettSpeed = 340;
+      const totalQty = it.quantity || 1;
+      const baseAngle = Math.atan2(dir.y, dir.x);
 
-  // Determine target type
-  const isHotbar = targetSlotEl.classList.contains('slot');
-  const isSell = targetSlotEl.classList.contains('shop-sell-slot');
-  const isBuy = targetSlotEl.classList.contains('shop-buy-slot'); // Can't drop onto buy slots generally
-  const isCraftInput = targetSlotEl.classList.contains('input-slot') && !targetSlotEl.classList.contains('refinery-input-slot');
-  const isCraftOutput = targetSlotEl.classList.contains('output-slot') && !targetSlotEl.closest('#refinery-output-area');
-  const isRefineryInput = targetSlotEl.classList.contains('refinery-input-slot');
-  const isRefineryOutput = !!targetSlotEl.closest('#refinery-output-area');
+      for (let i = 0; i < totalQty; i++) {
+        const spread = (Math.random() - 0.5) * 0.5;
+        const angle = baseAngle + spread;
+        const speedVar = 0.8 + Math.random() * 0.4;
+        const jVx = Math.cos(angle) * jettSpeed * speedVar;
+        const jVy = Math.sin(angle) * jettSpeed * speedVar;
 
-  if (drag.kind === 'hotbar') {
-    const from = drag.fromSlot;
-    const it = hotbar[from];
-    if (!it) return;
-
-    if (isSell && shopMenuOpen) {
-      const sellIndex = parseInt(targetSlotEl.dataset.sellSlot, 10);
-      if (sellIndex >= 0 && !shopSellSlots[sellIndex]) {
-        shopSellSlots[sellIndex] = { ...it };
-        hotbar[from] = null;
-        updateHUD();
-        syncShopSellArea();
-        return;
-      }
-    } else if (isCraftInput && craftingMenuOpen) {
-      const idx = parseInt(targetSlotEl.dataset.craftInput, 10);
-      if (idx >= 0 && !craftingInputSlots[idx]) {
-        craftingInputSlots[idx] = { ...it };
-        hotbar[from] = null;
-        updateHUD();
-        syncCraftingUI();
-        return;
-      }
-    } else if (isRefineryInput && refineryMenuOpen) {
-      const idx = parseInt(targetSlotEl.dataset.refineryInput, 10);
-      if (idx >= 0 && !refineryInputSlots[idx]) {
-        // Only allow accepted ores
-        const accepted = activeRefineryStructure && activeRefineryStructure.acceptedOres || [];
-        if (accepted.includes(it.item)) {
-          refineryInputSlots[idx] = { ...it };
-          hotbar[from] = null;
-          updateHUD();
-          syncRefineryUI();
-          return;
+        const floatItem = {
+          x: ship.x + Math.cos(angle) * 20,
+          y: ship.y + Math.sin(angle) * 20,
+          vx: jVx + ship.vx * 0.3,
+          vy: jVy + ship.vy * 0.3,
+          item: it.item,
+          quantity: 1
+        };
+        if (it.energy != null) {
+          floatItem.energy = it.energy;
+          floatItem.maxEnergy = it.maxEnergy;
         }
+        if (it.fuel != null) {
+          floatItem.fuel = it.fuel;
+          floatItem.maxFuel = it.maxFuel;
+        }
+        if (it.oxygen != null) {
+          floatItem.oxygen = it.oxygen;
+          floatItem.maxOxygen = it.maxOxygen;
+        }
+        if (it.health != null) {
+          floatItem.health = it.health;
+          floatItem.maxHealth = it.maxHealth ?? it.health;
+        }
+        if (it.heat != null) {
+          floatItem.heat = it.heat;
+          floatItem.overheated = !!it.overheated;
+        }
+        floatingItems.push(floatItem);
       }
-    } else if (isHotbar) {
-      const to = parseInt(targetSlotEl.dataset.slot, 10);
-      if (to >= 0 && to !== from) {
-        const tmp = hotbar[to];
-        hotbar[to] = hotbar[from];
-        hotbar[from] = tmp;
+      hotbar[from] = null;
+      updateHUD();
+    }
+  }
+
+  return true;
+}
+
+function getDropSlotKinds(targetSlotEl) {
+  return {
+    isHotbar: targetSlotEl.classList.contains('slot'),
+    isSell: targetSlotEl.classList.contains('shop-sell-slot'),
+    isCraftInput: targetSlotEl.classList.contains('input-slot') && !targetSlotEl.classList.contains('refinery-input-slot'),
+    isRefineryInput: targetSlotEl.classList.contains('refinery-input-slot')
+  };
+}
+
+function tryHandleHotbarDrag(drag, targetSlotEl, slotKinds) {
+  const from = drag.fromSlot;
+  const it = hotbar[from];
+  if (!it) return false;
+
+  if (slotKinds.isSell && shopMenuOpen) {
+    const sellIndex = parseInt(targetSlotEl.dataset.sellSlot, 10);
+    if (sellIndex >= 0 && !shopSellSlots[sellIndex]) {
+      shopSellSlots[sellIndex] = { ...it };
+      hotbar[from] = null;
+      updateHUD();
+      syncShopSellArea();
+      return true;
+    }
+  } else if (slotKinds.isCraftInput && craftingMenuOpen) {
+    const idx = parseInt(targetSlotEl.dataset.craftInput, 10);
+    if (idx >= 0 && !craftingInputSlots[idx]) {
+      craftingInputSlots[idx] = { ...it };
+      hotbar[from] = null;
+      updateHUD();
+      syncCraftingUI();
+      return true;
+    }
+  } else if (slotKinds.isRefineryInput && refineryMenuOpen) {
+    const idx = parseInt(targetSlotEl.dataset.refineryInput, 10);
+    if (idx >= 0 && !refineryInputSlots[idx]) {
+      const accepted = activeRefineryStructure && activeRefineryStructure.acceptedOres || [];
+      if (accepted.includes(it.item)) {
+        refineryInputSlots[idx] = { ...it };
+        hotbar[from] = null;
         updateHUD();
-        return;
+        syncRefineryUI();
+        return true;
       }
     }
-  } else if (drag.kind === 'buy') {
-    if (!isHotbar) return;
-    const from = drag.fromBuySlot;
-    const it = shopBuySlots[from];
-    if (!it) return;
+  } else if (slotKinds.isHotbar) {
     const to = parseInt(targetSlotEl.dataset.slot, 10);
-    if (to < 0) return;
-    if (hotbar[to]) return;
-    if (player.credits < drag.price) return;
-    player.credits -= drag.price;
+    if (to >= 0 && to !== from) {
+      const tmp = hotbar[to];
+      hotbar[to] = hotbar[from];
+      hotbar[from] = tmp;
+      updateHUD();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function tryHandleBuyDrag(drag, targetSlotEl, slotKinds) {
+  if (!slotKinds.isHotbar) return false;
+  const from = drag.fromBuySlot;
+  const it = shopBuySlots[from];
+  if (!it) return false;
+  const to = parseInt(targetSlotEl.dataset.slot, 10);
+  if (to < 0 || hotbar[to] || player.credits < drag.price) return false;
+
+  player.credits -= drag.price;
+  hotbar[to] = { ...it };
+  removeFromShopInventory(it.item);
+  shopBuySlots[from] = null;
+  syncShopBuyArea();
+  updateHUD();
+  return true;
+}
+
+function tryHandleSellDrag(drag, targetSlotEl, slotKinds) {
+  const from = drag.fromSellSlot;
+  const it = shopSellSlots[from];
+  if (!it) return false;
+
+  if (slotKinds.isHotbar) {
+    const to = parseInt(targetSlotEl.dataset.slot, 10);
+    if (to >= 0 && !hotbar[to]) {
+      hotbar[to] = { ...it };
+      shopSellSlots[from] = null;
+      updateHUD();
+      syncShopSellArea();
+      return true;
+    }
+  } else if (slotKinds.isSell) {
+    const toSell = parseInt(targetSlotEl.dataset.sellSlot, 10);
+    if (toSell >= 0 && toSell !== from) {
+      const tmp = shopSellSlots[toSell];
+      shopSellSlots[toSell] = shopSellSlots[from];
+      shopSellSlots[from] = tmp;
+      syncShopSellArea();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function tryHandleCraftInputDrag(drag, targetSlotEl, slotKinds) {
+  const from = drag.fromCraftInput;
+  const it = craftingInputSlots[from];
+  if (!it) return false;
+
+  if (slotKinds.isHotbar) {
+    const to = parseInt(targetSlotEl.dataset.slot, 10);
+    if (to >= 0 && !hotbar[to]) {
+      hotbar[to] = { ...it };
+      craftingInputSlots[from] = null;
+      updateHUD();
+      syncCraftingUI();
+      return true;
+    }
+  } else if (slotKinds.isCraftInput) {
+    const to = parseInt(targetSlotEl.dataset.craftInput, 10);
+    if (to >= 0 && to !== from) {
+      const tmp = craftingInputSlots[to];
+      craftingInputSlots[to] = craftingInputSlots[from];
+      craftingInputSlots[from] = tmp;
+      syncCraftingUI();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function tryHandleCraftOutputDrag(targetSlotEl, slotKinds) {
+  const it = craftingOutputSlot;
+  if (!it || !it.real || !slotKinds.isHotbar) return false;
+
+  const to = parseInt(targetSlotEl.dataset.slot, 10);
+  if (to >= 0 && !hotbar[to]) {
     hotbar[to] = { ...it };
-    removeFromShopInventory(it.item);
-    shopBuySlots[from] = null;
-    syncShopBuyArea();
+    craftingOutputSlot = null;
     updateHUD();
+    syncCraftingUI();
+    return true;
+  }
+
+  return false;
+}
+
+function tryHandleRefineryInputDrag(drag, targetSlotEl, slotKinds) {
+  const from = drag.fromRefineryInput;
+  const it = refineryInputSlots[from];
+  if (!it) return false;
+
+  if (slotKinds.isHotbar) {
+    const to = parseInt(targetSlotEl.dataset.slot, 10);
+    if (to >= 0 && !hotbar[to]) {
+      hotbar[to] = { ...it };
+      refineryInputSlots[from] = null;
+      updateHUD();
+      syncRefineryUI();
+      return true;
+    }
+  } else if (slotKinds.isRefineryInput) {
+    const to = parseInt(targetSlotEl.dataset.refineryInput, 10);
+    if (to >= 0 && to !== from) {
+      const tmp = refineryInputSlots[to];
+      refineryInputSlots[to] = refineryInputSlots[from];
+      refineryInputSlots[from] = tmp;
+      syncRefineryUI();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function tryHandleRefineryOutputDrag(targetSlotEl, slotKinds) {
+  const it = refineryOutputSlot;
+  if (!it || !it.real || !slotKinds.isHotbar) return false;
+
+  const to = parseInt(targetSlotEl.dataset.slot, 10);
+  if (to >= 0 && !hotbar[to]) {
+    hotbar[to] = { ...it };
+    refineryOutputSlot = null;
+    updateHUD();
+    syncRefineryUI();
+    return true;
+  }
+
+  return false;
+}
+
+function endDrag(clientX, clientY) {
+  const drag = inventoryDrag;
+  inventoryDrag = null;
+  setDragGhostVisible(false);
+  clearResourceBarHighlights();
+  if (!drag) return;
+
+  const dropTarget = resolveDropTarget(clientX, clientY);
+  if (tryHandleResourceBarDrop(drag, dropTarget)) return;
+  if (tryHandleJettisonDrop(drag, dropTarget.targetSlotEl)) return;
+  if (!dropTarget.targetSlotEl) return;
+
+  const slotKinds = getDropSlotKinds(dropTarget.targetSlotEl);
+  if (drag.kind === 'hotbar') {
+    tryHandleHotbarDrag(drag, dropTarget.targetSlotEl, slotKinds);
+  } else if (drag.kind === 'buy') {
+    tryHandleBuyDrag(drag, dropTarget.targetSlotEl, slotKinds);
   } else if (drag.kind === 'sell') {
-    const from = drag.fromSellSlot;
-    const it = shopSellSlots[from];
-    if (!it) return;
-    
-    if (isHotbar) {
-      const to = parseInt(targetSlotEl.dataset.slot, 10);
-      if (to >= 0 && !hotbar[to]) {
-        hotbar[to] = { ...it };
-        shopSellSlots[from] = null;
-        updateHUD();
-        syncShopSellArea();
-        return;
-      }
-    } else if (isSell) {
-      const toSell = parseInt(targetSlotEl.dataset.sellSlot, 10);
-      if (toSell >= 0 && toSell !== from) {
-        const tmp = shopSellSlots[toSell];
-        shopSellSlots[toSell] = shopSellSlots[from];
-        shopSellSlots[from] = tmp;
-        syncShopSellArea();
-        return;
-      }
-    }
+    tryHandleSellDrag(drag, dropTarget.targetSlotEl, slotKinds);
   } else if (drag.kind === 'craftInput') {
-    const from = drag.fromCraftInput;
-    const it = craftingInputSlots[from];
-    if (!it) return;
-    
-    if (isHotbar) {
-      const to = parseInt(targetSlotEl.dataset.slot, 10);
-      if (to >= 0 && !hotbar[to]) {
-        hotbar[to] = { ...it };
-        craftingInputSlots[from] = null;
-        updateHUD();
-        syncCraftingUI();
-        return;
-      }
-    } else if (isCraftInput) {
-      const to = parseInt(targetSlotEl.dataset.craftInput, 10);
-      if (to >= 0 && to !== from) {
-        const tmp = craftingInputSlots[to];
-        craftingInputSlots[to] = craftingInputSlots[from];
-        craftingInputSlots[from] = tmp;
-        syncCraftingUI();
-        return;
-      }
-    }
+    tryHandleCraftInputDrag(drag, dropTarget.targetSlotEl, slotKinds);
   } else if (drag.kind === 'craftOutput') {
-    const it = craftingOutputSlot;
-    if (!it || !it.real) return;
-    
-    if (isHotbar) {
-      const to = parseInt(targetSlotEl.dataset.slot, 10);
-      if (to >= 0 && !hotbar[to]) {
-        hotbar[to] = { ...it };
-        // Clear output slot
-        craftingOutputSlot = null;
-        updateHUD();
-        syncCraftingUI();
-        return;
-      }
-    }
+    tryHandleCraftOutputDrag(dropTarget.targetSlotEl, slotKinds);
   } else if (drag.kind === 'refineryInput') {
-    const from = drag.fromRefineryInput;
-    const it = refineryInputSlots[from];
-    if (!it) return;
-
-    if (isHotbar) {
-      const to = parseInt(targetSlotEl.dataset.slot, 10);
-      if (to >= 0 && !hotbar[to]) {
-        hotbar[to] = { ...it };
-        refineryInputSlots[from] = null;
-        updateHUD();
-        syncRefineryUI();
-        return;
-      }
-    } else if (isRefineryInput) {
-      const to = parseInt(targetSlotEl.dataset.refineryInput, 10);
-      if (to >= 0 && to !== from) {
-        const tmp = refineryInputSlots[to];
-        refineryInputSlots[to] = refineryInputSlots[from];
-        refineryInputSlots[from] = tmp;
-        syncRefineryUI();
-        return;
-      }
-    }
+    tryHandleRefineryInputDrag(drag, dropTarget.targetSlotEl, slotKinds);
   } else if (drag.kind === 'refineryOutput') {
-    const it = refineryOutputSlot;
-    if (!it || !it.real) return;
-
-    if (isHotbar) {
-      const to = parseInt(targetSlotEl.dataset.slot, 10);
-      if (to >= 0 && !hotbar[to]) {
-        hotbar[to] = { ...it };
-        refineryOutputSlot = null;
-        updateHUD();
-        syncRefineryUI();
-        return;
-      }
-    }
+    tryHandleRefineryOutputDrag(dropTarget.targetSlotEl, slotKinds);
   }
 }
 

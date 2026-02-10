@@ -3,6 +3,13 @@
   padding: 0;
 }
 
+:root {
+  --game-width: 1200px;
+  --game-height: 900px;
+  --slot-bg: #222;
+  --slot-border: #555;
+}
+
 body {
   display: flex;
   justify-content: center;
@@ -28,8 +35,8 @@ textarea {
   display: block;
   background: #111;
   /* Fixed pixel size - prevents 4K from scaling canvas and tanking performance */
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   cursor: none;
 }
 
@@ -37,8 +44,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   pointer-events: none;
   z-index: 2;
 }
@@ -47,8 +54,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   pointer-events: none;
   /* Above shop/warp blur overlays; below hotbar/drop zones */
   z-index: 14;
@@ -96,8 +103,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -129,8 +136,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,8 +190,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
@@ -235,8 +242,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -375,8 +382,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -480,8 +487,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -686,8 +693,8 @@ textarea {
   position: absolute;
   left: 0;
   top: 0;
-  width: 1200px;
-  height: 900px;
+  width: var(--game-width);
+  height: var(--game-height);
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -835,8 +842,8 @@ textarea {
   width: 40px;
   height: 40px;
   box-sizing: border-box;
-  border: 1px solid #555;
-  background: #222;
+  border: 1px solid var(--slot-border);
+  background: var(--slot-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -971,8 +978,8 @@ textarea {
   width: 40px;
   height: 40px;
   box-sizing: border-box;
-  border: 1px solid #555;
-  background: #222;
+  border: 1px solid var(--slot-border);
+  background: var(--slot-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1003,8 +1010,8 @@ textarea {
   width: 40px;
   height: 40px;
   box-sizing: border-box;
-  border: 1px solid #555;
-  background: #222;
+  border: 1px solid var(--slot-border);
+  background: var(--slot-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1189,6 +1196,10 @@ textarea {
 
 #level-select-ui label {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.level-editor-link {
+  margin-left: 0.75em;
 }
 
 #level-select {

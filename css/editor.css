@@ -12,6 +12,10 @@ body {
   font-family: Arial, sans-serif;
 }
 
+.hidden-input {
+  display: none;
+}
+
 #toolbar {
   width: 240px;
   padding: 15px;
@@ -129,6 +133,14 @@ body {
   row-gap: 6px;
 }
 
+.palette-grid-bottom-gap {
+  margin-bottom: 10px;
+}
+
+.palette-grid-single-column {
+  grid-template-columns: 1fr;
+}
+
 .palette-btn {
   padding: 8px 10px;
   background: #333;
@@ -150,6 +162,12 @@ body {
   color: #fff;
 }
 
+.palette-btn[data-asteroid-type="cuprite"] { border-left: 5px solid #665544; }
+.palette-btn[data-asteroid-type="hematite"] { border-left: 5px solid #8B4513; }
+.palette-btn[data-asteroid-type="aurite"] { border-left: 5px solid #FFD700; }
+.palette-btn[data-asteroid-type="diamite"] { border-left: 5px solid #C0C0C0; }
+.palette-btn[data-asteroid-type="platinite"] { border-left: 5px solid #E5E4E2; }
+
 #properties-panel {
   position: absolute;
   top: 15px;
@@ -159,7 +177,7 @@ body {
   border: 1px solid #444;
   border-radius: 6px;
   padding: 10px;
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 10px;
   max-height: calc(100vh - 30px);
@@ -205,6 +223,34 @@ body {
   color: #aaa;
 }
 
+.prop-inline-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.prop-inline-label {
+  font-size: 11px;
+  color: #ccc;
+  min-width: 55px;
+}
+
+.prop-note {
+  font-size: 10px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.prop-row-tight {
+  display: flex;
+  gap: 5px;
+}
+
+.prop-small-label {
+  font-size: 12px;
+}
+
 .prop-group input, .prop-group select {
   padding: 6px;
   background: #222;
@@ -240,6 +286,7 @@ body {
   color: #666;
   font-size: 14px;
   user-select: none;
+  margin-right: 5px;
 }
 
 .prop-list-item .drag-handle:hover {
@@ -248,6 +295,11 @@ body {
 
 .prop-list-item[draggable="true"]:active .drag-handle {
   cursor: grabbing;
+}
+
+.prop-list-item .item-label {
+  font-size: 10px;
+  flex: 1;
 }
 
 .prop-list-item input {
@@ -276,6 +328,76 @@ body {
 
 .add-btn:hover {
   background: #4a8ed5;
+}
+
+.recipe-item-select {
+  font-size: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.recipe-list {
+  max-height: 400px;
+}
+
+.recipe-card {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px;
+  margin-bottom: 6px;
+}
+
+.recipe-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.recipe-header-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #ccc;
+}
+
+.recipe-delete-btn {
+  background: #844;
+  font-size: 12px;
+  padding: 1px 5px;
+}
+
+.recipe-section-label {
+  font-size: 10px;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+
+.recipe-input-row,
+.recipe-output-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.recipe-input-row {
+  margin-bottom: 3px;
+}
+
+.recipe-qty-input {
+  width: 40px;
+  font-size: 10px;
+}
+
+.recipe-remove-input-btn {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: #a33;
+}
+
+.recipe-add-input-btn {
+  font-size: 10px;
+  padding: 3px 6px;
+  margin-bottom: 6px;
 }
 
 .spawn-tier {
