@@ -58,6 +58,14 @@ const PIRATE_BASE_AGGRO_RADIUS = 300;
 const PIRATE_TYPE_KEYS = ['normal', 'sturdy', 'fast'];
 const PIRATE_TYPE_LABELS = { normal: 'Normal', sturdy: 'Sturdy', fast: 'Fast' };
 const DEFAULT_PIRATE_TYPE_PERCENTAGES = { normal: 100, sturdy: 0, fast: 0 };
+const PIRATE_ARCHETYPE_KEYS = ['standard', 'shotgun', 'slowing', 'breaching', 'drone'];
+const PIRATE_ARCHETYPE_LABELS = {
+  standard: 'Standard',
+  shotgun: 'Shotgun',
+  slowing: 'Slowing',
+  breaching: 'Breaching',
+  drone: 'Drone'
+};
 
 function normalizePirateBaseTier(tier) {
   const n = Number(tier);
@@ -84,6 +92,10 @@ function normalizePirateTypePercentages(mix) {
   return out;
 }
 
+function normalizePirateArchetype(archetype) {
+  return PIRATE_ARCHETYPE_KEYS.includes(archetype) ? archetype : 'standard';
+}
+
 function ensureSpawnSettingsDefaults(spawnSettings) {
   const s = spawnSettings || {};
   if (!Array.isArray(s.tiers)) s.tiers = [];
@@ -105,6 +117,7 @@ function ensureSpawnSettingsDefaults(spawnSettings) {
 }
 
 function ensurePirateBaseSpawnDefaults(obj) {
+  obj.pirateArchetype = normalizePirateArchetype(obj.pirateArchetype);
   obj.defenseTypePercentages = normalizePirateTypePercentages(obj.defenseTypePercentages);
   obj.waveSpawnTypePercentages = normalizePirateTypePercentages(obj.waveSpawnTypePercentages);
   obj.waveSpawnCount = Math.max(1, Math.round(Number(obj.waveSpawnCount) || 4));
@@ -170,6 +183,10 @@ const state = {
     inCanvas: false,
     isPanning: false,
     isErasing: false,
+    isMoving: false,
+    moveStartWorld: { x: 0, y: 0 },
+    moveOriginalX: 0,
+    moveOriginalY: 0,
     eraseNeedsSave: false,
     eraseLastSaveAt: 0,
     panStart: { x: 0, y: 0 },
@@ -536,6 +553,15 @@ function handleMouseMove(e) {
     state.camera.y = state.mouse.panCamStart.y - (state.mouse.y - state.mouse.panStart.y) / state.camera.zoom;
   }
 
+  // Move tool: drag selected object
+  if (state.mouse.isMoving && state.selectedObject) {
+    const world = screenToWorld(state.mouse.x, state.mouse.y);
+    const dx = world.x - state.mouse.moveStartWorld.x;
+    const dy = world.y - state.mouse.moveStartWorld.y;
+    state.selectedObject.x = state.mouse.moveOriginalX + dx;
+    state.selectedObject.y = state.mouse.moveOriginalY + dy;
+  }
+
   // Eraser brush: continuously erase while held
   if (state.mouse.isErasing && state.tool.selected === 'eraser') {
     const world = screenToWorld(state.mouse.x, state.mouse.y);
@@ -821,12 +847,16 @@ function renderShopProperties(parent, obj) {
     // Set full capacity for containers
     if (name === 'small energy cell') { newItem.energy = 10; newItem.maxEnergy = 10; }
     else if (name === 'medium energy cell') { newItem.energy = 30; newItem.maxEnergy = 30; }
-    else if (name === 'large fuel tank') { newItem.fuel = 30; newItem.maxFuel = 30; }
+    else if (name === 'large energy cell') { newItem.energy = 60; newItem.maxEnergy = 60; }
     else if (name === 'fuel tank') { newItem.fuel = 10; newItem.maxFuel = 10; }
-    else if (name === 'large oxygen canister') { newItem.oxygen = 30; newItem.maxOxygen = 30; }
+    else if (name === 'medium fuel tank') { newItem.fuel = 30; newItem.maxFuel = 30; }
+    else if (name === 'large fuel tank') { newItem.fuel = 60; newItem.maxFuel = 60; }
     else if (name === 'oxygen canister') { newItem.oxygen = 10; newItem.maxOxygen = 10; }
+    else if (name === 'medium oxygen canister') { newItem.oxygen = 30; newItem.maxOxygen = 30; }
+    else if (name === 'large oxygen canister') { newItem.oxygen = 60; newItem.maxOxygen = 60; }
     else if (name === 'health pack') { newItem.health = 10; }
-    else if (name === 'large health pack') { newItem.health = 30; }
+    else if (name === 'medium health pack') { newItem.health = 30; }
+    else if (name === 'large health pack') { newItem.health = 60; }
     else if (name.includes('laser') || name.includes('blaster')) { newItem.heat = 0; newItem.overheated = false; }
     
     obj.inventory.push(newItem);
@@ -899,10 +929,10 @@ function renderShopProperties(parent, obj) {
 const ALL_ITEM_NAMES = [
   'mining laser', 'medium mining laser', 'large mining laser',
   'light blaster', 'medium blaster', 'large blaster',
-  'small energy cell', 'medium energy cell',
-  'oxygen canister', 'large oxygen canister',
-  'fuel tank', 'large fuel tank',
-  'health pack', 'large health pack',
+  'small energy cell', 'medium energy cell', 'large energy cell',
+  'oxygen canister', 'medium oxygen canister', 'large oxygen canister',
+  'fuel tank', 'medium fuel tank', 'large fuel tank',
+  'health pack', 'medium health pack', 'large health pack',
   'cuprite', 'hematite', 'aurite', 'diamite', 'platinite',
   'copper', 'iron', 'gold', 'diamond', 'platinum',
   'scrap', 'warp key'
@@ -1099,6 +1129,22 @@ function renderPirateBaseProperties(parent, obj) {
   tierDiv.appendChild(tierSelect);
   parent.appendChild(tierDiv);
 
+  const archetypeDiv = document.createElement('div');
+  archetypeDiv.className = 'prop-group';
+  archetypeDiv.innerHTML = '<label>Pirate Archetype</label>';
+  const archetypeSelect = document.createElement('select');
+  const selectedArchetype = normalizePirateArchetype(obj.pirateArchetype);
+  for (const archetype of PIRATE_ARCHETYPE_KEYS) {
+    const opt = document.createElement('option');
+    opt.value = archetype;
+    opt.textContent = PIRATE_ARCHETYPE_LABELS[archetype];
+    opt.selected = archetype === selectedArchetype;
+    archetypeSelect.appendChild(opt);
+  }
+  archetypeSelect.onchange = (e) => { obj.pirateArchetype = normalizePirateArchetype(e.target.value); saveLevel(); };
+  archetypeDiv.appendChild(archetypeSelect);
+  parent.appendChild(archetypeDiv);
+
   addPropInput(parent, 'Health', obj.health || 150, (v) => { obj.health = parseInt(v); saveLevel(); });
   addPropInput(parent, 'Defense Count', obj.defenseCount || 8, (v) => { obj.defenseCount = parseInt(v); saveLevel(); });
   renderPirateTypePercentagesEditor(parent, 'Defense Type Percentages', obj.defenseTypePercentages, () => { saveLevel(); });
@@ -1241,6 +1287,7 @@ function handlePlaceObject(world) {
     }
     if (type === 'piratebase') {
       st.tier = normalizePirateBaseTier(state.tool.piratebaseTier);
+      st.pirateArchetype = 'standard';
       ensurePirateBaseSpawnDefaults(st);
     }
     state.level.structures.push(st);
@@ -1322,6 +1369,14 @@ function handleMouseDown(e) {
 
     if (state.tool.selected === 'select') {
       handleSelectObject(world);
+    } else if (state.tool.selected === 'move') {
+      handleSelectObject(world);
+      if (state.selectedObject) {
+        state.mouse.isMoving = true;
+        state.mouse.moveStartWorld = { x: world.x, y: world.y };
+        state.mouse.moveOriginalX = state.selectedObject.x;
+        state.mouse.moveOriginalY = state.selectedObject.y;
+      }
     } else if (state.tool.selected === 'eraser') {
       state.mouse.isErasing = true;
       eraseBrushAt(world);
@@ -1373,6 +1428,11 @@ canvas.addEventListener('mousedown', handleMouseDown);
 canvas.addEventListener('mouseup', (e) => {
   if (e.button === 1) state.mouse.isPanning = false;
   if (e.button === 0) {
+    if (state.mouse.isMoving) {
+      state.mouse.isMoving = false;
+      saveLevel();
+      updatePropertiesPanel();
+    }
     if (state.mouse.isErasing) {
       state.mouse.isErasing = false;
       flushEraseSave(true);
@@ -1431,6 +1491,11 @@ canvas.addEventListener('mouseenter', () => { state.mouse.inCanvas = true; rende
 canvas.addEventListener('mouseleave', () => {
   state.mouse.inCanvas = false;
   state.mouse.isPanning = false;
+  if (state.mouse.isMoving) {
+    state.mouse.isMoving = false;
+    saveLevel();
+    updatePropertiesPanel();
+  }
   if (state.mouse.isErasing) {
     state.mouse.isErasing = false;
     flushEraseSave(true);

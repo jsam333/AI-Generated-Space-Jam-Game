@@ -74,121 +74,81 @@
       "y": 575.278867340021,
       "radius": 30,
       "oreType": "aurite"
+    },
+    {
+      "x": 36.66666666666667,
+      "y": 573.3333333333334,
+      "radius": 30,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 23.333333333333336,
+      "y": 440,
+      "radius": 30,
+      "oreType": "hematite"
+    },
+    {
+      "x": -750.8848118554973,
+      "y": -1150.8876253713647,
+      "radius": 140,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1224.4988482298259,
+      "y": 1717.7761457084243,
+      "radius": 180,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1063.1697287072213,
+      "y": 1245.7175504674465,
+      "radius": 110,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1544.046205008334,
+      "y": 221.71352079086333,
+      "radius": 120,
+      "oreType": "diamite"
+    },
+    {
+      "x": 142.39529913896862,
+      "y": -1550.3218213445,
+      "radius": 170,
+      "oreType": "platinite"
+    },
+    {
+      "x": 229.54457826037992,
+      "y": 1013.3194728103496,
+      "radius": 190,
+      "oreType": "platinite"
     }
   ],
   "structures": [
     {
-      "x": -1212.101691965775,
-      "y": -216.87227127682002,
+      "x": -552.9552945377911,
+      "y": -214.93504381542803,
       "type": "piratebase",
-      "tier": 2,
-      "defenseTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnCount": 4
-    },
-    {
-      "x": -823.7250567341275,
-      "y": -42.91190341264456,
-      "type": "piratebase",
-      "tier": 2,
-      "defenseTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnCount": 4
-    },
-    {
-      "x": -459.6219612044579,
-      "y": -281.6017104820947,
-      "type": "piratebase",
-      "tier": 5,
+      "tier": 4,
       "drops": [],
       "defenseTypePercentages": {
-        "normal": 25,
+        "normal": 50,
         "sturdy": 25,
-        "fast": 50
+        "fast": 25
       },
       "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
       },
       "waveSpawnCount": 2,
-      "spawnRate": 1,
-      "defenseCount": 8
+      "spawnRate": 10,
+      "defenseCount": 16,
+      "health": 400,
+      "pirateArchetype": "standard"
     },
     {
-      "x": -508.16904060841375,
-      "y": -682.1151155647312,
-      "type": "piratebase",
-      "tier": 2,
-      "defenseTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnCount": 4
-    },
-    {
-      "x": -920.8192155420393,
-      "y": -868.2122532798958,
-      "type": "piratebase",
-      "tier": 2,
-      "defenseTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnCount": 4
-    },
-    {
-      "x": -1256.6031814194014,
-      "y": -649.750395962094,
-      "type": "piratebase",
-      "tier": 2,
-      "defenseTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnCount": 4
-    },
-    {
-      "x": -872.2721361380834,
-      "y": -459.6076682965998,
-      "type": "shop"
-    },
-    {
-      "x": -501.80765704685507,
+      "x": -275.1409903801884,
       "y": 405.4950436797544,
       "type": "piratebase",
       "tier": 2,
@@ -202,13 +162,31 @@
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 2
+        },
+        {
+          "item": "medium fuel tank",
+          "quantity": 1
+        },
+        {
+          "item": "health pack",
+          "quantity": 1
+        }
+      ],
+      "health": 250,
+      "spawnRate": 40,
+      "defenseCount": 10,
+      "pirateArchetype": "standard"
     },
     {
-      "x": -30.131032666177532,
-      "y": 624.9881263123469,
+      "x": 508.9571002368325,
+      "y": 63.39647496319031,
       "type": "piratebase",
-      "tier": 2,
+      "tier": 3,
       "defenseTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -219,13 +197,17 @@
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4
+      "waveSpawnCount": 4,
+      "drops": [],
+      "health": 300,
+      "defenseCount": 12,
+      "pirateArchetype": "standard"
     },
     {
-      "x": 548.9571002368325,
-      "y": 270.06314162985694,
+      "x": 84.52203831544583,
+      "y": -347.77323205007986,
       "type": "piratebase",
-      "tier": 2,
+      "tier": 1,
       "defenseTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -236,13 +218,39 @@
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "oxygen canister",
+          "quantity": 2
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 2
+        },
+        {
+          "item": "health pack",
+          "quantity": 2
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 4
+        },
+        {
+          "item": "scrap",
+          "quantity": 5
+        }
+      ],
+      "health": 100,
+      "defenseCount": 4,
+      "spawnRate": 30,
+      "pirateArchetype": "standard"
     },
     {
-      "x": -48.81129501788752,
-      "y": -421.1065653834131,
+      "x": 10.645274404096128,
+      "y": -2475.9093297087347,
       "type": "piratebase",
-      "tier": 2,
+      "tier": 5,
       "defenseTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -253,24 +261,9 @@
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4
-    },
-    {
-      "x": 478.90611641792003,
-      "y": -131.56249893190807,
-      "type": "piratebase",
-      "tier": 2,
-      "defenseTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnTypePercentages": {
-        "normal": 100,
-        "sturdy": 0,
-        "fast": 0
-      },
-      "waveSpawnCount": 4
+      "waveSpawnCount": 4,
+      "pirateArchetype": "slowing",
+      "drops": []
     }
   ],
   "spawnSettings": {

@@ -38,8 +38,8 @@ export const BLASTER_FIRE_RATE = 10;
 
 export const BLASTER_STATS = {
   'light blaster':  { energyPerShot: 0.15, heatPerShot: 0.09, coolRate: 1 / 3, fireRate: 10, pirateDmg: 3, asteroidDmg: 0.5 },
-  'medium blaster': { energyPerShot: 0.225, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 5, asteroidDmg: 1 },
-  'large blaster':  { energyPerShot: 0.375, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 9, asteroidDmg: 2 }
+  'medium blaster': { energyPerShot: 0.225, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 5, asteroidDmg: 0.9 },
+  'large blaster':  { energyPerShot: 0.375, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 9, asteroidDmg: 1.8 }
 };
 
 export const OXYGEN_DEPLETION_RATE = 1 / 25;
@@ -79,17 +79,21 @@ export const STRUCTURE_STYLES = {
 export const SHIP_STATS = {
   'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 9,  collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, desc: 'Standard issue scout ship.' },
   'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.2, desc: 'Sturdy mining vessel. 20% bonus weapon damage.' },
-  'transport': { name: 'Transport', price: 5000, health: 50, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 14, shipScale: 1.6, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
+  'transport': { name: 'Transport', price: 5000, health: 60, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 14, shipScale: 1.4, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
 };
 
 export const ITEM_USAGE = {
   'small energy cell': 'Powers mining lasers and blasters.',
   'medium energy cell': 'Powers mining lasers and blasters. Holds 3x more charge.',
+  'large energy cell': 'Powers mining lasers and blasters. Holds 6x more charge.',
   'fuel tank': 'Drag to fuel bar to refill ship fuel.',
+  'medium fuel tank': 'Medium capacity fuel tank.',
   'large fuel tank': 'Large capacity fuel tank.',
   'oxygen canister': 'Drag to O2 bar to refill ship oxygen.',
+  'medium oxygen canister': 'Medium capacity oxygen canister.',
   'large oxygen canister': 'Large capacity oxygen canister.',
   'health pack': 'Drag to health bar to repair ship.',
+  'medium health pack': 'Medium capacity repair kit.',
   'large health pack': 'Large capacity repair kit.',
   'light blaster': 'Select and left-click to fire rapid projectiles at enemies.',
   'medium blaster': 'Medium blaster. Higher damage per shot.',
@@ -114,11 +118,15 @@ export const ITEM_USAGE = {
 export const ITEM_DISPLAY_NAMES = {
   'small energy cell': 'Small Energy Cell',
   'medium energy cell': 'Medium Energy Cell',
+  'large energy cell': 'Large Energy Cell',
   'fuel tank': 'Fuel Tank',
+  'medium fuel tank': 'Medium Fuel Tank',
   'large fuel tank': 'Large Fuel Tank',
   'oxygen canister': 'Oxygen Canister',
+  'medium oxygen canister': 'Medium Oxygen Canister',
   'large oxygen canister': 'Large Oxygen Canister',
   'health pack': 'Health Pack',
+  'medium health pack': 'Medium Health Pack',
   'large health pack': 'Large Health Pack',
   'light blaster': 'Light Blaster',
   'medium blaster': 'Medium Blaster',
@@ -168,13 +176,17 @@ export const INTERACT_RADIUS = STRUCTURE_SIZE_COLL + SHOP_DASHED_EXTRA_3D; // 54
 // --- Item image paths (used for HUD, floating items, tooltips) ---
 export const ITEM_IMAGE_PATHS = {
   'oxygen canister': 'assets/oxygen-can.png',
+  'medium oxygen canister': 'assets/oxygen-can.png',
   'large oxygen canister': 'assets/oxygen-can.png',
   'fuel tank': 'assets/fuel-can.png',
+  'medium fuel tank': 'assets/fuel-can.png',
   'large fuel tank': 'assets/fuel-can.png',
   'health pack': 'assets/oxygen-can.png',      // Reuse oxygen-can for now
+  'medium health pack': 'assets/oxygen-can.png',
   'large health pack': 'assets/oxygen-can.png',
   'small energy cell': 'assets/energy-cell.png',
   'medium energy cell': 'assets/energy-cell.png',
+  'large energy cell': 'assets/energy-cell.png',
   'mining laser': 'assets/laser.png',
   'medium mining laser': 'assets/laser.png',
   'large mining laser': 'assets/laser.png',
@@ -193,11 +205,15 @@ export const ITEM_LABELS = {
   'large blaster': 'LB',
   'small energy cell': 'E',
   'medium energy cell': 'M',
+  'large energy cell': 'L',
   'oxygen canister': 'O',
+  'medium oxygen canister': 'MO',
   'large oxygen canister': 'LO',
   'fuel tank': 'F',
+  'medium fuel tank': 'MF',
   'large fuel tank': 'LF',
   'health pack': 'H',
+  'medium health pack': 'MH',
   'large health pack': 'LH',
   'cuprite': 'C',
   'hematite': 'H',
@@ -217,12 +233,16 @@ export const ITEM_LABELS = {
 export const ITEM_DEFAULTS = {
   'small energy cell':    { energy: 10, maxEnergy: 10 },
   'medium energy cell':   { energy: 30, maxEnergy: 30 },
+  'large energy cell':    { energy: 60, maxEnergy: 60 },
   'oxygen canister':      { oxygen: 10, maxOxygen: 10 },
-  'large oxygen canister':{ oxygen: 30, maxOxygen: 30 },
+  'medium oxygen canister': { oxygen: 30, maxOxygen: 30 },
+  'large oxygen canister':{ oxygen: 60, maxOxygen: 60 },
   'fuel tank':            { fuel: 10, maxFuel: 10 },
-  'large fuel tank':      { fuel: 30, maxFuel: 30 },
+  'medium fuel tank':     { fuel: 30, maxFuel: 30 },
+  'large fuel tank':      { fuel: 60, maxFuel: 60 },
   'health pack':          { health: 10 },
-  'large health pack':    { health: 30 },
+  'medium health pack':   { health: 30 },
+  'large health pack':    { health: 60 },
   'light blaster':        { heat: 0, overheated: false },
   'medium blaster':       { heat: 0, overheated: false },
   'large blaster':        { heat: 0, overheated: false },
@@ -234,17 +254,21 @@ export const ITEM_DEFAULTS = {
 export const ITEM_BUY_PRICE = {
   'small energy cell': 150,
   'medium energy cell': 550,
+  'large energy cell': 1200,
   'oxygen canister': 500,
+  'medium oxygen canister': 1250,
+  'large oxygen canister': 2000,
   'fuel tank': 300,
+  'medium fuel tank': 750,
+  'large fuel tank': 1250,
   'light blaster': 1000,
   'medium blaster': 2500,
   'large blaster': 5000,
   'medium mining laser': 1500,
   'large mining laser': 3000,
   'health pack': 400,
-  'large health pack': 1000,
-  'large fuel tank': 750,
-  'large oxygen canister': 1250
+  'medium health pack': 1000,
+  'large health pack': 1750
 };
 
 export const ITEM_SELL_PRICE = {
@@ -272,10 +296,10 @@ export const HEAT_WEAPONS = ['mining laser', 'medium mining laser', 'large minin
 export const ALL_ITEM_NAMES = [
   'mining laser', 'medium mining laser', 'large mining laser',
   'light blaster', 'medium blaster', 'large blaster',
-  'small energy cell', 'medium energy cell',
-  'oxygen canister', 'large oxygen canister',
-  'fuel tank', 'large fuel tank',
-  'health pack', 'large health pack',
+  'small energy cell', 'medium energy cell', 'large energy cell',
+  'oxygen canister', 'medium oxygen canister', 'large oxygen canister',
+  'fuel tank', 'medium fuel tank', 'large fuel tank',
+  'health pack', 'medium health pack', 'large health pack',
   'cuprite', 'hematite', 'aurite', 'diamite', 'platinite',
   'copper', 'iron', 'gold', 'diamond', 'platinum',
   'scrap', 'warp key'
@@ -283,7 +307,7 @@ export const ALL_ITEM_NAMES = [
 
 // --- Resource bar drop configuration (used by endDrag) ---
 export const RESOURCE_BAR_CONFIG = {
-  oxygen:  { items: ['oxygen canister', 'large oxygen canister'], prop: 'oxygen', playerProp: 'oxygen', maxProp: 'maxOxygen' },
-  fuel:    { items: ['fuel tank', 'large fuel tank'],             prop: 'fuel',   playerProp: 'fuel',   maxProp: 'maxFuel' },
-  health:  { items: ['health pack', 'large health pack'],         prop: 'health', playerProp: 'health', maxProp: 'maxHealth' }
+  oxygen:  { items: ['oxygen canister', 'medium oxygen canister', 'large oxygen canister'], prop: 'oxygen', playerProp: 'oxygen', maxProp: 'maxOxygen' },
+  fuel:    { items: ['fuel tank', 'medium fuel tank', 'large fuel tank'],                   prop: 'fuel',   playerProp: 'fuel',   maxProp: 'maxFuel' },
+  health:  { items: ['health pack', 'medium health pack', 'large health pack'],             prop: 'health', playerProp: 'health', maxProp: 'maxHealth' }
 };

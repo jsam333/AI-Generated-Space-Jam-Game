@@ -12940,7 +12940,7 @@
           "maxEnergy": 30
         },
         {
-          "item": "large health pack",
+          "item": "medium health pack",
           "quantity": 1,
           "health": 30
         },
@@ -12977,7 +12977,7 @@
           "maxOxygen": 10
         },
         {
-          "item": "large oxygen canister",
+          "item": "medium oxygen canister",
           "quantity": 3,
           "oxygen": 30,
           "maxOxygen": 30

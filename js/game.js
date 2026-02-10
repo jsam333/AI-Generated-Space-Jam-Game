@@ -39,6 +39,12 @@ let MAX_SPEED = MAX_SPEED_DEFAULT;
 let shipCollisionRadius = SHIP_COLLISION_RADIUS;
 let shipScale = 1.0;
 let shipDamageMult = 1.0;
+let shipSlowTimer = 0;
+let shipSlowVisualActive = false;
+const SHIP_SLOW_DURATION = 3;
+const SHIP_SLOW_FACTOR = 0.8;
+const SHIP_SLOW_EMISSIVE_COLOR = 0xaa55ff;
+const SHIP_SLOW_EMISSIVE_INTENSITY = 0.1;
 
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
@@ -55,15 +61,20 @@ const ITEM_IMAGES = {
   'fuel tank': new Image(),
   'small energy cell': new Image(),
   'medium energy cell': new Image(),
+  'large energy cell': new Image(),
   'oxygen canister': new Image()
 };
 ITEM_IMAGES['fuel tank'].src = 'assets/fuel-can.png';
 ITEM_IMAGES['small energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['medium energy cell'].src = 'assets/energy-cell.png';
+ITEM_IMAGES['large energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['oxygen canister'].src = 'assets/oxygen-can.png';
 ITEM_IMAGES['health pack'] = ITEM_IMAGES['oxygen canister']; // Reuse for now
+ITEM_IMAGES['medium health pack'] = ITEM_IMAGES['oxygen canister'];
 ITEM_IMAGES['large health pack'] = ITEM_IMAGES['oxygen canister'];
+ITEM_IMAGES['medium fuel tank'] = ITEM_IMAGES['fuel tank'];
 ITEM_IMAGES['large fuel tank'] = ITEM_IMAGES['fuel tank'];
+ITEM_IMAGES['medium oxygen canister'] = ITEM_IMAGES['oxygen canister'];
 ITEM_IMAGES['large oxygen canister'] = ITEM_IMAGES['oxygen canister'];
 const laserImg = new Image();
 laserImg.src = 'assets/laser.png';
@@ -454,6 +465,7 @@ function initShip3D() {
     shipFlames = [flameGroup1, flameGroup2];
     
     shipModelLoaded = true;
+    setShipSlowVisual(shipSlowTimer > 0);
     // eslint-disable-next-line no-console
     console.log('[ship3d] Loaded scout-ship.glb');
   }, undefined, (err) => {
@@ -737,6 +749,35 @@ function refreshAsteroidMeshes() {
   }
 }
 
+function setShipSlowVisual(active) {
+  if (shipSlowVisualActive === active) return;
+  shipSlowVisualActive = active;
+  if (!shipMesh) return;
+  shipMesh.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const applyToMaterial = (mat) => {
+      if (!mat || !mat.isMaterial || !mat.emissive) return;
+      if (!mat.userData._shipSlowBaseEmissive) {
+        mat.userData._shipSlowBaseEmissive = mat.emissive.clone();
+        mat.userData._shipSlowBaseEmissiveIntensity = mat.emissiveIntensity ?? 0;
+      }
+      if (active) {
+        mat.emissive.setHex(SHIP_SLOW_EMISSIVE_COLOR);
+        mat.emissiveIntensity = SHIP_SLOW_EMISSIVE_INTENSITY;
+      } else {
+        mat.emissive.copy(mat.userData._shipSlowBaseEmissive);
+        mat.emissiveIntensity = mat.userData._shipSlowBaseEmissiveIntensity;
+      }
+      mat.needsUpdate = true;
+    };
+    if (Array.isArray(child.material)) {
+      child.material.forEach(applyToMaterial);
+    } else {
+      applyToMaterial(child.material);
+    }
+  });
+}
+
 // Non-cuprite asteroids: emissive glow in ore color, intensity 0.06
 const ORE_EMISSIVE_COLOR = { hematite: 0xA0522D, aurite: 0xFFD700, diamite: 0x909090, platinite: 0xE5E4E2 };
 const ORE_EMISSIVE_INTENSITY = { hematite: 0.06, aurite: 0.02, diamite: 0.06, platinite: 0.06 };
@@ -796,11 +837,30 @@ const DEFAULT_PIRATE_TYPE_PERCENTAGES = Object.freeze({ normal: 100, sturdy: 0, 
 const PIRATE_TYPE_CONFIG = Object.freeze({
   normal: { health: PIRATE_HEALTH, speedMult: 1, sizeMult: 1, tint: 0xff6666, emissiveIntensity: 1.5 },
   sturdy: { health: PIRATE_HEALTH * 2, speedMult: 0.7, sizeMult: 1.3, tint: 0xff6666, emissiveIntensity: 1.5 },
-  fast: { health: 15, speedMult: 1.3, sizeMult: 0.8, tint: 0xff6666, emissiveIntensity: 1.5 }
+  fast: { health: 15, speedMult: 1.5, sizeMult: 0.8, tint: 0xff6666, emissiveIntensity: 1.5 }
+});
+const PIRATE_ARCHETYPE_KEYS = ['standard', 'shotgun', 'slowing', 'breaching', 'drone'];
+const PIRATE_ARCHETYPE_CONFIG = Object.freeze({
+  standard: { bonusHealthMult: 1, speedMult: 1, sizeMult: 1, fixedHealth: null, pelletCount: 1, pelletSpread: 0, bulletDamage: 3 },
+  shotgun: { bonusHealthMult: 2, speedMult: 1, sizeMult: 1, fixedHealth: null, pelletCount: 3, pelletSpread: 0.06, bulletDamage: 2 },
+  slowing: { bonusHealthMult: 2, speedMult: 1, sizeMult: 1, fixedHealth: null, pelletCount: 1, pelletSpread: 0, bulletDamage: 3 },
+  breaching: { bonusHealthMult: 2, speedMult: 1, sizeMult: 1, fixedHealth: null, pelletCount: 1, pelletSpread: 0, bulletDamage: 3 },
+  drone: { bonusHealthMult: 1, speedMult: 2, sizeMult: 0.5, fixedHealth: 5, pelletCount: 1, pelletSpread: 0, bulletDamage: 3 }
+});
+const PIRATE_ARCHETYPE_BULLET_COLORS = Object.freeze({
+  standard: '#ffcc00',
+  shotgun: '#ffcc00',
+  slowing: '#d8a6ff',
+  breaching: '#ffcc00',
+  drone: '#ffcc00'
 });
 
 function normalizePirateType(type) {
   return PIRATE_TYPE_KEYS.includes(type) ? type : 'normal';
+}
+
+function normalizePirateArchetype(archetype) {
+  return PIRATE_ARCHETYPE_KEYS.includes(archetype) ? archetype : 'standard';
 }
 
 function normalizePirateTypePercentages(percentages) {
@@ -865,27 +925,70 @@ function buildDeterministicPirateTypeSequence(count, percentages, shuffleSeed) {
   return sequence;
 }
 
+function getPirateCombatProfile(pirateType, pirateArchetype) {
+  const resolvedType = normalizePirateType(pirateType);
+  const resolvedArchetype = normalizePirateArchetype(pirateArchetype);
+  const typeCfg = PIRATE_TYPE_CONFIG[resolvedType];
+  const archetypeCfg = PIRATE_ARCHETYPE_CONFIG[resolvedArchetype];
+  let health = typeCfg.health;
+  if (archetypeCfg.fixedHealth != null) {
+    health = archetypeCfg.fixedHealth;
+  } else {
+    health = Math.max(1, Math.round(health * (archetypeCfg.bonusHealthMult ?? 1)));
+  }
+  const speedMult = (typeCfg.speedMult ?? 1) * (archetypeCfg.speedMult ?? 1);
+  const sizeMult = (typeCfg.sizeMult ?? 1) * (archetypeCfg.sizeMult ?? 1);
+  return {
+    pirateType: resolvedType,
+    pirateArchetype: resolvedArchetype,
+    health,
+    speedMult,
+    sizeMult
+  };
+}
+
+function getPirateBulletProfile(pirateArchetype) {
+  const resolvedArchetype = normalizePirateArchetype(pirateArchetype);
+  const cfg = PIRATE_ARCHETYPE_CONFIG[resolvedArchetype] || PIRATE_ARCHETYPE_CONFIG.standard;
+  return {
+    pirateArchetype: resolvedArchetype,
+    pelletCount: Math.max(1, Math.round(cfg.pelletCount || 1)),
+    pelletSpread: cfg.pelletSpread || 0,
+    bulletDamage: cfg.bulletDamage || 3,
+    bulletColor: PIRATE_ARCHETYPE_BULLET_COLORS[resolvedArchetype] || PIRATE_ARCHETYPE_BULLET_COLORS.standard
+  };
+}
+
+function rotateUnitVector(v, angle) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return {
+    x: v.x * c - v.y * s,
+    y: v.x * s + v.y * c
+  };
+}
+
 function createPirate({
   x,
   y,
   vx = 0,
   vy = 0,
   pirateType = 'normal',
+  pirateArchetype = 'standard',
   facingAngle = 0,
   defendingBase,
   orbitAngle,
   orbitRadius,
   fromBaseSpawn = false
 }) {
-  const resolvedType = normalizePirateType(pirateType);
-  const cfg = PIRATE_TYPE_CONFIG[resolvedType];
+  const profile = getPirateCombatProfile(pirateType, pirateArchetype);
   return {
     x,
     y,
     vx,
     vy,
-    health: cfg.health,
-    maxHealth: cfg.health,
+    health: profile.health,
+    maxHealth: profile.health,
     state: 'chase',
     stateTimer: Math.random() * 5,
     cooldown: 1 + Math.random() * 2,
@@ -897,11 +1000,12 @@ function createPirate({
     orbitAngle,
     orbitRadius,
     fromBaseSpawn,
-    pirateType: resolvedType,
-    sizeMult: cfg.sizeMult,
-    accel: PIRATE_ACCEL * cfg.speedMult,
-    maxSpeed: PIRATE_MAX_SPEED * cfg.speedMult,
-    collisionRadius: PIRATE_BASE_COLLISION_RADIUS * cfg.sizeMult
+    pirateType: profile.pirateType,
+    pirateArchetype: profile.pirateArchetype,
+    sizeMult: profile.sizeMult,
+    accel: PIRATE_ACCEL * profile.speedMult,
+    maxSpeed: PIRATE_MAX_SPEED * profile.speedMult,
+    collisionRadius: PIRATE_BASE_COLLISION_RADIUS * profile.sizeMult
   };
 }
 
@@ -1013,6 +1117,7 @@ function spawnBaseDefensePirates(st) {
   const count = Math.max(0, Math.round(Number(st.defenseCount ?? 8)));
   const baseShuffleSeed = ((levelSeed ^ (Math.imul(Math.floor(st.x), 31) ^ Math.imul(Math.floor(st.y), 37))) >>> 0);
   const defenseTypeSequence = buildDeterministicPirateTypeSequence(count, st.defenseTypePercentages, baseShuffleSeed);
+  const baseArchetype = normalizePirateArchetype(st.pirateArchetype);
   for (let i = 0; i < count; i++) {
     const orbitAngle = (i / count) * Math.PI * 2;
     pirates.push(createPirate({
@@ -1020,6 +1125,7 @@ function spawnBaseDefensePirates(st) {
       y: st.y + Math.sin(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
       facingAngle: orbitAngle + Math.PI / 2,
       pirateType: defenseTypeSequence[i] || 'normal',
+      pirateArchetype: baseArchetype,
       defendingBase: st,
       orbitAngle,
       orbitRadius: BASE_DEFENSE_ORBIT_RADIUS
@@ -1041,13 +1147,14 @@ function onPirateBaseDeath(st) {
     for (let k = 0; k < drop.quantity; k++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 20 + Math.random() * 40;
+      const droppedItem = getItemPayload(drop.item, 1);
       floatingItems.push({
+        ...droppedItem,
+        quantity: 1,
         x: st.x,
         y: st.y,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        item: drop.item,
-        quantity: 1
+        vy: Math.sin(angle) * speed
       });
     }
   }
@@ -1246,14 +1353,23 @@ function updatePirates(dt) {
          const fdist = Math.sqrt(fdx*fdx + fdy*fdy);
          const fdir = (fdist > 0) ? {x: fdx/fdist, y: fdy/fdist} : {x:1, y:0};
          
-         bullets.push({
-            x: p.x + fdir.x * SHIP_SIZE * (p.sizeMult || 1),
-            y: p.y + fdir.y * SHIP_SIZE * (p.sizeMult || 1),
-             vx: fdir.x * PIRATE_BULLET_SPEED + p.vx,
-             vy: fdir.y * PIRATE_BULLET_SPEED + p.vy,
-             lifespan: 4,
-             owner: 'pirate'
-         });
+         const bulletProfile = getPirateBulletProfile(p.pirateArchetype);
+         for (let pelletIdx = 0; pelletIdx < bulletProfile.pelletCount; pelletIdx++) {
+            const centered = pelletIdx - (bulletProfile.pelletCount - 1) / 2;
+            const spreadAngle = centered * bulletProfile.pelletSpread;
+            const pelletDir = spreadAngle === 0 ? fdir : rotateUnitVector(fdir, spreadAngle);
+            bullets.push({
+              x: p.x + pelletDir.x * SHIP_SIZE * (p.sizeMult || 1),
+              y: p.y + pelletDir.y * SHIP_SIZE * (p.sizeMult || 1),
+              vx: pelletDir.x * PIRATE_BULLET_SPEED + p.vx,
+              vy: pelletDir.y * PIRATE_BULLET_SPEED + p.vy,
+              lifespan: 4,
+              owner: 'pirate',
+              damage: bulletProfile.bulletDamage,
+              pirateArchetype: bulletProfile.pirateArchetype,
+              color: bulletProfile.bulletColor
+            });
+         }
     }
     }
 
@@ -1292,6 +1408,11 @@ function updatePirates(dt) {
 
 function update(dt) {
   levelElapsedTime += dt;
+  shipSlowTimer = Math.max(0, shipSlowTimer - dt);
+  const shipSlowActive = shipSlowTimer > 0;
+  setShipSlowVisual(shipSlowActive);
+  const effectiveAccel = shipSlowActive ? ACCEL * SHIP_SLOW_FACTOR : ACCEL;
+  const effectiveMaxSpeed = shipSlowActive ? MAX_SPEED * SHIP_SLOW_FACTOR : MAX_SPEED;
   // Ship movement (right-click) - only if there's a direction to move
   if (input.rightMouseDown && player.fuel > 0) {
     const dx = input.mouseX - WIDTH / 2;
@@ -1299,8 +1420,8 @@ function update(dt) {
     const dir = normalize(dx, dy);
     // Only apply thrust and consume fuel if there's a direction
     if (dir.x !== 0 || dir.y !== 0) {
-      ship.vx += dir.x * ACCEL * dt;
-      ship.vy += dir.y * ACCEL * dt;
+      ship.vx += dir.x * effectiveAccel * dt;
+      ship.vy += dir.y * effectiveAccel * dt;
       player.fuel = Math.max(0, player.fuel - FUEL_DEPLETION_RATE * dt);
       tutorialTextTimerStarted = true; // Start tutorial fade timer on first thrust
     }
@@ -1313,8 +1434,8 @@ function update(dt) {
 
   // Max speed cap
   const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-  if (speed > MAX_SPEED) {
-    const scale = MAX_SPEED / speed;
+  if (speed > effectiveMaxSpeed) {
+    const scale = effectiveMaxSpeed / speed;
     ship.vx *= scale;
     ship.vy *= scale;
   }
@@ -1333,7 +1454,10 @@ function update(dt) {
         player.health = Math.max(0, player.health - damage);
         const currentHealth = ast.health ?? ast.radius;
         ast.health = Math.max(0, currentHealth - damage / 2);
-        spawnSparks(ship.x * 0.9 + ast.x * 0.1, ship.y * 0.9 + ast.y * 0.1, Math.max(2, Math.round(damage)));
+        const sparkOffset = shipCollisionRadius * 0.7 + (SHIP_SIZE * shipScale * 0.3);
+        const sparkX = ship.x - hit.nx * sparkOffset;
+        const sparkY = ship.y - hit.ny * sparkOffset;
+        spawnSparks(sparkX, sparkY, Math.max(2, Math.round(damage)));
       }
     }
   }
@@ -1347,7 +1471,10 @@ function update(dt) {
       if (impactSpeed > 0) {
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
-        spawnSparks(ship.x * 0.9 + st.x * 0.1, ship.y * 0.9 + st.y * 0.1, Math.max(2, Math.round(damage)));
+        const sparkOffset = shipCollisionRadius * 0.7 + (SHIP_SIZE * shipScale * 0.3);
+        const sparkX = ship.x - hit.nx * sparkOffset;
+        const sparkY = ship.y - hit.ny * sparkOffset;
+        spawnSparks(sparkX, sparkY, Math.max(2, Math.round(damage)));
         if (st.type === 'piratebase') {
           st.aggroed = true;
           const currentHealth = st.health ?? 100;
@@ -1529,6 +1656,7 @@ function update(dt) {
       const waveCount = Math.max(1, Math.round(Number(st.waveSpawnCount) || 4));
       const spawnMix = normalizePirateTypePercentages(st.waveSpawnTypePercentages);
       const offsets = buildRadialSpawnOffsets(waveCount, BASE_SPAWN_OFFSET);
+      const baseArchetype = normalizePirateArchetype(st.pirateArchetype);
       for (const [ox, oy] of offsets) {
         const angle = Math.atan2(ship.y - (st.y + oy), ship.x - (st.x + ox));
         pirates.push(createPirate({
@@ -1536,6 +1664,7 @@ function update(dt) {
           y: st.y + oy,
           facingAngle: angle,
           pirateType: pickPirateType(spawnMix),
+          pirateArchetype: baseArchetype,
           fromBaseSpawn: true
         }));
       }
@@ -1543,7 +1672,7 @@ function update(dt) {
   }
 
   // Bullets (movement + bullet-asteroid collision)
-  const BULLET_DAMAGE = 4;            // pirate bullet damage to player
+  const BULLET_DAMAGE = 3;            // pirate bullet damage to player
   const BULLET_DAMAGE_PIRATE = 3;    // fallback blaster damage per pellet to pirates
   const BULLET_DAMAGE_ASTEROID = 0.5; // fallback pellet damage to asteroids
   const VIEWPORT_HALF_W = WIDTH / 2;
@@ -1613,7 +1742,19 @@ function update(dt) {
           const dy = b.y - ship.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < shipCollisionRadius) {
-              player.health = Math.max(0, player.health - BULLET_DAMAGE);
+              const bulletDamage = Number.isFinite(Number(b.damage)) ? Number(b.damage) : BULLET_DAMAGE;
+              const bulletArchetype = normalizePirateArchetype(b.pirateArchetype);
+              player.health = Math.max(0, player.health - bulletDamage);
+              if (bulletArchetype === 'slowing') {
+                shipSlowTimer = SHIP_SLOW_DURATION;
+                setShipSlowVisual(true);
+              } else if (bulletArchetype === 'breaching') {
+                if (Math.random() < 0.5) {
+                  player.oxygen = Math.max(0, player.oxygen - 1);
+                } else {
+                  player.fuel = Math.max(0, player.fuel - 1);
+                }
+              }
               remove = true;
               spawnSparks(b.x, b.y, 4);
           }
@@ -1778,11 +1919,28 @@ function update(dt) {
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
-      } else if (item.oxygen != null && item.item === 'oxygen canister') {
+      } else if (item.oxygen != null) {
         let added = false;
         for (let j = 0; j < hotbar.length; j++) {
           if (!hotbar[j]) {
             hotbar[j] = { item: item.item, oxygen: item.oxygen, maxOxygen: item.maxOxygen };
+            added = true;
+            break;
+          }
+        }
+        if (added) {
+          if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
+          floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
+        }
+      } else if (item.health != null) {
+        let added = false;
+        for (let j = 0; j < hotbar.length; j++) {
+          if (!hotbar[j]) {
+            hotbar[j] = {
+              item: item.item,
+              health: item.health,
+              maxHealth: item.maxHealth ?? item.health
+            };
             added = true;
             break;
           }
@@ -2026,7 +2184,7 @@ function render(dt = 1 / 60) {
   // Bullets (fillRect faster than arc)
   for (const b of bullets) {
     const { x, y } = worldToScreen(b.x, b.y);
-    ctx.fillStyle = '#ffcc00';
+    ctx.fillStyle = b.color || '#ffcc00';
     ctx.fillRect(x - 2, y - 2, 4, 4);
   }
 
@@ -2283,6 +2441,18 @@ function render(dt = 1 / 60) {
     const meterWidth = 40;
     const meterSpacing = 50;
     const meterY = HEIGHT - 20;
+    const rightmost = WIDTH - 30;
+
+    syncResourceBarDropZones({
+      meterWidth,
+      meterY,
+      oxygenX: rightmost - (meterSpacing * 2),
+      fuelX: rightmost - meterSpacing,
+      healthX: rightmost,
+      oxygenMax: player.maxOxygen,
+      fuelMax: player.maxFuel,
+      healthMax: player.maxHealth
+    });
 
     function drawMeter(x, value, max, color, label) {
       const barHeight = max * 2; // 2 pixels per unit
@@ -2309,10 +2479,35 @@ function render(dt = 1 / 60) {
       uiCtx.fillText(value.toFixed(1), x, meterY - barHeight - 2);
     }
 
-    const rightmost = WIDTH - 30;
     drawMeter(rightmost - 100, player.oxygen, player.maxOxygen, '#44aaff', 'O2');
     drawMeter(rightmost - 50, player.fuel, player.maxFuel, '#ffaa44', 'Fuel');
     drawMeter(rightmost, player.health, player.maxHealth, '#ff4444', 'HP');
+  }
+}
+
+function syncResourceBarDropZones({
+  meterWidth,
+  meterY,
+  oxygenX,
+  fuelX,
+  healthX,
+  oxygenMax,
+  fuelMax,
+  healthMax
+}) {
+  const barSpecs = [
+    { id: 'oxygen-bar-drop-zone', x: oxygenX, max: oxygenMax },
+    { id: 'fuel-bar-drop-zone', x: fuelX, max: fuelMax },
+    { id: 'health-bar-drop-zone', x: healthX, max: healthMax }
+  ];
+  for (const spec of barSpecs) {
+    const el = document.getElementById(spec.id);
+    if (!el) continue;
+    const barHeight = Math.max(1, Number(spec.max) * 2);
+    el.style.left = `${spec.x - meterWidth / 2}px`;
+    el.style.bottom = `${HEIGHT - meterY}px`;
+    el.style.width = `${meterWidth}px`;
+    el.style.height = `${barHeight}px`;
   }
 }
 
@@ -2492,17 +2687,18 @@ function getSlotHTML(it) {
       const fillH = Math.round(32 * charge);
       const color = charge > 0.5 ? '#ffaa44' : (charge > 0.25 ? '#ffcc66' : '#ff8844');
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
-    } else if ((it.item === 'oxygen canister' || it.item === 'large oxygen canister') && it.oxygen != null) {
+    } else if (it.oxygen != null) {
       // Oxygen canister: oxygen value + charge bar (blue)
       html += `<span class="slot-energy">${it.oxygen.toFixed(1)}</span>`;
       const charge = it.maxOxygen > 0 ? it.oxygen / it.maxOxygen : 0;
       const fillH = Math.round(32 * charge);
       const color = charge > 0.5 ? '#66aaff' : (charge > 0.25 ? '#88ccff' : '#4488dd');
       html += `<div class="slot-bar"><div class="slot-bar-fill" style="height:${fillH}px;background:${color};"></div></div>`;
-    } else if ((it.item === 'health pack' || it.item === 'large health pack') && it.health != null) {
+    } else if (it.health != null) {
       // Health pack: health value + charge bar (reddish)
       html += `<span class="slot-energy">${it.health.toFixed(1)}</span>`;
-      const maxHealth = it.item === 'large health pack' ? 30 : 10;
+      const maxHealthByItem = { 'health pack': 10, 'medium health pack': 30, 'large health pack': 60 };
+      const maxHealth = maxHealthByItem[it.item] || Math.max(it.health, 10);
       const charge = it.health / maxHealth;
       const fillH = Math.round(32 * charge);
       const color = '#ff4444';
@@ -2516,22 +2712,27 @@ function getSlotHTML(it) {
 
 const SMALL_ENERGY_CELL_FULL_SELL = 150;
 const MEDIUM_ENERGY_CELL_FULL_SELL = 550;
+const LARGE_ENERGY_CELL_FULL_SELL = 1200;
 const ENERGY_CELL_MIN_SELL = 10;
 
 function getItemSellPrice(item) {
   if (!item) return 0;
-  // Small energy cell: proportional to charge, min ENERGY_CELL_MIN_SELL cr
-  if (item.item === 'small energy cell' && item.energy != null && item.maxEnergy != null) {
+  // Energy cells: proportional to remaining charge, with a small sell floor.
+  const energyCellFullSell = {
+    'small energy cell': SMALL_ENERGY_CELL_FULL_SELL,
+    'medium energy cell': MEDIUM_ENERGY_CELL_FULL_SELL,
+    'large energy cell': LARGE_ENERGY_CELL_FULL_SELL
+  };
+  if (energyCellFullSell[item.item] != null && item.energy != null && item.maxEnergy != null) {
     const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
-    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(SMALL_ENERGY_CELL_FULL_SELL * chargeRatio));
+    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(energyCellFullSell[item.item] * chargeRatio));
   }
-  // Medium energy cell: proportional to charge, min ENERGY_CELL_MIN_SELL cr
-  if (item.item === 'medium energy cell' && item.energy != null && item.maxEnergy != null) {
-    const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
-    return Math.max(ENERGY_CELL_MIN_SELL, Math.round(MEDIUM_ENERGY_CELL_FULL_SELL * chargeRatio));
-  }
-  // Fuel tank and oxygen canister: always sell for half of purchase price
-  if (['fuel tank', 'large fuel tank', 'oxygen canister', 'large oxygen canister', 'health pack', 'large health pack'].includes(item.item)) {
+  // Consumable refill items sell for half of purchase price.
+  if ([
+    'fuel tank', 'medium fuel tank', 'large fuel tank',
+    'oxygen canister', 'medium oxygen canister', 'large oxygen canister',
+    'health pack', 'medium health pack', 'large health pack'
+  ].includes(item.item)) {
     const buy = ITEM_BUY_PRICE[item.item];
     return buy != null ? Math.floor(buy / 2) : 0;
   }
@@ -2577,12 +2778,16 @@ function syncShopBuyArea() {
     // Build price list - only items in this shop, sorted by price
     const itemNames = { 
       'small energy cell': 'Small Energy Cell',
-      'medium energy cell': 'Medium Energy Cell', 
+      'medium energy cell': 'Medium Energy Cell',
+      'large energy cell': 'Large Energy Cell',
       'fuel tank': 'Fuel Tank', 
+      'medium fuel tank': 'Medium Fuel Tank',
       'large fuel tank': 'Large Fuel Tank',
       'oxygen canister': 'Oxygen Canister',
+      'medium oxygen canister': 'Medium Oxygen Canister',
       'large oxygen canister': 'Large Oxygen Canister',
       'health pack': 'Health Pack',
+      'medium health pack': 'Medium Health Pack',
       'large health pack': 'Large Health Pack',
       'light blaster': 'Light Blaster',
       'medium blaster': 'Medium Blaster',
@@ -2856,6 +3061,8 @@ function loadLevel(levelData, levelIdx) {
   ship.y = 0;
   ship.vx = 0;
   ship.vy = 0;
+  shipSlowTimer = 0;
+  setShipSlowVisual(false);
   
   levelWidth = levelData.width || 10000;
   levelHeight = levelData.height || 10000;
@@ -2903,6 +3110,7 @@ function loadLevel(levelData, levelIdx) {
     
     if (st.type === 'piratebase') {
       st.tier = normalizePirateBaseTier(st.tier);
+      st.pirateArchetype = normalizePirateArchetype(st.pirateArchetype);
       // Use config health or default 150
       const hp = st.health || 150;
       st.health = hp;
@@ -2972,11 +3180,22 @@ function loadLevel(levelData, levelIdx) {
   tutorialTextWorldX = ship.x;
   tutorialTextWorldY = ship.y - 80; // Above the ship
 
+  // Level 3: start in transport ship
+  if (currentLevelIdx === 2) {
+    ownedShips.add('transport');
+    currentShipType = 'transport';
+  }
+
   // Ensure inventory matches current ship's slot count
   const shipStats = SHIP_STATS[currentShipType];
   if (shipStats) {
     inventory.resize(shipStats.slots);
     applyShipStats(currentShipType);
+  }
+  if (currentLevelIdx === 2) {
+    player.health = player.maxHealth;
+    player.fuel = player.maxFuel;
+    player.oxygen = player.maxOxygen;
   }
 
   // Per-level starting inventory
@@ -3076,12 +3295,16 @@ function openShopMenu(shopStructure) {
         // Ensure containers are at full capacity with correct values
         if (item.item === 'small energy cell') { item.energy = 10; item.maxEnergy = 10; }
         else if (item.item === 'medium energy cell') { item.energy = 30; item.maxEnergy = 30; }
+        else if (item.item === 'large energy cell') { item.energy = 60; item.maxEnergy = 60; }
         else if (item.item === 'fuel tank') { item.fuel = 10; item.maxFuel = 10; }
-        else if (item.item === 'large fuel tank') { item.fuel = 30; item.maxFuel = 30; }
+        else if (item.item === 'medium fuel tank') { item.fuel = 30; item.maxFuel = 30; }
+        else if (item.item === 'large fuel tank') { item.fuel = 60; item.maxFuel = 60; }
         else if (item.item === 'oxygen canister') { item.oxygen = 10; item.maxOxygen = 10; }
-        else if (item.item === 'large oxygen canister') { item.oxygen = 30; item.maxOxygen = 30; }
+        else if (item.item === 'medium oxygen canister') { item.oxygen = 30; item.maxOxygen = 30; }
+        else if (item.item === 'large oxygen canister') { item.oxygen = 60; item.maxOxygen = 60; }
         else if (item.item === 'health pack') { item.health = 10; }
-        else if (item.item === 'large health pack') { item.health = 30; }
+        else if (item.item === 'medium health pack') { item.health = 30; }
+        else if (item.item === 'large health pack') { item.health = 60; }
         else if (item.maxFuel !== undefined) item.fuel = item.maxFuel;
         else if (item.maxOxygen !== undefined) item.oxygen = item.maxOxygen;
         shopBuySlots[slotIndex++] = item;
@@ -3547,12 +3770,14 @@ function switchShip(type) {
   if (type === currentShipType) return;
   const stats = SHIP_STATS[type];
   if (!stats) return;
+  let isNewlyBought = false;
 
   // Buy if not owned
   if (!ownedShips.has(type)) {
     if (player.credits < stats.price) return;
     player.credits -= stats.price;
     ownedShips.add(type);
+    isNewlyBought = true;
   }
 
   // Save current ship's resource state
@@ -3565,8 +3790,12 @@ function switchShip(type) {
   // Apply new ship stats
   applyShipStats(type);
 
-  // Restore saved stats for this ship, or start at full
-  if (shipSavedStats[type]) {
+  // Newly bought ships always start full. Otherwise restore saved stats if present.
+  if (isNewlyBought) {
+    player.health = player.maxHealth;
+    player.fuel = player.maxFuel;
+    player.oxygen = player.maxOxygen;
+  } else if (shipSavedStats[type]) {
     player.health = Math.min(shipSavedStats[type].health, player.maxHealth);
     player.fuel = Math.min(shipSavedStats[type].fuel, player.maxFuel);
     player.oxygen = Math.min(shipSavedStats[type].oxygen, player.maxOxygen);
@@ -4104,6 +4333,10 @@ function endDrag(clientX, clientY) {
               floatItem.oxygen = it.oxygen;
               floatItem.maxOxygen = it.maxOxygen;
             }
+            if (it.health != null) {
+              floatItem.health = it.health;
+              floatItem.maxHealth = it.maxHealth ?? it.health;
+            }
             if (it.heat != null) {
               floatItem.heat = it.heat;
               floatItem.overheated = !!it.overheated;
@@ -4500,15 +4733,15 @@ window.addEventListener('mousemove', (e) => {
     const isOverHealth = under && under.closest('#health-bar-drop-zone');
     
     // Highlight fuel bar
-    const showFuelHighlight = it && (it.item === 'fuel tank' || it.item === 'large fuel tank') && isOverFuel;
+    const showFuelHighlight = it && (it.item === 'fuel tank' || it.item === 'medium fuel tank' || it.item === 'large fuel tank') && isOverFuel;
     if (fuelBarEl) fuelBarEl.classList.toggle('highlight', showFuelHighlight);
     
     // Highlight O2 bar
-    const showO2Highlight = it && (it.item === 'oxygen canister' || it.item === 'large oxygen canister') && isOverO2;
+    const showO2Highlight = it && (it.item === 'oxygen canister' || it.item === 'medium oxygen canister' || it.item === 'large oxygen canister') && isOverO2;
     if (oxygenBarEl) oxygenBarEl.classList.toggle('highlight', showO2Highlight);
 
     // Highlight Health bar
-    const showHealthHighlight = it && (it.item === 'health pack' || it.item === 'large health pack') && isOverHealth;
+    const showHealthHighlight = it && (it.item === 'health pack' || it.item === 'medium health pack' || it.item === 'large health pack') && isOverHealth;
     if (healthBarEl) healthBarEl.classList.toggle('highlight', showHealthHighlight);
   }
 });
