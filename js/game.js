@@ -10,6 +10,14 @@ const ctx = canvas.getContext('2d');
 let shipCanvas, shipScene, shipCamera, shipRenderer, shipMesh, shipModelLoaded = false;
 let shipFlames = []; // Thruster flame meshes
 let shipBaseScale = 1; // Base 3D model scale (set once on load)
+const SHIP_MODEL_FILES = {
+  scout: 'scout-ship.glb',
+  cutter: 'cutter.glb',
+  transport: 'transport.glb'
+};
+const shipModelSources = { scout: null, cutter: null, transport: null };
+const PLAYER_SHIP_Y_OFFSET_BY_TYPE = { scout: 3, cutter: 5, transport: 5 };
+const SHIP_PREVIEW_Y_OFFSET_FACTOR = 0.15; // Scout baseline nudge factor in preview.
 // Small asteroid 3D models (radius 10-30)
 let smallAsteroidModels = [null, null, null];
 // Medium asteroid 3D models (radius 40-90)
@@ -19,8 +27,13 @@ let largeAsteroidModel = null;
 let oreModel = null;
 let scrapModel = null;
 let asteroidContainer = null;
-let structureModels = { warpgate: null, shop: null, piratebase: null };
-let pirateModel = null;
+let structureModels = {
+  warpgate: null,
+  shop: null,
+  piratebase: { 1: null, 2: null, 3: null, 4: null, 5: null }
+};
+const pirateModelFiles = { standard: 'pirate-standard.glb', shotgun: 'pirate-shotgun.glb', slowing: 'pirate-slowing.glb', breaching: 'pirate-breaching.glb', drone: 'pirate-drone.glb' };
+let pirateModels = { standard: null, shotgun: null, slowing: null, breaching: null, drone: null };
 let pirateContainer = null;
 let structureContainer = null;
 let floatingOreContainer = null;
@@ -69,9 +82,11 @@ ITEM_IMAGES['small energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['medium energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['large energy cell'].src = 'assets/energy-cell.png';
 ITEM_IMAGES['oxygen canister'].src = 'assets/oxygen-can.png';
-ITEM_IMAGES['health pack'] = ITEM_IMAGES['oxygen canister']; // Reuse for now
-ITEM_IMAGES['medium health pack'] = ITEM_IMAGES['oxygen canister'];
-ITEM_IMAGES['large health pack'] = ITEM_IMAGES['oxygen canister'];
+const healthPackImg = new Image();
+healthPackImg.src = 'assets/health-pack.png';
+ITEM_IMAGES['health pack'] = healthPackImg;
+ITEM_IMAGES['medium health pack'] = healthPackImg;
+ITEM_IMAGES['large health pack'] = healthPackImg;
 ITEM_IMAGES['medium fuel tank'] = ITEM_IMAGES['fuel tank'];
 ITEM_IMAGES['large fuel tank'] = ITEM_IMAGES['fuel tank'];
 ITEM_IMAGES['medium oxygen canister'] = ITEM_IMAGES['oxygen canister'];
@@ -353,6 +368,64 @@ function drawShip2D() {
   ctx.restore();
 }
 
+function createShipFlames(shipType) {
+  const flameHeight = 0.42;
+  const flameGeom = new THREE.ConeGeometry(0.105, flameHeight, 8);
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.9 });
+  const flame1 = new THREE.Mesh(flameGeom.clone(), flameMat.clone());
+  const flame2 = new THREE.Mesh(flameGeom.clone(), flameMat.clone());
+  flame1.rotation.x = -Math.PI / 2;
+  flame2.rotation.x = -Math.PI / 2;
+  flame1.position.set(0, 0, -flameHeight / 2);
+  flame2.position.set(0, 0, -flameHeight / 2);
+  const flameGroup1 = new THREE.Group();
+  const flameGroup2 = new THREE.Group();
+  flameGroup1.add(flame1);
+  flameGroup2.add(flame2);
+  const flameX = shipType === 'cutter' ? 0.235 : 0.15;
+  flameGroup1.position.set(-flameX, 0.3, -0.9);
+  flameGroup2.position.set(flameX, 0.3, -0.9);
+  flameGroup1.visible = false;
+  flameGroup2.visible = false;
+  return [flameGroup1, flameGroup2];
+}
+
+function attachShipModelForType(shipType) {
+  if (!shipScene || typeof THREE === 'undefined') return;
+  const resolvedType = SHIP_MODEL_FILES[shipType] ? shipType : 'scout';
+  const source = shipModelSources[resolvedType] || shipModelSources.scout;
+  if (!source) return;
+
+  if (shipMesh) {
+    shipScene.remove(shipMesh);
+    shipMesh = null;
+    shipFlames = [];
+  }
+
+  const model = source.clone(true);
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const scale = (SHIP_SIZE * 2) / (maxDim > 0 ? maxDim : 1) * 1.2;
+  shipBaseScale = scale;
+  model.scale.setScalar(scale * shipScale);
+  model.position.sub(center.multiplyScalar(scale * shipScale));
+  // Flip to show ship tops (not undersides) in top-down view.
+  model.rotation.x = Math.PI / 2;
+  model.position.y += PLAYER_SHIP_Y_OFFSET_BY_TYPE[resolvedType] ?? PLAYER_SHIP_Y_OFFSET_BY_TYPE.scout;
+
+  const [flameGroup1, flameGroup2] = createShipFlames(resolvedType);
+  model.add(flameGroup1);
+  model.add(flameGroup2);
+  shipFlames = [flameGroup1, flameGroup2];
+
+  shipMesh = model;
+  shipScene.add(shipMesh);
+  shipModelLoaded = true;
+  setShipSlowVisual(shipSlowTimer > 0);
+}
+
 function drawCrosshairAndHeatBar() {
   if (!uiCtx) return;
   uiCtx.clearRect(0, 0, WIDTH, HEIGHT);
@@ -423,54 +496,19 @@ function initShip3D() {
   const LoaderClass = (window.GLTFLoader || (THREE && THREE.GLTFLoader));
   if (!LoaderClass) return;
   const loader = new LoaderClass();
-  const glbUrl = new URL('assets/scout-ship.glb', window.location.href).toString();
-  loader.load(glbUrl, (gltf) => {
-    const model = gltf.scene;
-    const box = new THREE.Box3().setFromObject(model);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const scale = (SHIP_SIZE * 2) / (maxDim > 0 ? maxDim : 1) * 1.2;
-    shipBaseScale = scale;
-    model.scale.setScalar(scale * shipScale);
-    model.position.sub(center.multiplyScalar(scale * shipScale));
-    // Convert common glTF orientation (Y-up, Z-forward) into our top-down XY view.
-    model.rotation.x = -Math.PI / 2;
-    // Shift centerpoint up a bit for better visual alignment
-    model.position.y += 3;
-    shipMesh = model;
-    shipScene.add(shipMesh);
-    
-    // Create thruster flames (two small cones at the back)
-    const flameHeight = 0.42;
-    const flameGeom = new THREE.ConeGeometry(0.105, flameHeight, 8);
-    const flameMat = new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.9 });
-    const flame1 = new THREE.Mesh(flameGeom.clone(), flameMat.clone());
-    const flame2 = new THREE.Mesh(flameGeom.clone(), flameMat.clone());
-    flame1.rotation.x = -Math.PI / 2; // Point flames backward (horizontal)
-    flame2.rotation.x = -Math.PI / 2;
-    // Offset cone so base is at origin (for scaling from base)
-    flame1.position.set(0, 0, -flameHeight / 2);
-    flame2.position.set(0, 0, -flameHeight / 2);
-    const flameGroup1 = new THREE.Group();
-    const flameGroup2 = new THREE.Group();
-    flameGroup1.add(flame1);
-    flameGroup2.add(flame2);
-    flameGroup1.position.set(-0.15, 0.3, -0.9);
-    flameGroup2.position.set(0.15, 0.3, -0.9);
-    flameGroup1.visible = false;
-    flameGroup2.visible = false;
-    shipMesh.add(flameGroup1);
-    shipMesh.add(flameGroup2);
-    shipFlames = [flameGroup1, flameGroup2];
-    
-    shipModelLoaded = true;
-    setShipSlowVisual(shipSlowTimer > 0);
-    // eslint-disable-next-line no-console
-    console.log('[ship3d] Loaded scout-ship.glb');
-  }, undefined, (err) => {
-    // eslint-disable-next-line no-console
-    console.error('[ship3d] Failed to load scout-ship.glb', err);
+  Object.entries(SHIP_MODEL_FILES).forEach(([type, file]) => {
+    const glbUrl = new URL('assets/' + file, window.location.href).toString();
+    loader.load(glbUrl, (gltf) => {
+      shipModelSources[type] = gltf.scene;
+      if (!shipMesh || type === currentShipType) {
+        attachShipModelForType(currentShipType);
+      }
+      // eslint-disable-next-line no-console
+      console.log('[ship3d] Loaded ' + file);
+    }, undefined, (err) => {
+      // eslint-disable-next-line no-console
+      console.error('[ship3d] Failed to load ' + file, err);
+    });
   });
 
   function setupAsteroidModel(model) {
@@ -558,19 +596,36 @@ function initShip3D() {
     const scale = 1 / (maxDim > 0 ? maxDim : 1);
     model.scale.setScalar(scale);
     model.position.sub(center.multiplyScalar(scale));
-    model.rotation.x = Math.PI / 4; // 45°
-    model.rotation.y = Math.PI / 4; // 45°
+    model.rotation.x = Math.PI / 4; // 45° tilt downward
+    if (structureType === 'crafting') {
+      model.rotation.y = (310 * Math.PI) / 180; // 310° on horizontal
+    } else {
+      model.rotation.y = Math.PI / 4; // 45°
+    }
   }
   const STRUCTURE_FILES = [
     { type: 'warpgate', file: 'warp-gate.glb' },
     { type: 'shop', file: 'shop.glb' },
-    { type: 'piratebase', file: 'pirate-base.glb' }
+    { type: 'shipyard', file: 'shipyard.glb' },
+    { type: 'refinery', file: 'refinery.glb' },
+    { type: 'crafting', file: 'crafting-station.glb' }
   ];
   STRUCTURE_FILES.forEach(({ type, file }) => {
     loader.load(new URL('assets/' + file, window.location.href).toString(), (gltf) => {
       const model = gltf.scene;
       setupStructureModel(model, type);
       structureModels[type] = model;
+      console.log('[ship3d] Loaded ' + file);
+      refreshStructureMeshes();
+    }, undefined, (err) => console.error('[ship3d] Failed to load ' + file, err));
+  });
+
+  [1, 2, 3, 4, 5].forEach((tier) => {
+    const file = `pirate-base-t${tier}.glb`;
+    loader.load(new URL('assets/' + file, window.location.href).toString(), (gltf) => {
+      const model = gltf.scene;
+      setupStructureModel(model, 'piratebase');
+      structureModels.piratebase[tier] = model;
       console.log('[ship3d] Loaded ' + file);
       refreshStructureMeshes();
     }, undefined, (err) => console.error('[ship3d] Failed to load ' + file, err));
@@ -608,24 +663,20 @@ function initShip3D() {
     console.log('[ship3d] Loaded scrap.glb');
   }, undefined, (err) => console.error('[ship3d] Failed to load scrap.glb', err));
 
-  loader.load(new URL('assets/pirate.glb', window.location.href).toString(), (gltf) => {
-    const model = gltf.scene;
+  const setupPirateModel = (model) => {
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const scale = (SHIP_SIZE * 2) / maxDim * 1.1; 
+    const scale = (SHIP_SIZE * 2) / maxDim * 1.1;
     model.scale.setScalar(scale);
     model.position.sub(center.multiplyScalar(scale));
-    // Convert common glTF orientation (Y-up, Z-forward) into our top-down XY view.
     model.rotation.x = -Math.PI / 2;
-    model.rotation.y = Math.PI; // flip 180 if needed, we'll align with rotation
-    
-    // Apply reddish emissive material (texture map shapes glow like asteroids)
+    model.rotation.y = Math.PI;
     model.traverse((child) => {
       if (child.isMesh && child.material) {
         const oldMat = child.material;
-        const newMat = new THREE.MeshStandardMaterial({
+        child.material = new THREE.MeshStandardMaterial({
           color: oldMat.color ? oldMat.color.clone() : 0xee9999,
           map: oldMat.map || null,
           roughness: 0.7,
@@ -634,13 +685,19 @@ function initShip3D() {
           emissiveMap: oldMat.map || null,
           emissiveIntensity: 1.5
         });
-        child.material = newMat;
       }
     });
-    
-    pirateModel = model;
-    console.log('[ship3d] Loaded pirate.glb');
-  }, undefined, (err) => console.error('[ship3d] Failed to load pirate.glb', err));
+  };
+  for (const archetype of PIRATE_ARCHETYPE_KEYS) {
+    const file = pirateModelFiles[archetype];
+    if (!file) continue;
+    loader.load(new URL('assets/' + file, window.location.href).toString(), (gltf) => {
+      const model = gltf.scene;
+      setupPirateModel(model);
+      pirateModels[archetype] = model;
+      console.log('[ship3d] Loaded ' + file);
+    }, undefined, (err) => console.error('[ship3d] Failed to load ' + file, err));
+  }
 }
 
 function buildOreIconDataUrls() {
@@ -824,6 +881,10 @@ function getPirateBaseVisualRadius(st) {
 
 function getPirateBaseAggroRadius(st) {
   return PIRATE_BASE_AGGRO_RADIUS * getPirateBaseTierScale(st?.tier);
+}
+
+function getPirateBaseDefenseOrbitRadius(st) {
+  return BASE_DEFENSE_ORBIT_RADIUS * getPirateBaseTierScale(st?.tier);
 }
 
 function getStructureCollisionRadius(st) {
@@ -1073,11 +1134,18 @@ function refreshStructureMeshes() {
   const STRUCTURE_SIZE = 40;
   const STRUCTURE_DIAMETER = STRUCTURE_SIZE * 2;
   const STRUCTURE_SCALE_MULT = 2.7; // base
-  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0, crafting: 1.0, shipyard: 1.2 };
+  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0, crafting: 0.75, shipyard: 0.96, refinery: 1.0 };
+  const getSourceModel = (st) => {
+    if (st.type === 'piratebase') {
+      const tier = normalizePirateBaseTier(st.tier);
+      return structureModels.piratebase?.[tier] || structureModels.piratebase?.[2] || structureModels['shop'];
+    }
+    return structureModels[st.type] || structureModels['shop'];
+  };
   while (structureContainer.children.length) structureContainer.remove(structureContainer.children[0]);
   for (const st of structures) {
     if (!isCollidableStructure(st)) continue;
-    const src = structureModels[st.type] || structureModels['shop']; // Fallback to shop model
+    const src = getSourceModel(st);
     if (!src) continue;
     const clone = src.clone(true);
     const box = new THREE.Box3().setFromObject(clone);
@@ -1115,20 +1183,21 @@ function spawnPirateGroup(minCount, maxCount, typePercentages = DEFAULT_PIRATE_T
 
 function spawnBaseDefensePirates(st) {
   const count = Math.max(0, Math.round(Number(st.defenseCount ?? 8)));
+  const orbitRadius = getPirateBaseDefenseOrbitRadius(st);
   const baseShuffleSeed = ((levelSeed ^ (Math.imul(Math.floor(st.x), 31) ^ Math.imul(Math.floor(st.y), 37))) >>> 0);
   const defenseTypeSequence = buildDeterministicPirateTypeSequence(count, st.defenseTypePercentages, baseShuffleSeed);
   const baseArchetype = normalizePirateArchetype(st.pirateArchetype);
   for (let i = 0; i < count; i++) {
     const orbitAngle = (i / count) * Math.PI * 2;
     pirates.push(createPirate({
-      x: st.x + Math.cos(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
-      y: st.y + Math.sin(orbitAngle) * BASE_DEFENSE_ORBIT_RADIUS,
+      x: st.x + Math.cos(orbitAngle) * orbitRadius,
+      y: st.y + Math.sin(orbitAngle) * orbitRadius,
       facingAngle: orbitAngle + Math.PI / 2,
       pirateType: defenseTypeSequence[i] || 'normal',
       pirateArchetype: baseArchetype,
       defendingBase: st,
       orbitAngle,
-      orbitRadius: BASE_DEFENSE_ORBIT_RADIUS
+      orbitRadius
     }));
   }
 }
@@ -1222,8 +1291,9 @@ function updatePirates(dt) {
       } else {
         inDefenseMode = true;
         p.orbitAngle += dt * BASE_DEFENSE_ORBIT_SPEED;
-        p.x = base.x + Math.cos(p.orbitAngle) * (p.orbitRadius || BASE_DEFENSE_ORBIT_RADIUS);
-        p.y = base.y + Math.sin(p.orbitAngle) * (p.orbitRadius || BASE_DEFENSE_ORBIT_RADIUS);
+        const orbitRadius = p.orbitRadius || getPirateBaseDefenseOrbitRadius(base);
+        p.x = base.x + Math.cos(p.orbitAngle) * orbitRadius;
+        p.y = base.y + Math.sin(p.orbitAngle) * orbitRadius;
         p.vx = 0;
         p.vy = 0;
         p.facingAngle = p.orbitAngle + Math.PI / 2;
@@ -2121,7 +2191,7 @@ function render(dt = 1 / 60) {
   const INTERACTABLE_TYPES_SET = new Set(['shop', 'warpgate', 'crafting', 'refinery', 'shipyard']);
   for (const st of structures) {
     if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
-    const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'piratebase';
+    const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'shipyard' || st.type === 'refinery' || st.type === 'crafting' || st.type === 'piratebase';
     const r = is3D
       ? (st.type === 'piratebase' ? getPirateBaseVisualRadius(st) : STRUCTURE_RADIUS_3D)
       : STRUCTURE_SIZE;
@@ -2144,10 +2214,11 @@ function render(dt = 1 / 60) {
           const barW = 90;
           const barH = 6;
           const pct = Math.max(0, st.health / st.maxHealth);
+          const barUpOffset = st.tier === 1 ? 28 : 20; // tier 1 bar slightly higher
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(x - barW/2, y - r - 20, barW, barH);
+          ctx.fillRect(x - barW/2, y - r - barUpOffset, barW, barH);
           ctx.fillStyle = '#ff3333';
-          ctx.fillRect(x - barW/2, y - r - 20, barW * pct, barH);
+          ctx.fillRect(x - barW/2, y - r - barUpOffset, barW * pct, barH);
         }
       } else {
         // Shop, warpgate (3D) -- dashed interact ring
@@ -2219,14 +2290,17 @@ function render(dt = 1 / 60) {
     const onScreen = st.x > cullLeft && st.x < cullRight && st.y > cullTop && st.y < cullBottom;
     st._mesh.visible = onScreen;
     if (!onScreen) continue;
-    const yOff = st.type === 'shop' ? 4 : 0;
+    const yOff = st.type === 'shop' ? 4 : st.type === 'crafting' ? 5 : 0;
     st._mesh.position.set(st.x - ship.x, -(st.y - ship.y) + yOff, 0);
   }
 
   // Update 3D pirate positions
   for (const p of pirates) {
-    if (!p._mesh && pirateModel && pirateContainer) {
-        const clone = pirateModel.clone(true);
+    if (!p._mesh && pirateContainer) {
+        const archetype = normalizePirateArchetype(p.pirateArchetype);
+        const src = pirateModels[archetype];
+        if (!src) continue;
+        const clone = src.clone(true);
         applyPirateVariantVisual(clone, p.pirateType, p.sizeMult);
         pirateContainer.add(clone);
         p._mesh = clone;
@@ -2259,7 +2333,7 @@ function render(dt = 1 / 60) {
     shipTilt += deltaAngle * PIRATE_TILT_SENSITIVITY - shipTilt * PIRATE_TILT_DECAY * dt;
     shipTilt = Math.max(-0.5, Math.min(0.5, shipTilt));
     shipMesh.scale.setScalar(shipBaseScale * shipScale);
-    shipMesh.rotation.y = aimAngle + Math.PI / 2;
+    shipMesh.rotation.y = -aimAngle + Math.PI / 2;
     shipMesh.rotation.z = shipTilt;
     // Show thruster flames when thrusting
     const thrustDx = input.mouseX - WIDTH / 2;
@@ -3748,6 +3822,7 @@ function applyShipStats(type) {
   shipCollisionRadius = stats.collisionRadius;
   shipScale = stats.shipScale;
   shipDamageMult = stats.damageMult;
+  attachShipModelForType(type);
   // Resize inventory
   const excess = inventory.resize(stats.slots);
   // Drop excess items as floating items
@@ -3867,7 +3942,8 @@ function createShipPreview(container, shipType) {
   const LoaderClass = (window.GLTFLoader || (THREE && THREE.GLTFLoader));
   if (LoaderClass) {
     const loader = new LoaderClass();
-    const glbUrl = new URL('assets/scout-ship.glb', window.location.href).toString();
+    const modelFile = SHIP_MODEL_FILES[shipType] || SHIP_MODEL_FILES.scout;
+    const glbUrl = new URL('assets/' + modelFile, window.location.href).toString();
     loader.load(glbUrl, (gltf) => {
       const model = gltf.scene.clone(true);
       const stats = SHIP_STATS[shipType];
@@ -3880,10 +3956,13 @@ function createShipPreview(container, shipType) {
       const displayScale = fitScale * (stats ? stats.shipScale : 1.0);
       model.scale.setScalar(displayScale);
       model.position.sub(center.multiplyScalar(displayScale));
-      // Same orientation as in-game: glTF Y-up → top-down XY view
-      model.rotation.x = -Math.PI / 2;
-      // Small upward nudge for visual centering
-      model.position.y += displayScale * 0.15;
+      // Same orientation as in-game: glTF Y-up → top-down XY view (top hull visible)
+      model.rotation.x = Math.PI / 2;
+      // Match per-ship world offset (3 for scout, 5 for cutter/transport) in preview space.
+      const scoutScale = fitScale * (SHIP_STATS.scout?.shipScale ?? 1.0);
+      const scoutPreviewOffset = scoutScale * SHIP_PREVIEW_Y_OFFSET_FACTOR;
+      const worldYOffset = PLAYER_SHIP_Y_OFFSET_BY_TYPE[shipType] ?? PLAYER_SHIP_Y_OFFSET_BY_TYPE.scout;
+      model.position.y += scoutPreviewOffset * (worldYOffset / PLAYER_SHIP_Y_OFFSET_BY_TYPE.scout);
 
       model.traverse((child) => {
         if (child.isMesh && child.material) {
@@ -3905,7 +3984,7 @@ function createShipPreview(container, shipType) {
     const now = performance.now();
     const dt = (now - lastTime) / 1000;
     lastTime = now;
-    previewObj.spinGroup.rotation.z += SHIPYARD_SPIN_SPEED * dt;
+    previewObj.spinGroup.rotation.z -= SHIPYARD_SPIN_SPEED * dt;
     renderer.render(scene, camera);
   }
   animate();

@@ -78,7 +78,7 @@ export const STRUCTURE_STYLES = {
 
 export const SHIP_STATS = {
   'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 9,  collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, desc: 'Standard issue scout ship.' },
-  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.2, desc: 'Sturdy mining vessel. 20% bonus weapon damage.' },
+  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.3, desc: 'Sturdy mining vessel. 30% bonus weapon damage vs pirates and bases.' },
   'transport': { name: 'Transport', price: 5000, health: 60, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 14, shipScale: 1.4, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
 };
 
@@ -181,9 +181,9 @@ export const ITEM_IMAGE_PATHS = {
   'fuel tank': 'assets/fuel-can.png',
   'medium fuel tank': 'assets/fuel-can.png',
   'large fuel tank': 'assets/fuel-can.png',
-  'health pack': 'assets/oxygen-can.png',      // Reuse oxygen-can for now
-  'medium health pack': 'assets/oxygen-can.png',
-  'large health pack': 'assets/oxygen-can.png',
+  'health pack': 'assets/health-pack.png',
+  'medium health pack': 'assets/health-pack.png',
+  'large health pack': 'assets/health-pack.png',
   'small energy cell': 'assets/energy-cell.png',
   'medium energy cell': 'assets/energy-cell.png',
   'large energy cell': 'assets/energy-cell.png',

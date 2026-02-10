@@ -585,7 +585,7 @@ textarea {
 .shipyard-card-preview {
   width: 200px;
   height: 100px;
-  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0d0d14 100%);
+  background: transparent;
   position: relative;
   overflow: hidden;
 }

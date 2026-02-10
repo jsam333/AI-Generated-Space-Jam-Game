@@ -210,7 +210,7 @@ const state = {
     panCamStart: { x: 0, y: 0 }
   },
   tool: {
-    selected: 'asteroid_cuprite',
+    selected: 'select',
     asteroidSize: 40,
     piratebaseTier: 2
   },
@@ -1626,12 +1626,12 @@ document.getElementById('apply-size').addEventListener('click', () => {
 });
 
 document.getElementById('clear-all').addEventListener('click', () => {
-  if (confirm('Clear all asteroids and structures?')) {
-    state.level.asteroids = [];
-    state.level.structures = [];
-    saveLevel();
-    render();
-  }
+  const shouldClear = window.confirm('Clear all asteroids and structures? This cannot be undone.');
+  if (!shouldClear) return;
+  state.level.asteroids = [];
+  state.level.structures = [];
+  saveLevel();
+  render();
 });
 
 document.getElementById('export-level').addEventListener('click', () => {
