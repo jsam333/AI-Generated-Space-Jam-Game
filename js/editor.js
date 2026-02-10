@@ -66,6 +66,13 @@ const PIRATE_ARCHETYPE_LABELS = {
   breaching: 'Breaching',
   drone: 'Drone'
 };
+const PIRATE_ARCHETYPE_OUTLINE_COLORS = Object.freeze({
+  standard: '#aa6644',
+  shotgun: '#d18a4f',
+  slowing: '#b48cff',
+  breaching: '#ff6b5d',
+  drone: '#7db8ff'
+});
 
 function normalizePirateBaseTier(tier) {
   const n = Number(tier);
@@ -79,6 +86,16 @@ function getPirateBaseTierScale(tier) {
 
 function getStructureDrawScale(type, tier) {
   return type === 'piratebase' ? getPirateBaseTierScale(tier) : 1;
+}
+
+function getStructureStyle(type, pirateArchetype = 'standard') {
+  const baseStyle = STRUCTURE_STYLES[type] || STRUCTURE_STYLES.shop;
+  if (type !== 'piratebase') return baseStyle;
+  const resolvedArchetype = normalizePirateArchetype(pirateArchetype);
+  return {
+    ...baseStyle,
+    stroke: PIRATE_ARCHETYPE_OUTLINE_COLORS[resolvedArchetype] || baseStyle.stroke
+  };
 }
 
 function normalizePirateTypePercentages(mix) {
@@ -287,11 +304,11 @@ function drawAsteroid(ctx, x, y, radius, type, isPreview = false) {
   ctx.stroke();
 }
 
-function drawStructure(ctx, x, y, type, isPreview = false, tier = 2) {
+function drawStructure(ctx, x, y, type, isPreview = false, tier = 2, pirateArchetype = 'standard') {
   const s = worldToScreen(x, y);
   const scale = getStructureDrawScale(type, tier);
   const r = CONSTANTS.STRUCTURE_SIZE * scale * state.camera.zoom;
-  const style = STRUCTURE_STYLES[type] || STRUCTURE_STYLES.shop;
+  const style = getStructureStyle(type, pirateArchetype);
 
   // Draw interact/aggro radius rings (bright dashed)
   // - interactables: bright using structure stroke color
@@ -410,7 +427,7 @@ function drawWorldObjects() {
   
   // Draw structures
   for (const st of state.level.structures) {
-    drawStructure(ctx, st.x, st.y, st.type, false, st.tier);
+    drawStructure(ctx, st.x, st.y, st.type, false, st.tier, st.pirateArchetype);
   }
 }
 
@@ -448,7 +465,7 @@ function drawOverlay() {
     const type = state.tool.selected.replace('asteroid_', '');
     drawAsteroid(ctx, world.x, world.y, state.tool.asteroidSize, type, true);
   } else if (STRUCTURE_STYLES[state.tool.selected]) {
-    drawStructure(ctx, world.x, world.y, state.tool.selected, true, state.tool.piratebaseTier);
+    drawStructure(ctx, world.x, world.y, state.tool.selected, true, state.tool.piratebaseTier, 'standard');
   }
 
   // Draw selection highlight
@@ -502,7 +519,7 @@ function drawOverlay() {
       drawAsteroid(ctx, cx + a.rx, cy + a.ry, a.radius, type, true);
     }
     for (const s of state.clipboard.structures) {
-      drawStructure(ctx, cx + s.rx, cy + s.ry, s.type, true, s.tier);
+      drawStructure(ctx, cx + s.rx, cy + s.ry, s.type, true, s.tier, s.pirateArchetype);
     }
     ctx.globalAlpha = 1.0;
 
@@ -1141,7 +1158,7 @@ function renderPirateBaseProperties(parent, obj) {
     opt.selected = archetype === selectedArchetype;
     archetypeSelect.appendChild(opt);
   }
-  archetypeSelect.onchange = (e) => { obj.pirateArchetype = normalizePirateArchetype(e.target.value); saveLevel(); };
+  archetypeSelect.onchange = (e) => { obj.pirateArchetype = normalizePirateArchetype(e.target.value); saveLevel(); render(); };
   archetypeDiv.appendChild(archetypeSelect);
   parent.appendChild(archetypeDiv);
 
