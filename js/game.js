@@ -14,6 +14,7 @@ import {
   ensureSpawnSettingsDefaults,
   ensurePirateBaseSpawnDefaults
 } from './pirateShared.js';
+import { playIntroCutscene } from './introCutscene.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -177,25 +178,54 @@ let activeRefineryStructure = null;
 const refineryInputSlots = [null, null, null, null];
 let refineryOutputSlot = null;
 
-// Start screen overlay (click to start). Keep rendering/asset loading running behind it.
+// Start screen overlay — hidden during cutscene, shown as fallback.
 const startOverlayEl = document.getElementById('start-menu-overlay');
-if (startOverlayEl) {
+
+// Intro cutscene overlay (replaces click-to-start).
+function beginGame() {
+  if (startOverlayEl) startOverlayEl.style.display = 'none';
+  startScreenOpen = false;
+  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  input.leftMouseDown = false;
+  input.rightMouseDown = false;
+  input.ctrlBrake = false;
+  if (canvas && canvas.focus) canvas.focus();
+}
+
+const mainMenuOverlay = document.getElementById('main-menu-overlay');
+const mainMenuStartBtn = document.getElementById('main-menu-start-btn');
+const cutsceneOverlay = document.getElementById('intro-cutscene-overlay');
+const cutsceneMapCanvas = document.getElementById('intro-map-canvas');
+const cutsceneDialogue = document.getElementById('intro-dialogue-text');
+
+if (mainMenuOverlay && mainMenuStartBtn) {
+  // Show main menu; game loads in background. On Start Game, play cutscene then begin.
+  mainMenuOverlay.style.display = 'flex';
+  mainMenuStartBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    mainMenuOverlay.style.display = 'none';
+    if (cutsceneOverlay && cutsceneMapCanvas && cutsceneDialogue) {
+      cutsceneOverlay.style.display = 'flex';
+      playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame);
+    } else {
+      beginGame();
+    }
+  });
+} else if (cutsceneOverlay && cutsceneMapCanvas && cutsceneDialogue) {
+  // Fallback: no main menu — play cutscene immediately.
+  cutsceneOverlay.style.display = 'flex';
+  playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame);
+} else if (startOverlayEl) {
+  // Fallback: classic click-to-start if cutscene markup is missing.
   startOverlayEl.style.display = 'flex';
   startOverlayEl.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    startOverlayEl.style.display = 'none';
-    startScreenOpen = false;
-    // Unpause unless another menu is open (shouldn't be at boot)
-    gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
-    // Clear latched inputs so the click doesn't immediately fire/thrust
-    input.leftMouseDown = false;
-    input.rightMouseDown = false;
-    input.ctrlBrake = false;
-    if (canvas && canvas.focus) canvas.focus();
+    beginGame();
   });
 } else {
-  // If markup is missing for some reason, don't block the game.
+  // No overlays at all — just start.
   startScreenOpen = false;
   gamePaused = false;
 }
