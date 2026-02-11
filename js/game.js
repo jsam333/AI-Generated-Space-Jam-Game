@@ -15,6 +15,7 @@ import {
   ensurePirateBaseSpawnDefaults
 } from './pirateShared.js';
 import { playIntroCutscene } from './introCutscene.js';
+import { sfx } from './sfx.js';
 
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
@@ -146,6 +147,7 @@ const hotbar = inventory.slots; // Alias for compatibility
 let selectedSlot = 0;
 let blasterFireAccum = 0;
 let hudDirty = true; // When true, updateHUD() will re-render; set by any mutation
+let laserWasFiring = false;
 
 // Input
 const input = new InputHandler(canvas);
@@ -189,6 +191,7 @@ function beginGame() {
   input.leftMouseDown = false;
   input.rightMouseDown = false;
   input.ctrlBrake = false;
+  sfx.stopLaserLoop();
   if (canvas && canvas.focus) canvas.focus();
 }
 
@@ -204,10 +207,17 @@ if (mainMenuOverlay && mainMenuStartBtn) {
   mainMenuStartBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    sfx.unlock();
+    sfx.playConfirm();
     mainMenuOverlay.style.display = 'none';
     if (cutsceneOverlay && cutsceneMapCanvas && cutsceneDialogue) {
       cutsceneOverlay.style.display = 'flex';
-      playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame);
+      playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame, {
+        onTypeChar: () => sfx.playCutsceneTypeTick(),
+        onSkip: () => sfx.playCutsceneSkip(),
+        onBlendStart: () => sfx.playCutsceneBlendStart(),
+        onBlendComplete: () => sfx.playCutsceneBlendComplete()
+      });
     } else {
       beginGame();
     }
@@ -215,13 +225,20 @@ if (mainMenuOverlay && mainMenuStartBtn) {
 } else if (cutsceneOverlay && cutsceneMapCanvas && cutsceneDialogue) {
   // Fallback: no main menu — play cutscene immediately.
   cutsceneOverlay.style.display = 'flex';
-  playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame);
+  playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame, {
+    onTypeChar: () => sfx.playCutsceneTypeTick(),
+    onSkip: () => sfx.playCutsceneSkip(),
+    onBlendStart: () => sfx.playCutsceneBlendStart(),
+    onBlendComplete: () => sfx.playCutsceneBlendComplete()
+  });
 } else if (startOverlayEl) {
   // Fallback: classic click-to-start if cutscene markup is missing.
   startOverlayEl.style.display = 'flex';
   startOverlayEl.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    sfx.unlock();
+    sfx.playConfirm();
     beginGame();
   });
 } else {
@@ -237,6 +254,8 @@ if (deathRestartBtn) {
   deathRestartBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    sfx.unlock();
+    sfx.playRespawn();
     // Hard reset: reload page to reset all runtime state
     window.location.reload();
   });
@@ -1216,6 +1235,7 @@ function spawnBaseDefensePirates(st) {
 function onPirateBaseDeath(st) {
   if (st.dead) return;
   st.dead = true;
+  sfx.playExplosion('base');
   
   const drops = st.drops || [
     { item: 'scrap', quantity: 50 },
@@ -1450,6 +1470,7 @@ function updatePirates(dt) {
               color: bulletProfile.bulletColor
             });
          }
+         sfx.playEnemyShot(p.pirateArchetype);
     }
     }
 
@@ -1465,6 +1486,7 @@ function updatePirates(dt) {
     // Death: drop 3-5 scrap only if not fromBaseSpawn
     if (p.health <= 0) {
         spawnSparks(p.x, p.y, 15);
+        sfx.playExplosion('pirate');
         if (!p.fromBaseSpawn) {
           const scrapCount = 3 + Math.floor(Math.random() * 3);
           for (let k = 0; k < scrapCount; k++) {
@@ -1530,6 +1552,7 @@ function update(dt) {
     if (hit) {
       const impactSpeed = bounceEntity(ship, hit.nx, hit.ny, BOUNCE_RESTITUTION);
       if (impactSpeed > 0) {
+        sfx.playShipCollision(impactSpeed / 200);
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
         const currentHealth = ast.health ?? ast.radius;
@@ -1549,6 +1572,7 @@ function update(dt) {
     if (hit) {
       const impactSpeed = bounceEntity(ship, hit.nx, hit.ny, BOUNCE_RESTITUTION);
       if (impactSpeed > 0) {
+        sfx.playShipCollision(impactSpeed / 200);
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
         player.health = Math.max(0, player.health - damage);
         const sparkOffset = shipCollisionRadius * 0.7 + (SHIP_SIZE * shipScale * 0.3);
@@ -1578,14 +1602,19 @@ function update(dt) {
   const selectedItem = hotbar[selectedSlot];
   const miningLaser = selectedItem && MINING_LASER_STATS[selectedItem.item] ? selectedItem : null;
   const laserStats = miningLaser ? MINING_LASER_STATS[miningLaser.item] : null;
+  let laserFiringNow = false;
 
   if (miningLaser && laserStats && miningLaser.heat != null) {
-    if (miningLaser.heat >= 1) miningLaser.overheated = true;
+    if (miningLaser.heat >= 1) {
+      if (!miningLaser.overheated) sfx.playOverheat();
+      miningLaser.overheated = true;
+    }
     if (miningLaser.heat <= 0) miningLaser.overheated = false;
     if (miningLaser.heat > 0) hudDirty = true;
 
     const canFire = !miningLaser.overheated;
     if (miningLaser && input.leftMouseDown && hasEnergy && canFire) {
+      laserFiringNow = true;
       miningLaser.heat = Math.min(1, miningLaser.heat + laserStats.heatRate * dt);
       hudDirty = true;
       const cell = inventory.getFirstChargedCell();
@@ -1690,6 +1719,7 @@ function update(dt) {
           const n = Math.floor(sparkCarry);
           if (n > 0) {
             spawnSparks(hitX, hitY, n);
+            sfx.playImpact('laser');
             sparkCarry -= n;
           }
         }
@@ -1698,12 +1728,22 @@ function update(dt) {
       miningLaser.heat = Math.max(0, miningLaser.heat - laserStats.coolRate * dt);
     }
   }
+  if (laserFiringNow) {
+    if (!laserWasFiring) sfx.startLaserLoop();
+    sfx.updateLaserHeat(miningLaser?.heat ?? 0);
+  } else if (laserWasFiring) {
+    sfx.stopLaserLoop();
+  }
+  laserWasFiring = laserFiringNow;
 
   // Blasters (light / medium / large): unified logic via BLASTER_STATS
   const blasterItem = hotbar[selectedSlot] && BLASTER_STATS[hotbar[selectedSlot].item] ? hotbar[selectedSlot] : null;
   const bStats = blasterItem ? BLASTER_STATS[blasterItem.item] : null;
   if (blasterItem && bStats && blasterItem.heat != null) {
-    if (blasterItem.heat >= 1) blasterItem.overheated = true;
+    if (blasterItem.heat >= 1) {
+      if (!blasterItem.overheated) sfx.playOverheat();
+      blasterItem.overheated = true;
+    }
     if (blasterItem.heat <= 0) blasterItem.overheated = false;
     if (blasterItem.heat > 0) hudDirty = true;
     const blasterCanFire = !blasterItem.overheated;
@@ -1717,6 +1757,7 @@ function update(dt) {
         c.energy = Math.max(0, c.energy - bStats.energyPerShot);
         blasterItem.heat = Math.min(1, blasterItem.heat + bStats.heatPerShot);
         fireBlasterPellet(bStats.pirateDmg, bStats.asteroidDmg);
+        sfx.playPlayerBlaster(blasterItem.heat);
         hudDirty = true;
       }
     } else {
@@ -1778,6 +1819,7 @@ function update(dt) {
           if (b.owner === 'player') ast.health -= (b.asteroidDmg ?? BULLET_DAMAGE_ASTEROID);
           remove = true;
           spawnSparks(b.x, b.y, 3);
+          sfx.playImpact('bullet');
           break;
         }
       }
@@ -1794,6 +1836,7 @@ function update(dt) {
             st.aggroed = true;
             remove = true;
             spawnSparks(b.x, b.y, 4);
+            sfx.playImpact('bullet');
             if (st.health <= 0) onPirateBaseDeath(st);
             break;
           }
@@ -1811,6 +1854,7 @@ function update(dt) {
                 if (p.defendingBase) p.defendingBase.aggroed = true;
                 remove = true;
                 spawnSparks(b.x, b.y, 2);
+                sfx.playImpact('bullet');
                 break;
             }
         }
@@ -1837,6 +1881,7 @@ function update(dt) {
               }
               remove = true;
               spawnSparks(b.x, b.y, 4);
+              sfx.playImpact('playerHit');
           }
       }
     }
@@ -1870,6 +1915,7 @@ function update(dt) {
   for (let i = asteroids.length - 1; i >= 0; i--) {
     if (asteroids[i].health <= 0) {
       const ast = asteroids[i];
+      sfx.playExplosion('asteroid');
       if (ast._mesh && asteroidContainer) asteroidContainer.remove(ast._mesh);
       const oreCount = calculateOreCount(ast.radius);
       if (oreCount > 0) {
@@ -1983,6 +2029,7 @@ function update(dt) {
           }
         }
         if (added) {
+          sfx.playPickup('resource');
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
@@ -1996,6 +2043,7 @@ function update(dt) {
           }
         }
         if (added) {
+          sfx.playPickup('resource');
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
@@ -2009,6 +2057,7 @@ function update(dt) {
           }
         }
         if (added) {
+          sfx.playPickup('resource');
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
@@ -2026,6 +2075,7 @@ function update(dt) {
           }
         }
         if (added) {
+          sfx.playPickup('resource');
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
@@ -2040,10 +2090,12 @@ function update(dt) {
           }
         }
         if (added) {
+          sfx.playPickup('weapon');
           if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
           floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
         }
       } else if (inventory.add(item.item, item.quantity)) {
+        sfx.playPickup(ORE_ITEMS.includes(item.item) ? 'ore' : 'generic');
         if (item._mesh && floatingOreContainer) floatingOreContainer.remove(item._mesh);
         floatingItems[i] = floatingItems[floatingItems.length - 1]; floatingItems.pop();
       }
@@ -2053,6 +2105,8 @@ function update(dt) {
 
   // Death: show overlay + pause game (one-shot)
   if (!deathScreenOpen && player.health <= 0) {
+    sfx.playDeath();
+    sfx.stopLaserLoop();
     deathScreenOpen = true;
     gamePaused = true;
     // Clear latched inputs so nothing keeps firing/thrusting
@@ -2613,6 +2667,7 @@ canvas.addEventListener('wheel', (e) => {
   } else {
     selectedSlot = (selectedSlot - 1 + slotCount) % slotCount;
   }
+  sfx.playHotbarSelect();
   markHUDDirty();
 });
 
@@ -3010,6 +3065,7 @@ function returnSellAreaToHotbar() {
 }
 
 window.addEventListener('keydown', (e) => {
+  sfx.resumeIfNeeded();
   if (startScreenOpen || deathScreenOpen) return;
   if (warpMenuOpen) return;
   // Allow E to close any open menu
@@ -3032,6 +3088,7 @@ window.addEventListener('keydown', (e) => {
   // Hotbar slot selection (1-9)
   if (e.key >= '1' && e.key <= '9') {
     selectedSlot = parseInt(e.key) - 1;
+    sfx.playHotbarSelect();
     markHUDDirty();
   }
   // Key in E position (KeyE): open warp gate/shop/crafting/refinery/shipyard menu when inside
@@ -3041,8 +3098,11 @@ window.addEventListener('keydown', (e) => {
       input.leftMouseDown = false;
       input.rightMouseDown = false;
       input.ctrlBrake = false;
+      sfx.stopLaserLoop();
+      laserWasFiring = false;
       gamePaused = true;
       warpMenuOpen = true;
+      sfx.playMenuOpen();
       const overlay = document.getElementById('warp-menu-overlay');
       if (overlay) overlay.style.display = 'flex';
       const payBtn = document.getElementById('warp-pay-btn');
@@ -3301,7 +3361,10 @@ if (levelSelect) {
       try { localStorage.setItem(LEVEL_STORAGE_KEY, idx); } catch (_) {}
       fetch(lev.path + '?t=' + Date.now())
         .then(res => res.json())
-        .then(level => loadLevel(level, Number(idx)))
+        .then(level => {
+          sfx.playLevelChange();
+          loadLevel(level, Number(idx));
+        })
         .catch(err => console.error('Failed to load ' + lev.path, err));
     }
   });
@@ -3321,6 +3384,7 @@ fetch(KNOWN_LEVELS[initialLevelIdx].path + '?t=' + Date.now())
   .catch(() => {});
 
 function closeWarpMenu() {
+  sfx.playMenuClose();
   warpMenuOpen = false;
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   const overlay = document.getElementById('warp-menu-overlay');
@@ -3329,6 +3393,7 @@ function closeWarpMenu() {
 
 function openShopMenu(shopStructure) {
   if (shopMenuOpen) return;
+  sfx.playMenuOpen();
   
   activeShopStructure = shopStructure;
   
@@ -3362,6 +3427,8 @@ function openShopMenu(shopStructure) {
   }
 
   gamePaused = true;
+  sfx.stopLaserLoop();
+  laserWasFiring = false;
   shopMenuOpen = true;
   for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
   syncShopBuyArea();
@@ -3377,6 +3444,7 @@ function openShopMenu(shopStructure) {
 }
 
 function closeShopMenu() {
+  sfx.playMenuClose();
   returnSellAreaToHotbar();
   shopMenuOpen = false;
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
@@ -3393,28 +3461,42 @@ const warpMenuOverlay = document.getElementById('warp-menu-overlay');
 const warpPayBtn = document.getElementById('warp-pay-btn');
 const warpCancelBtn = document.getElementById('warp-cancel-btn');
 if (warpCancelBtn) {
-  warpCancelBtn.addEventListener('click', () => closeWarpMenu());
+  warpCancelBtn.addEventListener('click', () => {
+    sfx.unlock();
+    sfx.playCancel();
+    closeWarpMenu();
+  });
 }
 if (warpPayBtn) {
   warpPayBtn.addEventListener('click', () => {
+    sfx.unlock();
     if (player.credits >= 3000) {
       player.credits -= 3000;
+      sfx.playWarp();
+      sfx.playConfirm();
       closeWarpMenu();
+    } else {
+      sfx.playCancel();
     }
   });
 }
 
 const shopCloseBtn = document.getElementById('shop-close-btn');
 if (shopCloseBtn) {
-  shopCloseBtn.addEventListener('click', () => closeShopMenu());
+  shopCloseBtn.addEventListener('click', () => {
+    sfx.unlock();
+    closeShopMenu();
+  });
 }
 
 const shopSellBtn = document.getElementById('shop-sell-btn');
 if (shopSellBtn) {
   shopSellBtn.addEventListener('click', () => {
+    sfx.unlock();
     const total = getSellTotal();
     if (total <= 0) return;
     player.credits += total;
+    sfx.playSell();
     for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
     syncShopSellArea();
     updateHUD();
@@ -3424,9 +3506,12 @@ if (shopSellBtn) {
 // Crafting Menu Logic
 function openCraftingMenu(structure) {
   if (craftingMenuOpen) return;
+  sfx.playMenuOpen();
   activeCraftingStructure = structure;
   craftingMenuOpen = true;
   gamePaused = true;
+  sfx.stopLaserLoop();
+  laserWasFiring = false;
   
   // Clear slots
   for(let i=0; i<craftingInputSlots.length; i++) craftingInputSlots[i] = null;
@@ -3453,6 +3538,7 @@ function openCraftingMenu(structure) {
 }
 
 function closeCraftingMenu() {
+  sfx.playMenuClose();
   // Return items to inventory or drop them
   for(let i=0; i<craftingInputSlots.length; i++) {
     if (craftingInputSlots[i]) {
@@ -3573,6 +3659,7 @@ function checkCraftingRecipe() {
 
 function craftItem(recipe) {
     if (craftingOutputSlot && craftingOutputSlot.real) return;
+  sfx.playCraft();
 
     // Consume inputs
     // Deep copy inputs to avoid modifying recipe definition
@@ -3600,16 +3687,22 @@ function craftItem(recipe) {
 
 const craftingCloseBtn = document.getElementById('crafting-close-btn');
 if (craftingCloseBtn) {
-  craftingCloseBtn.addEventListener('click', () => closeCraftingMenu());
+  craftingCloseBtn.addEventListener('click', () => {
+    sfx.unlock();
+    closeCraftingMenu();
+  });
 }
 
 // ============ Refinery Menu Logic ============
 
 function openRefineryMenu(structure) {
   if (refineryMenuOpen) return;
+  sfx.playMenuOpen();
   activeRefineryStructure = structure;
   refineryMenuOpen = true;
   gamePaused = true;
+  sfx.stopLaserLoop();
+  laserWasFiring = false;
 
   // Clear slots
   for (let i = 0; i < 4; i++) refineryInputSlots[i] = null;
@@ -3629,6 +3722,7 @@ function openRefineryMenu(structure) {
 }
 
 function closeRefineryMenu() {
+  sfx.playMenuClose();
   // Return unprocessed items to inventory or drop them
   for (let i = 0; i < 4; i++) {
     if (refineryInputSlots[i]) {
@@ -3754,6 +3848,7 @@ function checkRefineryRecipe() {
 
 function refineOre(oreType, totalOre, refinedName, outputQty) {
   if (refineryOutputSlot && refineryOutputSlot.real) return;
+  sfx.playRefine();
 
   // Consume input ores: consume outputQty * 2 ores
   let toConsume = outputQty * 2;
@@ -3775,7 +3870,10 @@ function refineOre(oreType, totalOre, refinedName, outputQty) {
 
 const refineryCloseBtn = document.getElementById('refinery-close-btn');
 if (refineryCloseBtn) {
-  refineryCloseBtn.addEventListener('click', () => closeRefineryMenu());
+  refineryCloseBtn.addEventListener('click', () => {
+    sfx.unlock();
+    closeRefineryMenu();
+  });
 }
 
 // ============ End Refinery Menu Logic ============
@@ -3828,6 +3926,9 @@ function switchShip(type) {
     player.credits -= stats.price;
     ownedShips.add(type);
     isNewlyBought = true;
+    sfx.playBuy();
+  } else {
+    sfx.playConfirm();
   }
 
   // Save current ship's resource state
@@ -3970,9 +4071,12 @@ function createShipPreview(container, shipType) {
 
 function openShipyardMenu(structure) {
   if (shipyardMenuOpen) return;
+  sfx.playMenuOpen();
   shipyardMenuOpen = true;
   activeShipyardStructure = structure;
   gamePaused = true;
+  sfx.stopLaserLoop();
+  laserWasFiring = false;
 
   renderShipyardCards(structure);
 
@@ -4112,6 +4216,7 @@ function renderShipyardCards(structure) {
 }
 
 function closeShipyardMenu() {
+  sfx.playMenuClose();
   cleanupShipyardPreviews();
   shipyardMenuOpen = false;
   activeShipyardStructure = null;
@@ -4122,7 +4227,10 @@ function closeShipyardMenu() {
 
 const shipyardCloseBtn = document.getElementById('shipyard-close-btn');
 if (shipyardCloseBtn) {
-  shipyardCloseBtn.addEventListener('click', () => closeShipyardMenu());
+  shipyardCloseBtn.addEventListener('click', () => {
+    sfx.unlock();
+    closeShipyardMenu();
+  });
 }
 
 // Extended inventory hover listeners
@@ -4325,6 +4433,7 @@ function tryHandleResourceBarDrop(drag, dropTarget) {
         const addAmount = it[cfg.prop] !== undefined ? it[cfg.prop] : 10;
         player[cfg.playerProp] = Math.min(player[cfg.maxProp], player[cfg.playerProp] + addAmount);
         hotbar[drag.fromSlot] = null;
+        sfx.playUseResource(barType);
         updateHUD();
         return true;
       }
@@ -4338,6 +4447,8 @@ function tryHandleResourceBarDrop(drag, dropTarget) {
           player.credits -= price;
           const addAmount = it[cfg.prop] !== undefined ? it[cfg.prop] : 10;
           player[cfg.playerProp] = Math.min(player[cfg.maxProp], player[cfg.playerProp] + addAmount);
+          sfx.playBuy();
+          sfx.playUseResource(barType);
           removeFromShopInventory(it.item);
           shopBuySlots[drag.fromBuySlot] = null;
           syncShopBuyArea();
@@ -4407,6 +4518,7 @@ function tryHandleJettisonDrop(drag, targetSlotEl) {
         floatingItems.push(floatItem);
       }
       hotbar[from] = null;
+      sfx.playJettison();
       updateHUD();
     }
   }
@@ -4481,6 +4593,7 @@ function tryHandleBuyDrag(drag, targetSlotEl, slotKinds) {
   if (to < 0 || hotbar[to] || player.credits < drag.price) return false;
 
   player.credits -= drag.price;
+  sfx.playBuy();
   hotbar[to] = { ...it };
   removeFromShopInventory(it.item);
   shopBuySlots[from] = null;

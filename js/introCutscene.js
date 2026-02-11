@@ -178,7 +178,7 @@ function generateMap() {
 
 // ─── Typewriter Engine ──────────────────────────────────────────────────────
 
-function runTypewriter(el, script, onDone) {
+function runTypewriter(el, script, onDone, onCharTyped = null) {
   let lineIdx = 0;
   let charIdx = 0;
   let waitTimer = 0;
@@ -219,6 +219,7 @@ function runTypewriter(el, script, onDone) {
       waitTimer -= dt;
       if (waitTimer <= 0) {
         charIdx++;
+        if (onCharTyped) onCharTyped();
         if (charIdx >= script[lineIdx].text.length) {
           // Finished this line
           lines.push(script[lineIdx].text);
@@ -264,6 +265,8 @@ export function playIntroCutscene(mapCanvas, dialogueEl, overlayEl, onComplete, 
   const onBlendStart = (typeof hooks.onBlendStart === 'function') ? hooks.onBlendStart : null;
   const onBlendProgress = (typeof hooks.onBlendProgress === 'function') ? hooks.onBlendProgress : null;
   const onBlendComplete = (typeof hooks.onBlendComplete === 'function') ? hooks.onBlendComplete : null;
+  const onTypeChar = (typeof hooks.onTypeChar === 'function') ? hooks.onTypeChar : null;
+  const onSkip = (typeof hooks.onSkip === 'function') ? hooks.onSkip : null;
 
   // Size the visible canvas to match its CSS layout
   const rect = mapCanvas.getBoundingClientRect();
@@ -284,7 +287,7 @@ export function playIntroCutscene(mapCanvas, dialogueEl, overlayEl, onComplete, 
   let lastNow = performance.now();
   let blendStarted = false;
 
-  const typewriter = runTypewriter(dialogueEl, SCRIPT, () => { dialogueDone = true; });
+  const typewriter = runTypewriter(dialogueEl, SCRIPT, () => { dialogueDone = true; }, onTypeChar);
 
   function clearOverlayBlendStyles() {
     overlayEl.style.opacity = '';
@@ -330,6 +333,7 @@ export function playIntroCutscene(mapCanvas, dialogueEl, overlayEl, onComplete, 
 
   function skip() {
     if (done) return;
+    if (onSkip) onSkip();
     typewriter.skipToEnd();
     // Draw final frame at the end of the single timeline.
     drawMapFrame(TOTAL_DURATION);
