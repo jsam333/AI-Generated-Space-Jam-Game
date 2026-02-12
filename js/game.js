@@ -3329,7 +3329,7 @@ function loadLevel(levelData, levelIdx) {
   });
 
   // Health multipliers by ore type
-  const oreHealthMult = { cuprite: 1, hematite: 3, aurite: 5, diamite: 8, platinite: 12 };
+  const oreHealthMult = { cuprite: 1, hematite: 2.2, aurite: 3.7, diamite: 5.5, platinite: 8 };
   asteroids = (levelData.asteroids || []).map(ast => {
     const baseHealth = ast.radius;
     const mult = oreHealthMult[ast.oreType] || 1;

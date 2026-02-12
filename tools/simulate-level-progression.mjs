@@ -13,10 +13,10 @@ const DEFAULT_RUNS = 1000;
 
 const ORE_HEALTH_MULT = Object.freeze({
   cuprite: 1,
-  hematite: 3,
-  aurite: 5,
-  diamite: 8,
-  platinite: 12
+  hematite: 2.2,
+  aurite: 3.7,
+  diamite: 5.5,
+  platinite: 8
 });
 
 const PIRATE_TYPE_HEALTH = Object.freeze({

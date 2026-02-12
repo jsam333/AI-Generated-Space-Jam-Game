@@ -27,8 +27,8 @@ export const WEAPON_ENERGY_DRAIN = 1;
 
 export const MINING_LASER_STATS = {
   'mining laser':       { heatRate: 1, coolRate: 1 / 3, dps: 7, energyDrain: 0.75 },
-  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 10, energyDrain: 0.9 },
-  'large mining laser':  { heatRate: 1 / 2.2, coolRate: 1 / 3, dps: 16, energyDrain: 1.125 }
+  'medium mining laser': { heatRate: 1 / 1.5, coolRate: 1 / 3, dps: 15, energyDrain: 1.2 },
+  'large mining laser':  { heatRate: 1 / 2.2, coolRate: 1 / 3, dps: 25, energyDrain: 1.5 }
 };
 
 export const BLASTER_ENERGY_PER_SHOT = 0.15;
@@ -38,8 +38,8 @@ export const BLASTER_FIRE_RATE = 10;
 
 export const BLASTER_STATS = {
   'light blaster':  { energyPerShot: 0.15, heatPerShot: 0.09, coolRate: 1 / 3, fireRate: 10, pirateDmg: 3, asteroidDmg: 0.5 },
-  'medium blaster': { energyPerShot: 0.225, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 5, asteroidDmg: 0.9 },
-  'large blaster':  { energyPerShot: 0.375, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 9, asteroidDmg: 1.8 }
+  'medium blaster': { energyPerShot: 0.225, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 6, asteroidDmg: 1 },
+  'large blaster':  { energyPerShot: 0.375, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 11, asteroidDmg: 2 }
 };
 
 export const OXYGEN_DEPLETION_RATE = 1 / 25;
