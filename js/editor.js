@@ -25,7 +25,7 @@ const CONSTANTS = {
   DEFAULT_LEVEL_SIZE: 5000,
   DEFAULT_SEED: 12345,
   ASTEROID_SIZE_MIN: 10,
-  ASTEROID_SIZE_MAX: 300,
+  ASTEROID_SIZE_MAX: 500,
   ASTEROID_SIZE_STEP: 10
 };
 
@@ -1053,7 +1053,7 @@ function renderShipyardProperties(parent, obj) {
   shipsDiv.className = 'prop-group';
   shipsDiv.innerHTML = `<label>Available Ships</label>`;
   
-  const shipTypes = ['scout', 'cutter', 'transport'];
+  const shipTypes = ['scout', 'cutter', 'transport', 'frigate', 'carrier'];
   
   shipTypes.forEach(type => {
     const row = document.createElement('div');
@@ -1251,7 +1251,7 @@ function handlePlaceObject(world) {
       st.recipes = [];
     }
     if (type === 'shipyard') {
-      st.availableShips = ['scout', 'cutter', 'transport'];
+      st.availableShips = ['scout', 'cutter', 'transport', 'frigate', 'carrier'];
     }
     if (type === 'refinery') {
       st.acceptedOres = ['cuprite'];

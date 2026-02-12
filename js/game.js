@@ -30,7 +30,7 @@ const SHIP_MODEL_FILES = {
   transport: 'transport.glb'
 };
 const shipModelSources = { scout: null, cutter: null, transport: null };
-const PLAYER_SHIP_Y_OFFSET_BY_TYPE = { scout: 3, cutter: 5, transport: 5 };
+const PLAYER_SHIP_Y_OFFSET_BY_TYPE = { scout: 3, cutter: 5, transport: 5, frigate: 5, carrier: 5 };
 const SHIP_PREVIEW_Y_OFFSET_FACTOR = 0.15; // Scout baseline nudge factor in preview.
 // Small asteroid 3D models (radius 10-30)
 let smallAsteroidModels = [null, null, null];
@@ -66,6 +66,7 @@ let MAX_SPEED = MAX_SPEED_DEFAULT;
 let shipCollisionRadius = SHIP_COLLISION_RADIUS;
 let shipScale = 1.0;
 let shipDamageMult = 1.0;
+let shipDamageReduction = 0;
 let shipSlowTimer = 0;
 let shipSlowVisualActive = false;
 const SHIP_SLOW_DURATION = 3;
@@ -197,6 +198,23 @@ const lowResourceState = {
   fuel: false,
   oxygen: false
 };
+
+function applyPlayerDamage(amount) {
+  const damage = Math.max(0, Number(amount) || 0);
+  if (damage <= 0) return 0;
+  const reducedDamage = damage * (1 - shipDamageReduction);
+  player.health = Math.max(0, player.health - reducedDamage);
+  return reducedDamage;
+}
+
+function getShipCollisionRadiusByScale(stats) {
+  const scoutStats = SHIP_STATS.scout || {};
+  const scoutScale = Number(scoutStats.shipScale) || 1;
+  const scoutRadius = Number(scoutStats.collisionRadius) || SHIP_COLLISION_RADIUS;
+  const shipScaleValue = Number(stats?.shipScale) || scoutScale;
+  return scoutRadius * (shipScaleValue / scoutScale);
+}
+
 let refineryMenuOpen = false;
 let activeShopStructure = null;
 let activeCraftingStructure = null;
@@ -1643,13 +1661,13 @@ function update(dt) {
       if (impactSpeed > 0) {
         sfx.playShipCollision(impactSpeed / 200);
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
-        player.health = Math.max(0, player.health - damage);
+        const appliedDamage = applyPlayerDamage(damage);
         const currentHealth = ast.health ?? ast.radius;
-        ast.health = Math.max(0, currentHealth - damage / 2);
+        ast.health = Math.max(0, currentHealth - appliedDamage / 2);
         const sparkOffset = shipCollisionRadius * 0.7 + (SHIP_SIZE * shipScale * 0.3);
         const sparkX = ship.x - hit.nx * sparkOffset;
         const sparkY = ship.y - hit.ny * sparkOffset;
-        spawnSparks(sparkX, sparkY, Math.max(2, Math.round(damage)));
+        spawnSparks(sparkX, sparkY, Math.max(2, Math.round(appliedDamage)));
       }
     }
   }
@@ -1663,15 +1681,15 @@ function update(dt) {
       if (impactSpeed > 0) {
         sfx.playShipCollision(impactSpeed / 200);
         const damage = Math.min(MAX_COLLISION_DAMAGE, impactSpeed * DAMAGE_PER_SPEED);
-        player.health = Math.max(0, player.health - damage);
+        const appliedDamage = applyPlayerDamage(damage);
         const sparkOffset = shipCollisionRadius * 0.7 + (SHIP_SIZE * shipScale * 0.3);
         const sparkX = ship.x - hit.nx * sparkOffset;
         const sparkY = ship.y - hit.ny * sparkOffset;
-        spawnSparks(sparkX, sparkY, Math.max(2, Math.round(damage)));
+        spawnSparks(sparkX, sparkY, Math.max(2, Math.round(appliedDamage)));
         if (st.type === 'piratebase') {
           st.aggroed = true;
           const currentHealth = st.health ?? 100;
-          st.health = Math.max(0, currentHealth - damage / 2);
+          st.health = Math.max(0, currentHealth - appliedDamage / 2);
           if (st.health <= 0) onPirateBaseDeath(st);
         }
       }
@@ -1685,7 +1703,7 @@ function update(dt) {
   
   // No oxygen: drain health at 1 per second
   if (player.oxygen <= 0) {
-    player.health = Math.max(0, player.health - 1 * dt);
+    applyPlayerDamage(1 * dt);
   }
 
   // Mining lasers (light + medium): unified logic via MINING_LASER_STATS
@@ -1798,7 +1816,9 @@ function update(dt) {
         if (target) {
           // Apply damage multiplier only to pirates/pirate bases, not asteroids
           const isEnemy = target.defendingBase !== undefined || target.type === 'piratebase';
-          target.health -= laserStats.dps * dt * (isEnemy ? shipDamageMult : 1);
+          // Mining lasers deal 30% less damage to pirates than to asteroids
+          const pirateDmgMult = 0.7;
+          target.health -= laserStats.dps * dt * (isEnemy ? shipDamageMult * pirateDmgMult : 1);
           if (target.defendingBase) target.defendingBase.aggroed = true;
           if (target.type === 'piratebase') {
             target.aggroed = true;
@@ -1959,7 +1979,7 @@ function update(dt) {
           if (dist < shipCollisionRadius) {
               const bulletDamage = Number.isFinite(Number(b.damage)) ? Number(b.damage) : BULLET_DAMAGE;
               const bulletArchetype = normalizePirateArchetype(b.pirateArchetype);
-              player.health = Math.max(0, player.health - bulletDamage);
+              applyPlayerDamage(bulletDamage);
               if (bulletArchetype === 'slowing') {
                 shipSlowTimer = SHIP_SLOW_DURATION;
                 setShipSlowVisual(true);
@@ -4027,9 +4047,10 @@ function applyShipStats(type) {
   player.maxFuel = stats.fuel;
   player.maxOxygen = stats.oxygen;
   MAX_SPEED = stats.speed;
-  shipCollisionRadius = stats.collisionRadius;
+  shipCollisionRadius = getShipCollisionRadiusByScale(stats);
   shipScale = stats.shipScale;
   shipDamageMult = stats.damageMult;
+  shipDamageReduction = Math.max(0, Math.min(0.95, Number(stats.damageReduction) || 0));
   attachShipModelForType(type);
   // Resize inventory
   const excess = inventory.resize(stats.slots);
@@ -4234,6 +4255,14 @@ function renderShipyardCards(structure) {
   ownedContainer.innerHTML = '';
 
   const available = structure.availableShips || ['scout'];
+  const shipyardOrder = ['scout', 'cutter', 'transport', 'frigate', 'carrier'];
+  const shipOrderRank = new Map(shipyardOrder.map((type, index) => [type, index]));
+  const compareShipOrder = (a, b) => {
+    const rankA = shipOrderRank.has(a) ? shipOrderRank.get(a) : Number.MAX_SAFE_INTEGER;
+    const rankB = shipOrderRank.has(b) ? shipOrderRank.get(b) : Number.MAX_SAFE_INTEGER;
+    if (rankA !== rankB) return rankA - rankB;
+    return String(a).localeCompare(String(b));
+  };
 
   function makeCard(type, mode) {
     const stats = SHIP_STATS[type];
@@ -4271,7 +4300,11 @@ function renderShipyardCards(structure) {
       ['O2', stats.oxygen],
       ['Speed', stats.speed],
       ['Slots', stats.slots],
+      ['Drones', stats.droneSlots ?? 0],
     ];
+    if ((stats.damageReduction ?? 0) > 0) {
+      statEntries.push(['Dmg Resist', `${Math.round((stats.damageReduction || 0) * 100)}%`]);
+    }
     if (stats.damageMult > 1) {
       statEntries.push(['Wpn Dmg', `+${Math.round((stats.damageMult - 1) * 100)}%`]);
     }
@@ -4325,7 +4358,7 @@ function renderShipyardCards(structure) {
   }
 
   // For-sale section (unowned ships available here)
-  const forSale = available.filter(t => !ownedShips.has(t));
+  const forSale = available.filter(t => !ownedShips.has(t)).sort(compareShipOrder);
   if (forSale.length > 0) {
     forSaleSection.style.display = '';
     forSale.forEach(type => {
@@ -4337,7 +4370,7 @@ function renderShipyardCards(structure) {
   }
 
   // Owned ships section
-  const ownedArr = [...ownedShips];
+  const ownedArr = [...ownedShips].sort(compareShipOrder);
   if (ownedArr.length > 0) {
     ownedSection.style.display = '';
     ownedArr.forEach(type => {

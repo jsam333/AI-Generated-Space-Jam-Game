@@ -77,9 +77,11 @@ export const STRUCTURE_STYLES = {
 };
 
 export const SHIP_STATS = {
-  'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 9,  collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, desc: 'Standard issue scout ship.' },
-  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 14, collisionRadius: 11, shipScale: 1.3, damageMult: 1.3, desc: 'Sturdy mining vessel. 30% bonus weapon damage vs pirates and bases.' },
-  'transport': { name: 'Transport', price: 5000, health: 60, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 14, shipScale: 1.4, damageMult: 1.0, desc: 'Heavy transport with 18 inventory slots.' }
+  'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 9,  collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, damageReduction: 0,    droneSlots: 0,  desc: 'Standard issue scout ship.' },
+  'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 14, collisionRadius: 10.4, shipScale: 1.3, damageMult: 1.3, damageReduction: 0,    droneSlots: 0,  desc: 'Sturdy mining vessel. 30% bonus weapon damage vs pirates and bases.' },
+  'transport': { name: 'Transport', price: 5000,  health: 60, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 11.2, shipScale: 1.4, damageMult: 1.0, damageReduction: 0,    droneSlots: 0,  desc: 'Heavy transport with 18 inventory slots.' },
+  'frigate':   { name: 'Frigate',   price: 8000,  health: 80, fuel: 60, oxygen: 60, speed: 175, slots: 25, collisionRadius: 12,   shipScale: 1.5, damageMult: 1.0, damageReduction: 0.10, droneSlots: 5,  desc: 'Defensive combat hull. Takes 10% less damage from all sources.' },
+  'carrier':   { name: 'Carrier',   price: 10000, health: 120, fuel: 90, oxygen: 60, speed: 175, slots: 27, collisionRadius: 13.6, shipScale: 1.7, damageMult: 1.0, damageReduction: 0,    droneSlots: 20, desc: 'Heavy capital ship with expanded storage and drone bays.' }
 };
 
 export const ITEM_USAGE = {

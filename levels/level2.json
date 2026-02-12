@@ -6840,30 +6840,30 @@
       "inventory": [
         {
           "item": "health pack",
-          "quantity": 3,
+          "quantity": 5,
           "health": 10
         },
         {
           "item": "small energy cell",
-          "quantity": 4,
+          "quantity": 5,
           "energy": 10,
           "maxEnergy": 10
         },
         {
           "item": "medium energy cell",
-          "quantity": 2,
+          "quantity": 3,
           "energy": 30,
           "maxEnergy": 30
         },
         {
           "item": "fuel tank",
-          "quantity": 5,
+          "quantity": 6,
           "fuel": 10,
           "maxFuel": 10
         },
         {
           "item": "oxygen canister",
-          "quantity": 1,
+          "quantity": 2,
           "oxygen": 10,
           "maxOxygen": 10
         }
@@ -6939,7 +6939,7 @@
             },
             {
               "item": "aurite",
-              "quantity": 10
+              "quantity": 5
             }
           ],
           "output": {
@@ -6982,7 +6982,7 @@
       ],
       "defenseCount": 12,
       "health": 250,
-      "spawnRate": 20,
+      "spawnRate": 30,
       "pirateArchetype": "standard"
     },
     {
@@ -7058,24 +7058,29 @@
         },
         {
           "item": "medium energy cell",
-          "quantity": 5,
+          "quantity": 4,
           "energy": 30,
           "maxEnergy": 30
         },
         {
+          "item": "health pack",
+          "quantity": 3,
+          "health": 10
+        },
+        {
           "item": "medium health pack",
-          "quantity": 1,
+          "quantity": 3,
           "health": 30
         },
         {
           "item": "oxygen canister",
-          "quantity": 2,
+          "quantity": 4,
           "oxygen": 10,
           "maxOxygen": 10
         },
         {
           "item": "fuel tank",
-          "quantity": 4,
+          "quantity": 5,
           "fuel": 10,
           "maxFuel": 10
         }
@@ -7089,13 +7094,13 @@
       "inventory": [
         {
           "item": "small energy cell",
-          "quantity": 6,
+          "quantity": 8,
           "energy": 10,
           "maxEnergy": 10
         },
         {
           "item": "oxygen canister",
-          "quantity": 4,
+          "quantity": 5,
           "oxygen": 10,
           "maxOxygen": 10
         },
@@ -7107,7 +7112,7 @@
         },
         {
           "item": "fuel tank",
-          "quantity": 2,
+          "quantity": 4,
           "fuel": 10,
           "maxFuel": 10
         }
@@ -7121,7 +7126,7 @@
       "inventory": [
         {
           "item": "small energy cell",
-          "quantity": 5,
+          "quantity": 8,
           "energy": 10,
           "maxEnergy": 10
         },
@@ -7132,8 +7137,14 @@
           "maxFuel": 10
         },
         {
+          "item": "medium fuel tank",
+          "quantity": 3,
+          "fuel": 30,
+          "maxFuel": 30
+        },
+        {
           "item": "health pack",
-          "quantity": 4,
+          "quantity": 5,
           "health": 10
         }
       ],
@@ -7227,7 +7238,7 @@
         }
       ],
       "health": 200,
-      "spawnRate": 25,
+      "spawnRate": 30,
       "defenseCount": 12,
       "pirateArchetype": "standard"
     },
@@ -7260,7 +7271,7 @@
           "inputs": [
             {
               "item": "hematite",
-              "quantity": 30
+              "quantity": 20
             }
           ],
           "output": {
@@ -7272,7 +7283,7 @@
           "inputs": [
             {
               "item": "aurite",
-              "quantity": 15
+              "quantity": 10
             }
           ],
           "output": {
@@ -7321,7 +7332,7 @@
         }
       ],
       "defenseCount": 12,
-      "spawnRate": 20,
+      "spawnRate": 30,
       "health": 250,
       "pirateArchetype": "standard"
     },
@@ -7332,7 +7343,7 @@
       "inventory": [
         {
           "item": "medium energy cell",
-          "quantity": 5,
+          "quantity": 6,
           "energy": 30,
           "maxEnergy": 30
         },
@@ -7343,13 +7354,13 @@
         },
         {
           "item": "fuel tank",
-          "quantity": 3,
+          "quantity": 4,
           "fuel": 10,
           "maxFuel": 10
         },
         {
           "item": "oxygen canister",
-          "quantity": 2,
+          "quantity": 3,
           "oxygen": 10,
           "maxOxygen": 10
         }

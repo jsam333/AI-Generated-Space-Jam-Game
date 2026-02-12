@@ -437,7 +437,10 @@
           "item": "warp key",
           "quantity": 1
         }
-      ]
+      ],
+      "pirateArchetype": "standard",
+      "spawnRate": 40,
+      "defenseCount": 8
     },
     {
       "x": 730,

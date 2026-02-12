@@ -1,9 +1,1108 @@
 {
-  "width": 6000,
-  "height": 6000,
+  "width": 5000,
+  "height": 5000,
   "seed": 999,
-  "asteroids": [],
-  "structures": [],
+  "asteroids": [
+    {
+      "x": 1865.6489066779613,
+      "y": -638.2043974008411,
+      "radius": 50,
+      "oreType": "hematite"
+    },
+    {
+      "x": -1229.7281192149967,
+      "y": 177.91094025596976,
+      "radius": 90,
+      "oreType": "aurite"
+    },
+    {
+      "x": -453.2865493092686,
+      "y": -753.6759949289262,
+      "radius": 200,
+      "oreType": "diamite"
+    },
+    {
+      "x": -216.82893857359886,
+      "y": 384.48371924459934,
+      "radius": 40,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1387.2010575141758,
+      "y": -1906.7170040216297,
+      "radius": 60,
+      "oreType": "hematite"
+    },
+    {
+      "x": -766.110167530891,
+      "y": -2298.3704984173337,
+      "radius": 200,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 2387.331191350129,
+      "y": 1801.8787903932202,
+      "radius": 170,
+      "oreType": "hematite"
+    },
+    {
+      "x": -1535.175226163119,
+      "y": 784.640604397282,
+      "radius": 100,
+      "oreType": "platinite"
+    },
+    {
+      "x": -2186.6118034813553,
+      "y": 1315.4399511404335,
+      "radius": 210,
+      "oreType": "hematite"
+    },
+    {
+      "x": 1702.1272704005241,
+      "y": 874.6510068885982,
+      "radius": 80,
+      "oreType": "hematite"
+    },
+    {
+      "x": 609.6539134159684,
+      "y": 2270.7713954150677,
+      "radius": 120,
+      "oreType": "hematite"
+    },
+    {
+      "x": 866.5947953704745,
+      "y": -397.92446070350707,
+      "radius": 150,
+      "oreType": "platinite"
+    },
+    {
+      "x": 419.1127442754805,
+      "y": 1301.709966501221,
+      "radius": 70,
+      "oreType": "aurite"
+    },
+    {
+      "x": -2202.6813705451787,
+      "y": 2107.6765982434154,
+      "radius": 50,
+      "oreType": "platinite"
+    },
+    {
+      "x": 402.2311920425819,
+      "y": -1064.0814616407022,
+      "radius": 180,
+      "oreType": "aurite"
+    },
+    {
+      "x": -1695.0247972272336,
+      "y": -1265.0199350900948,
+      "radius": 100,
+      "oreType": "platinite"
+    },
+    {
+      "x": 793.2609564159065,
+      "y": 916.4723998401314,
+      "radius": 60,
+      "oreType": "hematite"
+    },
+    {
+      "x": -822.7454021107405,
+      "y": -1192.2708398196846,
+      "radius": 40,
+      "oreType": "aurite"
+    },
+    {
+      "x": 861.3805309869349,
+      "y": -842.7303971257061,
+      "radius": 40,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -424.09794172272086,
+      "y": 1319.7437254711986,
+      "radius": 100,
+      "oreType": "hematite"
+    },
+    {
+      "x": 206.01061813503622,
+      "y": -525.9838820703419,
+      "radius": 60,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1713.3983329404145,
+      "y": -1637.7595695666969,
+      "radius": 100,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1427.979179425165,
+      "y": -594.6941336151212,
+      "radius": 180,
+      "oreType": "diamite"
+    },
+    {
+      "x": -2438.6674310522717,
+      "y": 1747.6059144607466,
+      "radius": 140,
+      "oreType": "platinite"
+    },
+    {
+      "x": 2409.9208903498948,
+      "y": -1150.7702863309532,
+      "radius": 120,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1939.1097667556073,
+      "y": -1854.0309413580876,
+      "radius": 90,
+      "oreType": "platinite"
+    },
+    {
+      "x": 2431.9349008146673,
+      "y": 478.6612279713154,
+      "radius": 80,
+      "oreType": "diamite"
+    },
+    {
+      "x": 300.27377160849977,
+      "y": -2424.2719685587845,
+      "radius": 130,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1263.9465311076492,
+      "y": -150.00898274593055,
+      "radius": 130,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1931.3432648777962,
+      "y": 855.2655624225736,
+      "radius": 60,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1975.9951380547136,
+      "y": -1570.0607071630657,
+      "radius": 170,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1354.7515170648694,
+      "y": 1258.024520939216,
+      "radius": 110,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1243.160009616986,
+      "y": -251.11225782893598,
+      "radius": 80,
+      "oreType": "aurite"
+    },
+    {
+      "x": -59.76586020551622,
+      "y": 2060.113900806755,
+      "radius": 190,
+      "oreType": "aurite"
+    },
+    {
+      "x": -2480.3152843378484,
+      "y": -882.284288527444,
+      "radius": 80,
+      "oreType": "hematite"
+    },
+    {
+      "x": 610.2565547917038,
+      "y": 171.88378842547536,
+      "radius": 60,
+      "oreType": "platinite"
+    },
+    {
+      "x": 462.987192440778,
+      "y": -1579.4714097864926,
+      "radius": 170,
+      "oreType": "diamite"
+    },
+    {
+      "x": -886.1948829144239,
+      "y": -1310.0422802381217,
+      "radius": 50,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1744.1006656736135,
+      "y": -203.73746752738953,
+      "radius": 190,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1841.905805049464,
+      "y": -1326.6669306904078,
+      "radius": 90,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1916.829627007246,
+      "y": 608.5262214764953,
+      "radius": 90,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1664.1484882706218,
+      "y": -2209.125872800081,
+      "radius": 220,
+      "oreType": "hematite"
+    },
+    {
+      "x": 1181.13633710891,
+      "y": -1287.5353510025889,
+      "radius": 210,
+      "oreType": "platinite"
+    },
+    {
+      "x": 2003.2495714258403,
+      "y": -450.6149876397103,
+      "radius": 140,
+      "oreType": "platinite"
+    },
+    {
+      "x": -1789.0433757565916,
+      "y": 275.7189283147454,
+      "radius": 130,
+      "oreType": "diamite"
+    },
+    {
+      "x": -2246.8210489023477,
+      "y": -1492.298545781523,
+      "radius": 50,
+      "oreType": "diamite"
+    },
+    {
+      "x": 36.615519784390926,
+      "y": -1354.495579143986,
+      "radius": 120,
+      "oreType": "aurite"
+    },
+    {
+      "x": 2005.8368158061057,
+      "y": -1245.9504092112184,
+      "radius": 90,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1953.4781877882779,
+      "y": 2080.0100755877793,
+      "radius": 180,
+      "oreType": "aurite"
+    },
+    {
+      "x": -771.3965454604477,
+      "y": -908.1159497145563,
+      "radius": 130,
+      "oreType": "diamite"
+    },
+    {
+      "x": 2349.529111525044,
+      "y": 673.8970486912876,
+      "radius": 90,
+      "oreType": "platinite"
+    },
+    {
+      "x": -2294.626359362155,
+      "y": -25.79005784355104,
+      "radius": 150,
+      "oreType": "aurite"
+    },
+    {
+      "x": 168.15183800645173,
+      "y": -2055.9085032436997,
+      "radius": 190,
+      "oreType": "aurite"
+    },
+    {
+      "x": 2230.53494351916,
+      "y": -891.3370221853256,
+      "radius": 100,
+      "oreType": "hematite"
+    },
+    {
+      "x": 1057.407152839005,
+      "y": -2491.36392143555,
+      "radius": 40,
+      "oreType": "platinite"
+    },
+    {
+      "x": -1060.6107139028609,
+      "y": -827.1613332908601,
+      "radius": 150,
+      "oreType": "hematite"
+    },
+    {
+      "x": -2096.231555333361,
+      "y": -285.7990760821849,
+      "radius": 110,
+      "oreType": "hematite"
+    },
+    {
+      "x": -226.05530568398535,
+      "y": -2119.0114156343043,
+      "radius": 120,
+      "oreType": "platinite"
+    },
+    {
+      "x": 390.3774363091503,
+      "y": 2382.198642993803,
+      "radius": 100,
+      "oreType": "hematite"
+    },
+    {
+      "x": 97.32784237712622,
+      "y": 859.9181845784187,
+      "radius": 150,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1484.7521553747356,
+      "y": 195.95584133639932,
+      "radius": 80,
+      "oreType": "hematite"
+    },
+    {
+      "x": 71.79049076512456,
+      "y": -2318.6873306985945,
+      "radius": 50,
+      "oreType": "hematite"
+    },
+    {
+      "x": -2419.5706530008465,
+      "y": 2064.723753137514,
+      "radius": 130,
+      "oreType": "hematite"
+    },
+    {
+      "x": -44.63650519028306,
+      "y": 1384.297184413299,
+      "radius": 100,
+      "oreType": "platinite"
+    },
+    {
+      "x": 280.59091967907625,
+      "y": 119.8151038217533,
+      "radius": 140,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1931.236118543893,
+      "y": -649.1225794889033,
+      "radius": 70,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1766.6732019279152,
+      "y": 566.2325804587454,
+      "radius": 90,
+      "oreType": "hematite"
+    },
+    {
+      "x": -2377.227732213214,
+      "y": -1113.930584397167,
+      "radius": 50,
+      "oreType": "aurite"
+    },
+    {
+      "x": -2479.754185769707,
+      "y": -1532.9079842194915,
+      "radius": 60,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 2152.6590920984745,
+      "y": -1740.5483743641526,
+      "radius": 50,
+      "oreType": "diamite"
+    },
+    {
+      "x": 983.0975055228919,
+      "y": 513.4267942048609,
+      "radius": 110,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1193.8919930253178,
+      "y": -2268.7692753970623,
+      "radius": 90,
+      "oreType": "diamite"
+    },
+    {
+      "x": -2393.4439511504024,
+      "y": -2084.222584962845,
+      "radius": 150,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1867.9110740777105,
+      "y": -926.7159702721983,
+      "radius": 50,
+      "oreType": "hematite"
+    },
+    {
+      "x": -1940.9811426885426,
+      "y": 1572.9311131872237,
+      "radius": 70,
+      "oreType": "aurite"
+    },
+    {
+      "x": 781.0217619407922,
+      "y": 1501.2030978687108,
+      "radius": 180,
+      "oreType": "diamite"
+    },
+    {
+      "x": -494.80662564747036,
+      "y": 1846.203920431435,
+      "radius": 90,
+      "oreType": "hematite"
+    },
+    {
+      "x": -2098.260869970545,
+      "y": 2419.6349957492203,
+      "radius": 110,
+      "oreType": "diamite"
+    },
+    {
+      "x": -773.7416191957891,
+      "y": 1449.0740443579853,
+      "radius": 90,
+      "oreType": "platinite"
+    },
+    {
+      "x": -407.8605049289763,
+      "y": -1301.8422643654048,
+      "radius": 170,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -736.6763196667174,
+      "y": 650.3073718437229,
+      "radius": 500,
+      "oreType": "aurite"
+    },
+    {
+      "x": -1417.4668495656147,
+      "y": -1900.1168521058778,
+      "radius": 450,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1044.473671601853,
+      "y": 172.62855938007556,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1091.8757322846488,
+      "y": 267.43268074566674,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 963.8901684411006,
+      "y": 291.1337110870646,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1049.2138776701327,
+      "y": 381.19762638437624,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 850.1252228023911,
+      "y": 419.11927493061273,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1139.2777929674444,
+      "y": 585.0264873203973,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1272.003562879272,
+      "y": 433.3398931354514,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1295.70459322067,
+      "y": 566.0656630472791,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1158.2386172405627,
+      "y": 480.74195381824705,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1404.7293327910998,
+      "y": 395.4182445892149,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1167.7190293771218,
+      "y": 163.14814724351646,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1343.1066539034655,
+      "y": -50.16112582906379,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1276.7437689475516,
+      "y": 186.84917758491423,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1603.8179876588413,
+      "y": 333.79556570158064,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1556.4159269760457,
+      "y": 82.5646440827639,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1774.4654061169056,
+      "y": 343.27597783813974,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1793.4262303900236,
+      "y": 205.81000185803248,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1087.1355262163693,
+      "y": -92.82298044357984,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1167.7190293771218,
+      "y": 11.461553058570487,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1352.5870660400246,
+      "y": 82.5646440827639,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1215.1210900599174,
+      "y": 352.7563899746989,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1053.9540837384122,
+      "y": 92.04505621932303,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1475.8324238152932,
+      "y": 186.84917758491423,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1660.700460478196,
+      "y": 253.2120625408281,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1399.9891267228202,
+      "y": 286.39350501878505,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1513.7540723615298,
+      "y": 485.4821598865266,
+      "radius": 10,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1219.861296128197,
+      "y": 234.25123826770985,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 916.488107758305,
+      "y": 148.92752903867776,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 954.4097563045415,
+      "y": -7.499271214547747,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1537.4551027029274,
+      "y": -7.499271214547747,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1253.0427386061538,
+      "y": -140.22504112637546,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1655.9602544099166,
+      "y": 68.34402587792522,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1594.3375755222823,
+      "y": 201.06979578975293,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1452.1313934738953,
+      "y": 603.9873115935156,
+      "radius": 10,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1404.7293327910998,
+      "y": 504.4429841596448,
+      "radius": 10,
+      "oreType": "hematite"
+    },
+    {
+      "x": 1433.1705692007772,
+      "y": 215.29041399459163,
+      "radius": 10,
+      "oreType": "hematite"
+    },
+    {
+      "x": 1234.0819143330357,
+      "y": 87.30485015104347,
+      "radius": 10,
+      "oreType": "hematite"
+    },
+    {
+      "x": 1020.7726412604553,
+      "y": 25.682171263409174,
+      "radius": 10,
+      "oreType": "hematite"
+    },
+    {
+      "x": 902.2674895534662,
+      "y": 238.99144433598943,
+      "radius": 10,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 883.306665280348,
+      "y": 92.04505621932303,
+      "radius": 10,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1466.352011678734,
+      "y": 73.08423194620478,
+      "radius": 10,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1314.665417493788,
+      "y": 319.57494749674197,
+      "radius": 10,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1518.4942784298091,
+      "y": 348.0161839064193,
+      "radius": 10,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1532.7148966346479,
+      "y": 257.95226860910765,
+      "radius": 10,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1162.9788233088423,
+      "y": 291.1337110870646,
+      "radius": 20,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1229.341708264756,
+      "y": -2.7590651462681848,
+      "radius": 20,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1376.2880963814223,
+      "y": 196.32958972147338,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1025.512847328735,
+      "y": 257.95226860910765,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1352.5870660400246,
+      "y": 513.9233962962039,
+      "radius": 20,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1409.4695388593793,
+      "y": 125.22649869727996,
+      "radius": 20,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1125.0571747626057,
+      "y": 115.74608656072084,
+      "radius": 20,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1461.6118056104544,
+      "y": 329.05535963330107,
+      "radius": 30,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1186.67985365024,
+      "y": -88.08277437530029,
+      "radius": 30,
+      "oreType": "platinite"
+    }
+  ],
+  "structures": [
+    {
+      "x": -56.7102202530578,
+      "y": 331.22189055300555,
+      "type": "shop",
+      "inventory": [
+        {
+          "item": "medium mining laser",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "medium blaster",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "medium energy cell",
+          "quantity": 4,
+          "energy": 30,
+          "maxEnergy": 30
+        },
+        {
+          "item": "medium oxygen canister",
+          "quantity": 3,
+          "oxygen": 30,
+          "maxOxygen": 30
+        },
+        {
+          "item": "medium fuel tank",
+          "quantity": 3,
+          "fuel": 30,
+          "maxFuel": 30
+        },
+        {
+          "item": "medium health pack",
+          "quantity": 2,
+          "health": 30
+        }
+      ],
+      "prices": {}
+    },
+    {
+      "x": -314.71326982816294,
+      "y": -302.7284598315385,
+      "type": "shipyard",
+      "availableShips": [
+        "frigate",
+        "carrier"
+      ]
+    },
+    {
+      "x": 304.4940491520893,
+      "y": -140.55511438432956,
+      "type": "crafting",
+      "recipes": [
+        {
+          "inputs": [
+            {
+              "item": "cuprite",
+              "quantity": 15
+            }
+          ],
+          "output": {
+            "item": "small energy cell",
+            "quantity": 1
+          }
+        },
+        {
+          "inputs": [
+            {
+              "item": "hematite",
+              "quantity": 10
+            }
+          ],
+          "output": {
+            "item": "fuel tank",
+            "quantity": 1
+          }
+        },
+        {
+          "inputs": [
+            {
+              "item": "hematite",
+              "quantity": 10
+            }
+          ],
+          "output": {
+            "item": "health pack",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    {
+      "x": 1376.822638825382,
+      "y": -1635.9294822943655,
+      "type": "shop",
+      "inventory": [
+        {
+          "item": "large mining laser",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 3,
+          "energy": 60,
+          "maxEnergy": 60
+        },
+        {
+          "item": "large fuel tank",
+          "quantity": 2,
+          "fuel": 60,
+          "maxFuel": 60
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 8,
+          "fuel": 10,
+          "maxFuel": 10
+        }
+      ],
+      "prices": {}
+    },
+    {
+      "x": 828.1257938322409,
+      "y": -1930.6000101610523,
+      "type": "piratebase",
+      "tier": 3,
+      "pirateArchetype": "shotgun",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "large health pack",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 40
+        }
+      ],
+      "health": 300,
+      "defenseCount": 10,
+      "spawnRate": 35
+    },
+    {
+      "x": 1493.674744703551,
+      "y": 1940.7610628461105,
+      "type": "piratebase",
+      "tier": 5,
+      "pirateArchetype": "breaching",
+      "defenseTypePercentages": {
+        "normal": 25,
+        "sturdy": 25,
+        "fast": 50
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 25,
+        "sturdy": 25,
+        "fast": 50
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 70
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 1
+        }
+      ],
+      "health": 450,
+      "defenseCount": 14,
+      "spawnRate": 25
+    },
+    {
+      "x": -1371.742112482853,
+      "y": 1371.742112482853,
+      "type": "piratebase",
+      "tier": 4,
+      "pirateArchetype": "slowing",
+      "defenseTypePercentages": {
+        "normal": 2,
+        "sturdy": 100,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 0,
+        "sturdy": 100,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "large fuel tank",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 50
+        }
+      ],
+      "health": 350,
+      "defenseCount": 10
+    },
+    {
+      "x": -1955.2252885154003,
+      "y": -3.8501287729171736,
+      "type": "shop",
+      "inventory": [
+        {
+          "item": "large blaster",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "medium energy cell",
+          "quantity": 2,
+          "energy": 30,
+          "maxEnergy": 30
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 2,
+          "energy": 60,
+          "maxEnergy": 60
+        },
+        {
+          "item": "large health pack",
+          "quantity": 2,
+          "health": 60
+        },
+        {
+          "item": "health pack",
+          "quantity": 8,
+          "health": 10
+        }
+      ],
+      "prices": {}
+    },
+    {
+      "x": -532.066041942531,
+      "y": 1579.7633465802269,
+      "type": "shop",
+      "inventory": [
+        {
+          "item": "medium energy cell",
+          "quantity": 3,
+          "energy": 30,
+          "maxEnergy": 30
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 3,
+          "energy": 60,
+          "maxEnergy": 60
+        },
+        {
+          "item": "large oxygen canister",
+          "quantity": 2,
+          "oxygen": 60,
+          "maxOxygen": 60
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 10,
+          "oxygen": 10,
+          "maxOxygen": 10
+        }
+      ],
+      "prices": {}
+    }
+  ],
   "spawnSettings": {
     "initialDelay": 60,
     "waveIntervalMin": 20,
