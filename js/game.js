@@ -1354,14 +1354,20 @@ function updatePirates(dt) {
 
       // Determine active tier based on the scheduled spawn time.
       let activeTier = null;
+      let nextTierStart = Infinity;
       if (levelSpawnSettings.tiers && levelSpawnSettings.tiers.length > 0) {
         // Find the tier with the highest startTime that is <= current time
         // Tiers should be sorted by startTime, but we'll iterate to be safe
         let bestStart = -1;
         for (const tier of levelSpawnSettings.tiers) {
-          if (t >= tier.startTime && tier.startTime > bestStart) {
-            bestStart = tier.startTime;
+          const tierStart = Number(tier.startTime);
+          if (!Number.isFinite(tierStart)) continue;
+          if (t >= tierStart && tierStart > bestStart) {
+            bestStart = tierStart;
             activeTier = tier;
+          }
+          if (tierStart > t && tierStart < nextTierStart) {
+            nextTierStart = tierStart;
           }
         }
       }
@@ -1375,10 +1381,14 @@ function updatePirates(dt) {
 
       spawnPirateGroup(minWave, maxWave, typePercentages);
 
-      // Schedule next wave (keep time moving forward even if dt is large)
+      // Schedule next wave (keep time moving forward even if dt is large).
+      // Clamp to the next tier boundary so phase start times are honored exactly.
       const rawInterval = minInt + Math.random() * (maxInt - minInt);
       const interval = Math.max(0.1, rawInterval);
-      pirateNextWaveTime += interval;
+      const nextByInterval = t + interval;
+      pirateNextWaveTime = Number.isFinite(nextTierStart)
+        ? Math.min(nextByInterval, nextTierStart)
+        : nextByInterval;
     }
   }
 
@@ -2943,9 +2953,9 @@ function getSlotHTML(it) {
   return html;
 }
 
-const SMALL_ENERGY_CELL_FULL_SELL = 150;
-const MEDIUM_ENERGY_CELL_FULL_SELL = 550;
-const LARGE_ENERGY_CELL_FULL_SELL = 1200;
+const SMALL_ENERGY_CELL_FULL_SELL = 100;
+const MEDIUM_ENERGY_CELL_FULL_SELL = 350;
+const LARGE_ENERGY_CELL_FULL_SELL = 750;
 const ENERGY_CELL_MIN_SELL = 10;
 
 function getItemSellPrice(item) {
@@ -2960,16 +2970,18 @@ function getItemSellPrice(item) {
     const chargeRatio = item.maxEnergy > 0 ? item.energy / item.maxEnergy : 0;
     return Math.max(ENERGY_CELL_MIN_SELL, Math.round(energyCellFullSell[item.item] * chargeRatio));
   }
-  // Consumable refill items sell for half of purchase price.
+  // Consumable refill items and buyable weapons sell for half of purchase price.
   if ([
     'fuel tank', 'medium fuel tank', 'large fuel tank',
     'oxygen canister', 'medium oxygen canister', 'large oxygen canister',
-    'health pack', 'medium health pack', 'large health pack'
+    'health pack', 'medium health pack', 'large health pack',
+    'light blaster', 'medium blaster', 'large blaster',
+    'medium mining laser', 'large mining laser'
   ].includes(item.item)) {
     const buy = ITEM_BUY_PRICE[item.item];
     return buy != null ? Math.floor(buy / 2) : 0;
   }
-  // Static prices for other items
+  // Static prices for ore, scrap, warp keys, base mining laser, etc.
   const price = ITEM_SELL_PRICE[item.item];
   return price != null ? price : 0;
 }

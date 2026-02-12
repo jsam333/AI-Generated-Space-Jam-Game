@@ -257,31 +257,29 @@ export const ITEM_DEFAULTS = {
 
 // --- Shop prices ---
 export const ITEM_BUY_PRICE = {
-  'small energy cell': 150,
-  'medium energy cell': 550,
-  'large energy cell': 1200,
-  'oxygen canister': 500,
-  'medium oxygen canister': 1250,
-  'large oxygen canister': 2000,
-  'fuel tank': 300,
-  'medium fuel tank': 750,
-  'large fuel tank': 1250,
+  'small energy cell': 100,
+  'medium energy cell': 350,
+  'large energy cell': 750,
+  'oxygen canister': 200,
+  'medium oxygen canister': 450,
+  'large oxygen canister': 800,
+  'fuel tank': 150,
+  'medium fuel tank': 350,
+  'large fuel tank': 600,
   'light blaster': 1000,
-  'medium blaster': 2500,
-  'large blaster': 5000,
+  'medium blaster': 2000,
+  'large blaster': 4000,
   'medium mining laser': 1500,
   'large mining laser': 3000,
-  'health pack': 400,
-  'medium health pack': 1000,
-  'large health pack': 1750
+  'health pack': 175,
+  'medium health pack': 400,
+  'large health pack': 800
 };
 
 export const ITEM_SELL_PRICE = {
   cuprite: 10, hematite: 20, aurite: 30, diamite: 40, platinite: 60,
   copper: 20, iron: 40, gold: 60, diamond: 80, platinum: 120,
-  scrap: 40, 'warp key': 500, 'mining laser': 300,
-  'light blaster': 500, 'medium blaster': 1250, 'large blaster': 2500,
-  'medium mining laser': 750, 'large mining laser': 1500
+  scrap: 40, 'warp key': 500, 'mining laser': 300
 };
 
 // --- Collidable structure types ---

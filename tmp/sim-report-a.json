@@ -1,0 +1,141 @@
+{
+  "config": {
+    "runs": 25,
+    "levels": [
+      "level1",
+      "level2",
+      "level3"
+    ],
+    "seed": 777
+  },
+  "summary": {
+    "total": {
+      "p50Seconds": 3205.8558627442167,
+      "p75Seconds": 3407.6394316749847,
+      "p90Seconds": 3509.0286822900566
+    },
+    "perLevel": {
+      "level1": {
+        "p50Seconds": 258.85377871173444,
+        "p75Seconds": 274.640066550147,
+        "p90Seconds": 317.6675654088398,
+        "p50Difficulty": 59.01364410130438,
+        "p75Difficulty": 63.198446610164886,
+        "p90Difficulty": 67.26167892133888,
+        "stageSummary": [
+          {
+            "name": "travel-and-orientation",
+            "p50Seconds": 25.59758866343017,
+            "p75Seconds": 28.812311514782813,
+            "p50Difficulty": 29.189500840917276,
+            "label": "easy"
+          },
+          {
+            "name": "resource-ramp",
+            "p50Seconds": 174.7853483834437,
+            "p75Seconds": 191.73357486299105,
+            "p50Difficulty": 54.48454633994094,
+            "label": "moderate"
+          },
+          {
+            "name": "combat-pressure",
+            "p50Seconds": 6.272149087803628,
+            "p75Seconds": 7.2137004190671,
+            "p50Difficulty": 49.27573242704868,
+            "label": "moderate"
+          },
+          {
+            "name": "exit-prep",
+            "p50Seconds": 52.73005878883346,
+            "p75Seconds": 66.59967482939703,
+            "p50Difficulty": 27.584429952088417,
+            "label": "easy"
+          }
+        ]
+      },
+      "level2": {
+        "p50Seconds": 1233.5048499371574,
+        "p75Seconds": 1337.3929942295376,
+        "p90Seconds": 1387.7573322073526,
+        "p50Difficulty": 98,
+        "p75Difficulty": 98,
+        "p90Difficulty": 98,
+        "stageSummary": [
+          {
+            "name": "travel-and-orientation",
+            "p50Seconds": 53.37847612251368,
+            "p75Seconds": 56.879414150232,
+            "p50Difficulty": 35.360539437290434,
+            "label": "moderate"
+          },
+          {
+            "name": "resource-ramp",
+            "p50Seconds": 898.1253306790359,
+            "p75Seconds": 972.7278484103475,
+            "p50Difficulty": 79,
+            "label": "hard"
+          },
+          {
+            "name": "combat-pressure",
+            "p50Seconds": 50.82827825038385,
+            "p75Seconds": 55.55732455283987,
+            "p50Difficulty": 57.53484848484849,
+            "label": "moderate"
+          },
+          {
+            "name": "exit-prep",
+            "p50Seconds": 255.3671018290928,
+            "p75Seconds": 341.4368436849328,
+            "p50Difficulty": 42.16969696969697,
+            "label": "moderate"
+          }
+        ]
+      },
+      "level3": {
+        "p50Seconds": 1739.1909027531258,
+        "p75Seconds": 1933.9125002837168,
+        "p90Seconds": 2077.5773244009706,
+        "p50Difficulty": 98,
+        "p75Difficulty": 98,
+        "p90Difficulty": 98,
+        "stageSummary": [
+          {
+            "name": "travel-and-orientation",
+            "p50Seconds": 35.38021031834598,
+            "p75Seconds": 40.74611006015516,
+            "p50Difficulty": 32.33174433796862,
+            "label": "easy"
+          },
+          {
+            "name": "resource-ramp",
+            "p50Seconds": 1197.1561012426391,
+            "p75Seconds": 1331.0986551332753,
+            "p50Difficulty": 79,
+            "label": "hard"
+          },
+          {
+            "name": "combat-pressure",
+            "p50Seconds": 231.4300971801553,
+            "p75Seconds": 281.17324451758174,
+            "p50Difficulty": 75.76666666666667,
+            "label": "hard"
+          },
+          {
+            "name": "exit-prep",
+            "p50Seconds": 326.31396294854915,
+            "p75Seconds": 360.6351442592821,
+            "p50Difficulty": 50,
+            "label": "moderate"
+          }
+        ]
+      }
+    }
+  },
+  "bottlenecks": [
+    "level2: highest pressure in \"resource-ramp\" (hard, P50 79.0)",
+    "level3: highest pressure in \"resource-ramp\" (hard, P50 79.0)"
+  ],
+  "warnings": [
+    "level1: warpgate points to missing level \"level6\""
+  ]
+}
