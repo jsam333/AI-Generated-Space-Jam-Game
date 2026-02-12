@@ -115,8 +115,12 @@ blasterImg.src = 'assets/blaster.png';
 ITEM_IMAGES['light blaster'] = blasterImg;
 ITEM_IMAGES['medium blaster'] = blasterImg;
 ITEM_IMAGES['large blaster'] = blasterImg;
-
-
+const warpKeyImg = new Image();
+warpKeyImg.src = 'assets/warp-key.png';
+ITEM_IMAGES['warp key'] = warpKeyImg;
+const warpKeyFragmentImg = new Image();
+warpKeyFragmentImg.src = 'assets/warp-key-fragment.png';
+ITEM_IMAGES['warp key fragment'] = warpKeyFragmentImg;
 
 // Ship (world coordinates, camera follows)
 const ship = {
@@ -171,6 +175,28 @@ let tutorialTextTimer = 0; // Time remaining for tutorial text (seconds)
 let tutorialTextTimerStarted = false; // True after player thrusts for the first time
 let tutorialTextWorldX = 0; // World X position of tutorial text
 let tutorialTextWorldY = 0; // World Y position of tutorial text
+const OXYGEN_BAR_COLOR = '#44aaff';
+const FUEL_BAR_COLOR = '#ffaa44';
+const HEALTH_BAR_COLOR = '#ff4444';
+const LOW_RESOURCE_THRESHOLD = 0.25;
+const OUTSIDE_BORDER_OXYGEN_DRAIN_RATE = 1; // additive, per second
+const SHIP_STATUS_TRANSIENT_DURATION = 0.75;
+const SHIP_STATUS_TRANSIENT_FADE_DURATION = 0.3;
+const SHIP_STATUS_PERSISTENT_FADE_DURATION = 0.225;
+const SHIP_STATUS_BASE_Y_OFFSET = 72;
+const SHIP_STATUS_LINE_SPACING = 16;
+const shipStatusTransient = [];
+const shipStatusPersistent = {
+  text: '',
+  color: '#fff',
+  active: false,
+  alpha: 0
+};
+const lowResourceState = {
+  health: false,
+  fuel: false,
+  oxygen: false
+};
 let refineryMenuOpen = false;
 let activeShopStructure = null;
 let activeCraftingStructure = null;
@@ -208,7 +234,6 @@ if (mainMenuOverlay && mainMenuStartBtn) {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
-    sfx.playConfirm();
     mainMenuOverlay.style.display = 'none';
     if (cutsceneOverlay && cutsceneMapCanvas && cutsceneDialogue) {
       cutsceneOverlay.style.display = 'flex';
@@ -238,7 +263,6 @@ if (mainMenuOverlay && mainMenuStartBtn) {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
-    sfx.playConfirm();
     beginGame();
   });
 } else {
@@ -321,6 +345,53 @@ function worldToScreen(wx, wy) {
     x: wx - ship.x + WIDTH / 2,
     y: wy - ship.y + HEIGHT / 2
   };
+}
+
+function pushShipStatusTransient(text, color, duration = SHIP_STATUS_TRANSIENT_DURATION, fadeDuration = SHIP_STATUS_TRANSIENT_FADE_DURATION) {
+  shipStatusTransient.push({
+    text,
+    color,
+    remaining: Math.max(0.01, duration),
+    fadeDuration: Math.max(0.01, fadeDuration)
+  });
+}
+
+function setShipStatusPersistent(text, color, active) {
+  shipStatusPersistent.text = text;
+  shipStatusPersistent.color = color;
+  shipStatusPersistent.active = !!active;
+}
+
+function updateShipStatus(dt) {
+  const fadeOutRate = 1 / SHIP_STATUS_PERSISTENT_FADE_DURATION;
+  const fadeInRate = fadeOutRate * 0.6;
+  if (shipStatusPersistent.active) {
+    shipStatusPersistent.alpha = Math.min(1, shipStatusPersistent.alpha + fadeInRate * dt);
+  } else {
+    shipStatusPersistent.alpha = Math.max(0, shipStatusPersistent.alpha - fadeOutRate * dt);
+  }
+  for (let i = shipStatusTransient.length - 1; i >= 0; i--) {
+    const msg = shipStatusTransient[i];
+    msg.remaining -= dt;
+    if (msg.remaining <= 0) {
+      shipStatusTransient[i] = shipStatusTransient[shipStatusTransient.length - 1];
+      shipStatusTransient.pop();
+    }
+  }
+}
+
+function syncLowResourceStateFromPlayer() {
+  lowResourceState.health = player.maxHealth > 0 && (player.health / player.maxHealth) <= LOW_RESOURCE_THRESHOLD;
+  lowResourceState.fuel = player.maxFuel > 0 && (player.fuel / player.maxFuel) <= LOW_RESOURCE_THRESHOLD;
+  lowResourceState.oxygen = player.maxOxygen > 0 && (player.oxygen / player.maxOxygen) <= LOW_RESOURCE_THRESHOLD;
+}
+
+function maybeNotifyLowResource(key, value, max, text, color) {
+  const below = max > 0 && (value / max) <= LOW_RESOURCE_THRESHOLD;
+  if (below && !lowResourceState[key]) {
+    pushShipStatusTransient(text, color);
+  }
+  lowResourceState[key] = below;
 }
 
 // Laser raycast: find closest asteroid hit by a ray from (ox, oy) in direction (dx, dy)
@@ -918,8 +989,8 @@ function applyOreEmissiveMaterial(mesh, oreType) {
 }
 
 // Floating ore drops: self-lit like asteroids with ore-colored emissive tint
-const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key', 'copper', 'iron', 'gold', 'diamond', 'platinum']);
-const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A, copper: 0xB87333, iron: 0x696969, gold: 0xFFD700, diamond: 0xB9F2FF, platinum: 0xE5E4E2 };
+const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key', 'warp key fragment', 'copper', 'iron', 'gold', 'diamond', 'platinum']);
+const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A, 'warp key fragment': 0x8A7A44, copper: 0xB87333, iron: 0x696969, gold: 0xFFD700, diamond: 0xB9F2FF, platinum: 0xE5E4E2 };
 const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
 
 function getPirateBaseHitRadius(st) {
@@ -1545,6 +1616,14 @@ function update(dt) {
   // Position
   ship.x += ship.vx * dt;
   ship.y += ship.vy * dt;
+  const halfLevelWidth = levelWidth * 0.5;
+  const halfLevelHeight = levelHeight * 0.5;
+  const outsideLevelBorder =
+    ship.x < -halfLevelWidth ||
+    ship.x > halfLevelWidth ||
+    ship.y < -halfLevelHeight ||
+    ship.y > halfLevelHeight;
+  setShipStatusPersistent('oxygen---', OXYGEN_BAR_COLOR, outsideLevelBorder);
 
   // Ship–asteroid collision: bounce + damage
   for (const ast of asteroids) {
@@ -1590,7 +1669,9 @@ function update(dt) {
   }
 
   // Oxygen depletion
-  player.oxygen = Math.max(0, player.oxygen - OXYGEN_DEPLETION_RATE * dt);
+  let oxygenDrainPerSecond = OXYGEN_DEPLETION_RATE;
+  if (outsideLevelBorder) oxygenDrainPerSecond += OUTSIDE_BORDER_OXYGEN_DRAIN_RATE;
+  player.oxygen = Math.max(0, player.oxygen - oxygenDrainPerSecond * dt);
   
   // No oxygen: drain health at 1 per second
   if (player.oxygen <= 0) {
@@ -1874,9 +1955,13 @@ function update(dt) {
                 setShipSlowVisual(true);
               } else if (bulletArchetype === 'breaching') {
                 if (Math.random() < 0.5) {
+                  const prevOxygen = player.oxygen;
                   player.oxygen = Math.max(0, player.oxygen - 1);
+                  if (player.oxygen < prevOxygen) pushShipStatusTransient('oxygen-', OXYGEN_BAR_COLOR);
                 } else {
+                  const prevFuel = player.fuel;
                   player.fuel = Math.max(0, player.fuel - 1);
+                  if (player.fuel < prevFuel) pushShipStatusTransient('fuel-', FUEL_BAR_COLOR);
                 }
               }
               remove = true;
@@ -2102,6 +2187,10 @@ function update(dt) {
     }
   }
   if (floatingItems.length !== prevFloatingCount) hudDirty = true;
+  maybeNotifyLowResource('health', player.health, player.maxHealth, 'low health', HEALTH_BAR_COLOR);
+  maybeNotifyLowResource('fuel', player.fuel, player.maxFuel, 'low fuel', FUEL_BAR_COLOR);
+  maybeNotifyLowResource('oxygen', player.oxygen, player.maxOxygen, 'low oxygen', OXYGEN_BAR_COLOR);
+  updateShipStatus(dt);
 
   // Death: show overlay + pause game (one-shot)
   if (!deathScreenOpen && player.health <= 0) {
@@ -2204,8 +2293,8 @@ function render(dt = 1 / 60) {
     const { x, y } = worldToScreen(item.x, item.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
     // Draw small glowing circle - same fill/stroke as ore type
-    const oreFill = { cuprite: '#665544', hematite: '#8B4513', aurite: '#B8860B', diamite: '#787878', platinite: '#D3D3D3', scrap: '#888888', 'warp key': '#B8860B', copper: '#B87333', iron: '#696969', gold: '#FFD700', diamond: '#B9F2FF', platinum: '#E5E4E2' };
-    const oreStroke = { cuprite: '#998877', hematite: '#A0522D', aurite: '#FFD700', diamite: '#909090', platinite: '#E5E4E2', scrap: '#aaaaaa', 'warp key': '#DAA520', copper: '#D4915E', iron: '#8A8A8A', gold: '#FFE44D', diamond: '#DFFFFF', platinum: '#F0F0F0' };
+    const oreFill = { cuprite: '#665544', hematite: '#8B4513', aurite: '#B8860B', diamite: '#787878', platinite: '#D3D3D3', scrap: '#888888', 'warp key': '#B8860B', 'warp key fragment': '#8C7A45', copper: '#B87333', iron: '#696969', gold: '#FFD700', diamond: '#B9F2FF', platinum: '#E5E4E2' };
+    const oreStroke = { cuprite: '#998877', hematite: '#A0522D', aurite: '#FFD700', diamite: '#909090', platinite: '#E5E4E2', scrap: '#aaaaaa', 'warp key': '#DAA520', 'warp key fragment': '#C4AE62', copper: '#D4915E', iron: '#8A8A8A', gold: '#FFE44D', diamond: '#DFFFFF', platinum: '#F0F0F0' };
     ctx.fillStyle = item.energy != null ? '#448844' :
                     (item.fuel != null ? '#886622' :
                     (item.oxygen != null ? '#446688' :
@@ -2224,14 +2313,7 @@ function render(dt = 1 / 60) {
       const size = 18;
       ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
     } else {
-      const icon = item.item === 'cuprite' ? 'C' : 
-                   (item.item === 'hematite' ? 'H' : 
-                   (item.item === 'aurite' ? 'A' : 
-                   (item.item === 'diamite' ? 'D' : 
-                   (item.item === 'platinite' ? 'P' : 
-                   (item.item === 'scrap' ? 'S' : 
-                   (item.item === 'warp key' ? 'K' : 
-                   (item.item === 'mining laser' ? 'L' : (item.item === 'medium mining laser' ? 'M' : (item.item === 'light blaster' ? 'B' : item.item.charAt(0).toUpperCase())))))))));
+      const icon = getItemLabel(item);
       ctx.fillStyle = '#fff';
       ctx.font = '10px Oxanium';
       ctx.textAlign = 'center';
@@ -2267,7 +2349,7 @@ function render(dt = 1 / 60) {
     ctx.lineWidth = 2;
     if (is3D) {
       if (st.type === 'piratebase') {
-        ctx.strokeStyle = STRUCTURE_STYLES.piratebase;
+        ctx.strokeStyle = normalizePirateBaseTier(st.tier) === 5 ? '#552200' : STRUCTURE_STYLES.piratebase;
         ctx.setLineDash([10, 10]);
         ctx.beginPath();
         ctx.arc(x, y, getPirateBaseAggroRadius(st), 0, Math.PI * 2);
@@ -2574,6 +2656,40 @@ function render(dt = 1 / 60) {
     }
   }
 
+  // Ship status notifications
+  {
+    const visible = [];
+    if (shipStatusPersistent.alpha > 0 && shipStatusPersistent.text) {
+      visible.push({
+        text: shipStatusPersistent.text,
+        color: shipStatusPersistent.color,
+        alpha: shipStatusPersistent.alpha
+      });
+    }
+    for (let i = shipStatusTransient.length - 1; i >= 0; i--) {
+      const msg = shipStatusTransient[i];
+      const alpha = msg.remaining > msg.fadeDuration ? 1 : Math.max(0, msg.remaining / msg.fadeDuration);
+      if (alpha <= 0) continue;
+      visible.push({ text: msg.text, color: msg.color, alpha });
+    }
+    if (visible.length > 0) {
+      const { x, y } = worldToScreen(ship.x, ship.y);
+      ctx.font = 'bold 13px Oxanium';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (let i = 0; i < visible.length; i++) {
+        const msg = visible[i];
+        const msgY = y - SHIP_STATUS_BASE_Y_OFFSET - (i * SHIP_STATUS_LINE_SPACING);
+        ctx.fillStyle = `rgba(0,0,0,${msg.alpha})`;
+        ctx.fillText(msg.text, x + 1, msgY + 1);
+        ctx.fillStyle = msg.color;
+        ctx.globalAlpha = msg.alpha;
+        ctx.fillText(msg.text, x, msgY);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
   // Player stats meters (bottom right) - bar height in pixels = max value in units
   if (uiCtx) {
     const meterWidth = 40;
@@ -2617,9 +2733,9 @@ function render(dt = 1 / 60) {
       uiCtx.fillText(value.toFixed(1), x, meterY - barHeight - 2);
     }
 
-    drawMeter(rightmost - 100, player.oxygen, player.maxOxygen, '#44aaff', 'O2');
-    drawMeter(rightmost - 50, player.fuel, player.maxFuel, '#ffaa44', 'Fuel');
-    drawMeter(rightmost, player.health, player.maxHealth, '#ff4444', 'HP');
+    drawMeter(rightmost - 100, player.oxygen, player.maxOxygen, OXYGEN_BAR_COLOR, 'O2');
+    drawMeter(rightmost - 50, player.fuel, player.maxFuel, FUEL_BAR_COLOR, 'Fuel');
+    drawMeter(rightmost, player.health, player.maxHealth, HEALTH_BAR_COLOR, 'HP');
   }
 }
 
@@ -2917,7 +3033,8 @@ function syncShopBuyArea() {
       diamite: 'Diamite',
       platinite: 'Platinite',
       'scrap': 'Scrap',
-      'warp key': 'Warp Key'
+      'warp key': 'Warp Key',
+      'warp key fragment': 'Warp Key Fragment'
     };
     let html = '';
     
@@ -3288,6 +3405,11 @@ function loadLevel(levelData, levelIdx) {
   tutorialTextTimerStarted = false;
   tutorialTextWorldX = ship.x;
   tutorialTextWorldY = ship.y - 80; // Above the ship
+  shipStatusTransient.length = 0;
+  shipStatusPersistent.text = '';
+  shipStatusPersistent.color = '#fff';
+  shipStatusPersistent.active = false;
+  shipStatusPersistent.alpha = 0;
 
   // Level 3: start in transport ship
   if (currentLevelIdx === 2) {
@@ -3335,6 +3457,7 @@ function loadLevel(levelData, levelIdx) {
     selectedSlot = 0;
     hudDirty = true;
   }
+  syncLowResourceStateFromPlayer();
 }
 
 // Level select: scan known levels and populate dropdown

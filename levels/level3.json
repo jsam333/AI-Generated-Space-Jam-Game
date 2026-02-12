@@ -308,6 +308,96 @@
       "y": 991.4468428396522,
       "radius": 40,
       "oreType": "aurite"
+    },
+    {
+      "x": -657.2503163325954,
+      "y": -1032.3674587578444,
+      "radius": 230,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1707.5366644832047,
+      "y": 1298.1472469736686,
+      "radius": 70,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 1776.0812146517787,
+      "y": 784.0631207093642,
+      "radius": 50,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -194.9081003226977,
+      "y": -1030.8103097313528,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": -46.34143701379662,
+      "y": -975.097810990515,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": -167.05185095227876,
+      "y": -928.6707287064833,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": -83.48310284102195,
+      "y": -1030.8103097313528,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": -129.91018512505354,
+      "y": -984.3832274473212,
+      "radius": 30,
+      "oreType": "diamite"
+    },
+    {
+      "x": -148.4810180386661,
+      "y": 1336.970886754259,
+      "radius": 40,
+      "oreType": "diamite"
+    },
+    {
+      "x": -46.34143701379662,
+      "y": 1364.827136124678,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": -74.19768638421556,
+      "y": 1271.9729715566148,
+      "radius": 20,
+      "oreType": "diamite"
+    },
+    {
+      "x": 0.08564527023497703,
+      "y": 1290.5438044702273,
+      "radius": 30,
+      "oreType": "diamite"
+    },
+    {
+      "x": -1761.5641991738528,
+      "y": -333.37236253123365,
+      "radius": 50,
+      "oreType": "platinite"
+    },
+    {
+      "x": -1668.7100346057898,
+      "y": -188.93255098091316,
+      "radius": 70,
+      "oreType": "platinite"
+    },
+    {
+      "x": -1596.4901288306294,
+      "y": -374.6408801170395,
+      "radius": 60,
+      "oreType": "platinite"
     }
   ],
   "structures": [
@@ -316,7 +406,16 @@
       "y": -214.93504381542803,
       "type": "piratebase",
       "tier": 4,
-      "drops": [],
+      "drops": [
+        {
+          "item": "large energy cell",
+          "quantity": 3
+        },
+        {
+          "item": "scrap",
+          "quantity": 30
+        }
+      ],
       "defenseTypePercentages": {
         "normal": 50,
         "sturdy": 25,
@@ -470,8 +569,17 @@
       },
       "waveSpawnCount": 4,
       "pirateArchetype": "slowing",
-      "drops": [],
-      "health": 800,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 50
+        },
+        {
+          "item": "warp key fragment",
+          "quantity": 1
+        }
+      ],
+      "health": 600,
       "defenseCount": 22,
       "spawnRate": 10
     },
@@ -492,8 +600,17 @@
         "fast": 0
       },
       "waveSpawnCount": 4,
-      "drops": [],
-      "health": 800,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 50
+        },
+        {
+          "item": "warp key fragment",
+          "quantity": 1
+        }
+      ],
+      "health": 600,
       "defenseCount": 22,
       "spawnRate": 10
     },
@@ -514,8 +631,17 @@
         "fast": 0
       },
       "waveSpawnCount": 4,
-      "drops": [],
-      "health": 800,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 50
+        },
+        {
+          "item": "warp key fragment",
+          "quantity": 1
+        }
+      ],
+      "health": 600,
       "defenseCount": 22,
       "spawnRate": 10
     },
@@ -536,8 +662,17 @@
         "fast": 0
       },
       "waveSpawnCount": 8,
-      "drops": [],
-      "health": 800,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 50
+        },
+        {
+          "item": "warp key fragment",
+          "quantity": 1
+        }
+      ],
+      "health": 600,
       "defenseCount": 46,
       "spawnRate": 10
     },
@@ -582,48 +717,1265 @@
       "x": -221.0259080548392,
       "y": 971.4159841845891,
       "type": "shop",
-      "inventory": [],
+      "inventory": [
+        {
+          "item": "medium energy cell",
+          "quantity": 6,
+          "energy": 30,
+          "maxEnergy": 30
+        },
+        {
+          "item": "medium health pack",
+          "quantity": 3,
+          "health": 30
+        },
+        {
+          "item": "large health pack",
+          "quantity": 3,
+          "health": 60
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 3,
+          "fuel": 10,
+          "maxFuel": 10
+        }
+      ],
       "prices": {}
     },
     {
       "x": -1966.885642579632,
       "y": -1895.2726590473335,
       "type": "shop",
-      "inventory": [],
+      "inventory": [
+        {
+          "item": "small energy cell",
+          "quantity": 6,
+          "energy": 10,
+          "maxEnergy": 10
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 6,
+          "fuel": 10,
+          "maxFuel": 10
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 6,
+          "oxygen": 10,
+          "maxOxygen": 10
+        },
+        {
+          "item": "health pack",
+          "quantity": 6,
+          "health": 10
+        }
+      ],
       "prices": {}
     },
     {
       "x": 1545.5380321740968,
       "y": -836.912639175056,
       "type": "shop",
-      "inventory": [],
+      "inventory": [
+        {
+          "item": "medium mining laser",
+          "quantity": 1,
+          "heat": 0,
+          "overheated": false
+        },
+        {
+          "item": "medium energy cell",
+          "quantity": 5,
+          "energy": 30,
+          "maxEnergy": 30
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 3,
+          "energy": 60,
+          "maxEnergy": 60
+        },
+        {
+          "item": "large oxygen canister",
+          "quantity": 2,
+          "oxygen": 60,
+          "maxOxygen": 60
+        },
+        {
+          "item": "large fuel tank",
+          "quantity": 2,
+          "fuel": 60,
+          "maxFuel": 60
+        }
+      ],
       "prices": {}
+    },
+    {
+      "x": 703.7037037037037,
+      "y": -1103.7037037037037,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 1
+        },
+        {
+          "item": "health pack",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": -1955.5249604299768,
+      "y": -955.2619122448857,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 1
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": -598.3428670922134,
+      "y": 1436.7715272629227,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 1
+        },
+        {
+          "item": "health pack",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": 1225.3705708304067,
+      "y": 257.7195836757405,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 1
+        },
+        {
+          "item": "health pack",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": 1132.0643019134352,
+      "y": 1267.1237655957023,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "oxygen canister",
+          "quantity": 1
+        },
+        {
+          "item": "fuel tank",
+          "quantity": 1
+        },
+        {
+          "item": "health pack",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": 1922.0402426062496,
+      "y": -2156.3337925737223,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 1
+        },
+        {
+          "item": "health pack",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": -1401.9036851158621,
+      "y": 589.0590159412715,
+      "type": "piratebase",
+      "tier": 3,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 25,
+        "sturdy": 50,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 25,
+        "sturdy": 50,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 20
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 1
+        }
+      ],
+      "health": 300,
+      "defenseCount": 14,
+      "spawnRate": 30
+    },
+    {
+      "x": 1226.6059021726367,
+      "y": -1694.2315702517333,
+      "type": "piratebase",
+      "tier": 3,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 25,
+        "sturdy": 25,
+        "fast": 50
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 25,
+        "sturdy": 25,
+        "fast": 50
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 20
+        },
+        {
+          "item": "large oxygen canister",
+          "quantity": 1
+        }
+      ],
+      "health": 300,
+      "defenseCount": 14,
+      "spawnRate": 30
+    },
+    {
+      "x": -1595.7108436256133,
+      "y": 1770.0713881100671,
+      "type": "piratebase",
+      "tier": 3,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 20
+        },
+        {
+          "item": "large fuel tank",
+          "quantity": 1
+        }
+      ],
+      "health": 300,
+      "defenseCount": 14,
+      "spawnRate": 30
+    },
+    {
+      "x": -1450.3554747433002,
+      "y": -1294.5043058253718,
+      "type": "piratebase",
+      "tier": 3,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 25,
+        "sturdy": 50,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 25,
+        "sturdy": 50,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 20
+        },
+        {
+          "item": "large health pack",
+          "quantity": 1
+        }
+      ],
+      "health": 300,
+      "defenseCount": 14,
+      "spawnRate": 30
+    },
+    {
+      "x": 1130.7443950156714,
+      "y": -487.4763604697655,
+      "type": "piratebase",
+      "tier": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 30
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "large health pack",
+          "quantity": 1
+        }
+      ],
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 3,
+      "spawnRate": 20,
+      "defenseCount": 16,
+      "health": 400,
+      "pirateArchetype": "standard"
+    },
+    {
+      "x": 1058.066710574515,
+      "y": 2359.066280142203,
+      "type": "piratebase",
+      "tier": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 30
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "large fuel tank",
+          "quantity": 1
+        }
+      ],
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 3,
+      "spawnRate": 20,
+      "defenseCount": 16,
+      "health": 400,
+      "pirateArchetype": "standard"
+    },
+    {
+      "x": -1812.701824851173,
+      "y": 1099.3197498288214,
+      "type": "piratebase",
+      "tier": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 30
+        },
+        {
+          "item": "large energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "large oxygen canister",
+          "quantity": 1
+        }
+      ],
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 3,
+      "spawnRate": 20,
+      "defenseCount": 16,
+      "health": 400,
+      "pirateArchetype": "standard"
+    },
+    {
+      "x": -492.04142694049995,
+      "y": -1522.937381942088,
+      "type": "crafting",
+      "recipes": [
+        {
+          "inputs": [
+            {
+              "item": "cuprite",
+              "quantity": 40
+            },
+            {
+              "item": "hematite",
+              "quantity": 30
+            },
+            {
+              "item": "aurite",
+              "quantity": 30
+            },
+            {
+              "item": "diamite",
+              "quantity": 20
+            }
+          ],
+          "output": {
+            "item": "large mining laser",
+            "quantity": 1
+          }
+        },
+        {
+          "inputs": [
+            {
+              "item": "scrap",
+              "quantity": 20
+            },
+            {
+              "item": "cuprite",
+              "quantity": 10
+            }
+          ],
+          "output": {
+            "item": "medium fuel tank",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    {
+      "x": 742.9189618147407,
+      "y": 696.2771512346228,
+      "type": "crafting",
+      "recipes": [
+        {
+          "inputs": [
+            {
+              "item": "aurite",
+              "quantity": 50
+            },
+            {
+              "item": "diamite",
+              "quantity": 50
+            },
+            {
+              "item": "platinite",
+              "quantity": 50
+            }
+          ],
+          "output": {
+            "item": "large blaster",
+            "quantity": 1
+          }
+        },
+        {
+          "inputs": [
+            {
+              "item": "scrap",
+              "quantity": 25
+            },
+            {
+              "item": "hematite",
+              "quantity": 10
+            }
+          ],
+          "output": {
+            "item": "medium health pack",
+            "quantity": 1
+          }
+        }
+      ]
+    },
+    {
+      "x": 2243.546703925771,
+      "y": 1794.2530719094302,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        },
+        {
+          "item": "medium health pack",
+          "quantity": 2
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": -1522.2055257790148,
+      "y": -2291.3301690853505,
+      "type": "piratebase",
+      "tier": 2,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "oxygen canister",
+          "quantity": 2
+        },
+        {
+          "item": "scrap",
+          "quantity": 15
+        }
+      ],
+      "health": 250,
+      "defenseCount": 12,
+      "spawnRate": 40
+    },
+    {
+      "x": -1266.3419881441826,
+      "y": -704.7890208034864,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -1529.4287877536951,
+      "y": 2390.3497981319533,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -2286.591450682161,
+      "y": -1792.6729982737575,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 487.5700092525665,
+      "y": 1875.6396760200969,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 2379.043731935335,
+      "y": -829.7409212716209,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 63.42135628733956,
+      "y": -1838.526906702431,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 1840.2603078984255,
+      "y": 2219.543989235146,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -2641.959241004378,
+      "y": 1680.7605651982358,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 2401.9706861496716,
+      "y": -1540.476501916055,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -727.5585641072728,
+      "y": 694.9015339817624,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 670.9856429672593,
+      "y": 1061.732801411148,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -979.7550604649754,
+      "y": 1864.1761989129286,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 1691.2351055052375,
+      "y": 557.3398086957429,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -1850.9793206097659,
+      "y": 236.36244969503065,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": 2178.074502067605,
+      "y": 1102.856843897331,
+      "type": "piratebase",
+      "tier": 3,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 50,
+        "sturdy": 25,
+        "fast": 25
+      },
+      "waveSpawnCount": 4,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 20
+        },
+        {
+          "item": "medium energy cell",
+          "quantity": 1
+        },
+        {
+          "item": "medium health pack",
+          "quantity": 1
+        }
+      ],
+      "health": 300,
+      "defenseCount": 14,
+      "spawnRate": 30
+    },
+    {
+      "x": 917.4504007713779,
+      "y": -2062.064710292212,
+      "type": "piratebase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 34,
+        "sturdy": 33,
+        "fast": 33
+      },
+      "waveSpawnCount": 2,
+      "drops": [
+        {
+          "item": "scrap",
+          "quantity": 5
+        },
+        {
+          "item": "small energy cell",
+          "quantity": 3
+        }
+      ],
+      "health": 80,
+      "defenseCount": 6,
+      "spawnRate": 25
+    },
+    {
+      "x": -2025.9584412945173,
+      "y": 531.2249149011836,
+      "type": "warpgate",
+      "warpCost": 3000,
+      "warpDestination": "level2"
+    },
+    {
+      "x": -1175.1257430269775,
+      "y": 2176.49748513946,
+      "type": "shipyard",
+      "availableShips": [
+        "cutter",
+        "transport"
+      ]
     }
   ],
   "spawnSettings": {
     "initialDelay": 60,
-    "waveIntervalMin": 40,
-    "waveIntervalMax": 70,
+    "waveIntervalMin": 20,
+    "waveIntervalMax": 40,
     "waveSizeMin": 1,
-    "waveSizeMax": 2,
+    "waveSizeMax": 1,
     "tiers": [
       {
         "startTime": 300,
-        "waveIntervalMin": 30,
-        "waveIntervalMax": 60,
-        "waveSizeMin": 1,
-        "waveSizeMax": 3,
+        "waveIntervalMin": 50,
+        "waveIntervalMax": 80,
+        "waveSizeMin": 3,
+        "waveSizeMax": 5,
         "pirateTypePercentages": {
-          "normal": 100,
-          "sturdy": 0,
-          "fast": 0
+          "normal": 34,
+          "sturdy": 33,
+          "fast": 33
         }
       }
     ],
     "pirateTypePercentages": {
-      "normal": 100,
-      "sturdy": 0,
-      "fast": 0
+      "normal": 34,
+      "sturdy": 33,
+      "fast": 33
     }
   }
 }

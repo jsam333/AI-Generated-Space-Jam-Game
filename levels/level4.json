@@ -1,0 +1,33 @@
+{
+  "width": 6000,
+  "height": 6000,
+  "seed": 999,
+  "asteroids": [],
+  "structures": [],
+  "spawnSettings": {
+    "initialDelay": 60,
+    "waveIntervalMin": 20,
+    "waveIntervalMax": 50,
+    "waveSizeMin": 1,
+    "waveSizeMax": 1,
+    "tiers": [
+      {
+        "startTime": 300,
+        "waveIntervalMin": 50,
+        "waveIntervalMax": 80,
+        "waveSizeMin": 3,
+        "waveSizeMax": 5,
+        "pirateTypePercentages": {
+          "normal": 34,
+          "sturdy": 33,
+          "fast": 33
+        }
+      }
+    ],
+    "pirateTypePercentages": {
+      "normal": 34,
+      "sturdy": 33,
+      "fast": 33
+    }
+  }
+}

@@ -290,7 +290,7 @@ function drawStructure(ctx, x, y, type, isPreview = false, tier = 2, pirateArche
 
     if (type === 'piratebase') {
       const ar = PIRATE_BASE_AGGRO_RADIUS * getPirateBaseTierScale(tier) * z;
-      ctx.strokeStyle = '#ff3333';
+      ctx.strokeStyle = normalizePirateBaseTier(tier) === 5 ? '#bb2222' : '#ff3333';
       ctx.lineWidth = 2;
       ctx.globalAlpha = isPreview ? 0.6 : 0.95;
       ctx.setLineDash([dashA, dashB]);
@@ -906,7 +906,7 @@ const ALL_ITEM_NAMES = [
   'health pack', 'medium health pack', 'large health pack',
   'cuprite', 'hematite', 'aurite', 'diamite', 'platinite',
   'copper', 'iron', 'gold', 'diamond', 'platinum',
-  'scrap', 'warp key'
+  'scrap', 'warp key', 'warp key fragment'
 ];
 
 function createItemSelect(selectedValue) {

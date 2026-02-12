@@ -108,6 +108,7 @@ export const ITEM_USAGE = {
   'platinite': 'Extremely rare ore. Most valuable.',
   'scrap': 'Salvaged material. Can be sold for credits.',
   'warp key': 'Required to activate warp gates.',
+  'warp key fragment': 'A broken piece of a warp key. No known use yet.',
   'copper': 'Refined copper. More valuable than raw cuprite.',
   'iron': 'Refined iron. More valuable than raw hematite.',
   'gold': 'Refined gold. More valuable than raw aurite.',
@@ -141,6 +142,7 @@ export const ITEM_DISPLAY_NAMES = {
   'platinite': 'Platinite',
   'scrap': 'Scrap',
   'warp key': 'Warp Key',
+  'warp key fragment': 'Warp Key Fragment',
   'copper': 'Copper',
   'iron': 'Iron',
   'gold': 'Gold',
@@ -192,7 +194,9 @@ export const ITEM_IMAGE_PATHS = {
   'large mining laser': 'assets/laser.png',
   'light blaster': 'assets/blaster.png',
   'medium blaster': 'assets/blaster.png',
-  'large blaster': 'assets/blaster.png'
+  'large blaster': 'assets/blaster.png',
+  'warp key': 'assets/warp-key.png',
+  'warp key fragment': 'assets/warp-key-fragment.png'
 };
 
 // --- Item short labels (for HUD slot display) ---
@@ -222,6 +226,7 @@ export const ITEM_LABELS = {
   'platinite': 'P',
   'scrap': 'S',
   'warp key': 'K',
+  'warp key fragment': 'KF',
   'copper': 'Cu',
   'iron': 'Fe',
   'gold': 'Au',
@@ -302,7 +307,7 @@ export const ALL_ITEM_NAMES = [
   'health pack', 'medium health pack', 'large health pack',
   'cuprite', 'hematite', 'aurite', 'diamite', 'platinite',
   'copper', 'iron', 'gold', 'diamond', 'platinum',
-  'scrap', 'warp key'
+  'scrap', 'warp key', 'warp key fragment'
 ];
 
 // --- Resource bar drop configuration (used by endDrag) ---
