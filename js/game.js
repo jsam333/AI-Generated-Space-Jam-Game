@@ -131,6 +131,7 @@ ITEM_IMAGES['warp key fragment'] = warpKeyFragmentImg;
 const WARP_KEY_OPPORTUNITY_ITEMS = new Set(['warp key', 'warp key fragment']);
 const SAVE_STORAGE_KEY = 'spacejam-saves-v1';
 const SAVE_SCHEMA_VERSION = 1;
+const MAX_SAVES = 50;
 
 // Ship (world coordinates, camera follows)
 const ship = {
@@ -148,7 +149,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 0
+  credits: 10000  // TEST: start with 10k credits
 };
 
 // Inventory
@@ -183,6 +184,7 @@ let deathScreenOpen = false;
 let pauseMenuOpen = false;
 let saveBrowserOpen = false;
 let saveBrowserContext = 'main';
+let saveLoadInProgress = false;
 let hidePlayerShip = false;
 let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
 let interactPromptTarget = null; // Current structure showing prompt
@@ -532,7 +534,7 @@ function syncPauseVolumeUI() {
 }
 
 function openPauseMenu() {
-  if (pauseMenuOpen || startScreenOpen || deathScreenOpen || deathSequence.active) return;
+  if (pauseMenuOpen || startScreenOpen || deathScreenOpen || deathSequence.active || warpTransition.active) return;
   pauseMenuOpen = true;
   clearLatchedGameplayInput();
   gamePaused = true;
@@ -804,7 +806,7 @@ function readProgressSaves() {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed
-      .filter(save => save && typeof save.id === 'string' && Number.isInteger(save.currentLevelIdx))
+      .filter(save => save && typeof save.id === 'string' && Number.isInteger(save.currentLevelIdx) && save.version === SAVE_SCHEMA_VERSION)
       .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
   } catch (_) {
     return [];
@@ -871,6 +873,8 @@ function createProgressSaveSnapshot(targetLevelIdx) {
 function appendProgressSave(targetLevelIdx) {
   const saves = readProgressSaves();
   saves.unshift(createProgressSaveSnapshot(targetLevelIdx));
+  // Trim oldest saves to stay within cap
+  while (saves.length > MAX_SAVES) saves.pop();
   if (!writeProgressSaves(saves)) return false;
   refreshMainMenuLoadButton();
   return true;
@@ -920,12 +924,14 @@ function openSaveBrowser(context = 'main') {
 }
 
 async function loadSaveById(saveId) {
+  if (saveLoadInProgress) return false;
+  saveLoadInProgress = true;
   const saves = readProgressSaves();
   const save = saves.find(entry => entry.id === saveId);
-  if (!save) return false;
+  if (!save) { saveLoadInProgress = false; return false; }
   const levelIdx = Math.max(0, Math.round(Number(save.currentLevelIdx) || 0));
   const levelMeta = KNOWN_LEVELS[levelIdx];
-  if (!levelMeta) return false;
+  if (!levelMeta) { saveLoadInProgress = false; return false; }
 
   clearLatchedGameplayInput();
   if (warpMenuOpen) closeWarpMenu();
@@ -936,8 +942,14 @@ async function loadSaveById(saveId) {
   if (pauseMenuOpen) closePauseMenu(false);
   closeSaveBrowser();
   deathSequence.active = false;
+  deathSequence.elapsed = 0;
+  deathSequence.scatteredItems.length = 0;
   deathScreenOpen = false;
   hidePlayerShip = false;
+  warpTransition.active = false;
+  warpTransition.phase = 'none';
+  warpTransition.elapsed = 0;
+  warpTransition.onLevelReady = null;
   if (deathOverlayEl) deathOverlayEl.style.display = 'none';
   if (mainMenuOverlay) mainMenuOverlay.style.display = 'none';
   if (cutsceneOverlay) cutsceneOverlay.style.display = 'none';
@@ -973,7 +985,14 @@ async function loadSaveById(saveId) {
 
   for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
 
-  const levelData = await fetch(levelMeta.path + '?t=' + Date.now()).then(res => res.json());
+  let levelData;
+  try {
+    levelData = await fetch(levelMeta.path + '?t=' + Date.now()).then(res => res.json());
+  } catch (err) {
+    console.error('Failed to load level for save', err);
+    saveLoadInProgress = false;
+    return false;
+  }
   loadLevel(levelData, levelIdx, { preservePlayerState: true });
   currentShipType = savedActiveShip;
   applyShipStats(savedActiveShip);
@@ -988,10 +1007,10 @@ async function loadSaveById(saveId) {
   selectedSlot = Math.max(0, Math.min(maxSlots - 1, Math.round(Number(save.selectedSlot) || 0)));
 
   const savedPlayer = save.player || {};
-  player.health = Math.max(0, Math.min(player.maxHealth, Number(savedPlayer.health) || player.maxHealth));
-  player.fuel = Math.max(0, Math.min(player.maxFuel, Number(savedPlayer.fuel) || player.maxFuel));
-  player.oxygen = Math.max(0, Math.min(player.maxOxygen, Number(savedPlayer.oxygen) || player.maxOxygen));
-  player.credits = Math.max(0, Number(savedPlayer.credits) || 0);
+  player.health = Math.max(0, Math.min(player.maxHealth, Number.isFinite(savedPlayer.health) ? savedPlayer.health : player.maxHealth));
+  player.fuel = Math.max(0, Math.min(player.maxFuel, Number.isFinite(savedPlayer.fuel) ? savedPlayer.fuel : player.maxFuel));
+  player.oxygen = Math.max(0, Math.min(player.maxOxygen, Number.isFinite(savedPlayer.oxygen) ? savedPlayer.oxygen : player.maxOxygen));
+  player.credits = Math.max(0, Number.isFinite(savedPlayer.credits) ? savedPlayer.credits : 0);
 
   syncActiveDronesForCurrentShip();
   syncLowResourceStateFromPlayer();
@@ -1000,6 +1019,7 @@ async function loadSaveById(saveId) {
   if (levelSelect) levelSelect.value = String(levelIdx);
   try { localStorage.setItem(LEVEL_STORAGE_KEY, String(levelIdx)); } catch (_) {}
   beginGame();
+  saveLoadInProgress = false;
   return true;
 }
 
@@ -4539,6 +4559,7 @@ function loadLevel(levelData, levelIdx, options = {}) {
   floatingItems.length = 0; // Clear floating items on level load
   pirates.length = 0; // Clear pirates on level load
   drones.length = 0; // Rebuild drones for the active ship
+  bullets.length = 0; // Clear bullets on level load
   for (const st of structures) {
     if (st.type === 'piratebase') spawnBaseDefensePirates(st);
   }
@@ -4635,11 +4656,12 @@ function loadLevel(levelData, levelIdx, options = {}) {
       selectedSlot = 0;
       hudDirty = true;
     } else {
-      // Default loadout (Level 1 / Debug)
+      // Default loadout (Level 1 / Debug) - TEST: includes warp key
       for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
       inventory.set(0, { item: 'mining laser', heat: 0, overheated: false });
       inventory.set(1, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
       inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+      inventory.set(3, { item: 'warp key', quantity: 1 });
       selectedSlot = 0;
       hudDirty = true;
     }
