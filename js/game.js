@@ -129,6 +129,8 @@ const warpKeyFragmentImg = new Image();
 warpKeyFragmentImg.src = 'assets/warp-key-fragment.png';
 ITEM_IMAGES['warp key fragment'] = warpKeyFragmentImg;
 const WARP_KEY_OPPORTUNITY_ITEMS = new Set(['warp key', 'warp key fragment']);
+const SAVE_STORAGE_KEY = 'spacejam-saves-v1';
+const SAVE_SCHEMA_VERSION = 1;
 
 // Ship (world coordinates, camera follows)
 const ship = {
@@ -179,6 +181,8 @@ let shipyardMenuOpen = false;
 let startScreenOpen = true;
 let deathScreenOpen = false;
 let pauseMenuOpen = false;
+let saveBrowserOpen = false;
+let saveBrowserContext = 'main';
 let hidePlayerShip = false;
 let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
 let interactPromptTarget = null; // Current structure showing prompt
@@ -214,9 +218,10 @@ const deathSequence = {
   menuDelay: 1.0,
   scatteredItems: []
 };
+let pauseConfirmAction = null;
 
 function computeMenuPauseState() {
-  return warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen || pauseMenuOpen;
+  return warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen || pauseMenuOpen || saveBrowserOpen;
 }
 
 function clearLatchedGameplayInput() {
@@ -389,7 +394,12 @@ const startOverlayEl = document.getElementById('start-menu-overlay');
 
 // Intro cutscene overlay (replaces click-to-start).
 function beginGame() {
+  if (mainMenuOverlay) mainMenuOverlay.style.display = 'none';
   if (startOverlayEl) startOverlayEl.style.display = 'none';
+  if (deathOverlayEl) deathOverlayEl.style.display = 'none';
+  if (saveBrowserOverlayEl) saveBrowserOverlayEl.style.display = 'none';
+  saveBrowserOpen = false;
+  deathScreenOpen = false;
   startScreenOpen = false;
   gamePaused = computeMenuPauseState();
   clearLatchedGameplayInput();
@@ -398,9 +408,39 @@ function beginGame() {
 
 const mainMenuOverlay = document.getElementById('main-menu-overlay');
 const mainMenuStartBtn = document.getElementById('main-menu-start-btn');
+const mainMenuLoadBtn = document.getElementById('main-menu-load-btn');
 const cutsceneOverlay = document.getElementById('intro-cutscene-overlay');
 const cutsceneMapCanvas = document.getElementById('intro-map-canvas');
 const cutsceneDialogue = document.getElementById('intro-dialogue-text');
+const saveBrowserOverlayEl = document.getElementById('save-browser-overlay');
+const saveBrowserListEl = document.getElementById('save-browser-list');
+const saveBrowserEmptyEl = document.getElementById('save-browser-empty');
+const saveBrowserCloseBtn = document.getElementById('save-browser-close-btn');
+
+function showMainMenu(playOpenSfx = false) {
+  clearLatchedGameplayInput();
+  hidePauseConfirm();
+  pauseMenuOpen = false;
+  deathSequence.active = false;
+  deathSequence.elapsed = 0;
+  hidePlayerShip = false;
+  deathScreenOpen = false;
+  saveBrowserOpen = false;
+  if (pauseOverlayEl) pauseOverlayEl.style.display = 'none';
+  if (deathOverlayEl) deathOverlayEl.style.display = 'none';
+  if (saveBrowserOverlayEl) saveBrowserOverlayEl.style.display = 'none';
+  if (cutsceneOverlay) cutsceneOverlay.style.display = 'none';
+  if (startOverlayEl) startOverlayEl.style.display = 'none';
+  startScreenOpen = true;
+  gamePaused = true;
+  if (mainMenuOverlay) {
+    mainMenuOverlay.style.display = 'flex';
+    const starfieldCanvas = document.getElementById('main-menu-starfield-canvas');
+    if (starfieldCanvas) requestAnimationFrame(() => drawStarfieldFirstFrame(starfieldCanvas));
+  }
+  refreshMainMenuLoadButton();
+  if (playOpenSfx) sfx.playMenuOpen();
+}
 
 if (mainMenuOverlay && mainMenuStartBtn) {
   // Show main menu; game loads in background. On Start Game, play cutscene then begin.
@@ -426,6 +466,15 @@ if (mainMenuOverlay && mainMenuStartBtn) {
       beginGame();
     }
   });
+  if (mainMenuLoadBtn) {
+    mainMenuLoadBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sfx.unlock();
+      sfx.playMenuOpen();
+      openSaveBrowser('main');
+    });
+  }
 } else if (cutsceneOverlay && cutsceneMapCanvas && cutsceneDialogue) {
   // Fallback: no main menu — play cutscene immediately.
   cutsceneOverlay.style.display = 'flex';
@@ -453,19 +502,24 @@ if (mainMenuOverlay && mainMenuStartBtn) {
 // Death screen overlay (shown when HP reaches 0)
 const deathOverlayEl = document.getElementById('death-menu-overlay');
 const deathMainMenuBtn = document.getElementById('death-main-menu-btn');
+const deathLoadSaveBtn = document.getElementById('death-load-save-btn');
+const deathRestartLevelBtn = document.getElementById('death-restart-level-btn');
 const pauseOverlayEl = document.getElementById('pause-menu-overlay');
 const pauseResumeBtn = document.getElementById('pause-resume-btn');
-const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseLoadSaveBtn = document.getElementById('pause-load-save-btn');
+const pauseBackMenuBtn = document.getElementById('pause-back-menu-btn');
+const pauseRestartLevelBtn = document.getElementById('pause-restart-level-btn');
 const pauseVolumeSlider = document.getElementById('pause-volume-slider');
 const pauseActionsMain = document.getElementById('pause-actions-main');
 const pauseActionsConfirm = document.getElementById('pause-actions-confirm');
-const pauseRestartConfirmBtn = document.getElementById('pause-restart-confirm-btn');
-const pauseRestartCancelBtn = document.getElementById('pause-restart-cancel-btn');
+const pauseConfirmTextEl = document.getElementById('pause-confirm-text');
+const pauseConfirmAcceptBtn = document.getElementById('pause-confirm-accept-btn');
+const pauseConfirmCancelBtn = document.getElementById('pause-confirm-cancel-btn');
 
 function closePauseMenu(playCloseSfx = true) {
   if (!pauseMenuOpen) return;
   pauseMenuOpen = false;
-  hidePauseRestartConfirm();
+  hidePauseConfirm();
   if (pauseOverlayEl) pauseOverlayEl.style.display = 'none';
   if (playCloseSfx) sfx.playMenuClose();
   gamePaused = computeMenuPauseState();
@@ -491,7 +545,26 @@ if (deathMainMenuBtn) {
   deathMainMenuBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    sfx.unlock();
     window.location.reload();
+  });
+}
+if (deathLoadSaveBtn) {
+  deathLoadSaveBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
+    sfx.playMenuOpen();
+    openSaveBrowser('death');
+  });
+}
+if (deathRestartLevelBtn) {
+  deathRestartLevelBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
+    sfx.playConfirm();
+    restartCurrentLevelFromSave();
   });
 }
 if (pauseResumeBtn) {
@@ -502,39 +575,68 @@ if (pauseResumeBtn) {
     closePauseMenu();
   });
 }
-function showPauseRestartConfirm() {
+function showPauseConfirm(text, action) {
+  pauseConfirmAction = typeof action === 'function' ? action : null;
+  if (pauseConfirmTextEl) pauseConfirmTextEl.textContent = text;
   if (pauseActionsMain) pauseActionsMain.style.display = 'none';
   if (pauseActionsConfirm) pauseActionsConfirm.style.display = 'flex';
 }
 
-function hidePauseRestartConfirm() {
+function hidePauseConfirm() {
+  pauseConfirmAction = null;
   if (pauseActionsMain) pauseActionsMain.style.display = 'flex';
   if (pauseActionsConfirm) pauseActionsConfirm.style.display = 'none';
 }
 
-if (pauseRestartBtn) {
-  pauseRestartBtn.addEventListener('click', (e) => {
+if (pauseLoadSaveBtn) {
+  pauseLoadSaveBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
-    showPauseRestartConfirm();
+    sfx.playMenuOpen();
+    openSaveBrowser('pause');
   });
 }
-if (pauseRestartConfirmBtn) {
-  pauseRestartConfirmBtn.addEventListener('click', (e) => {
+if (pauseBackMenuBtn) {
+  pauseBackMenuBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
-    sfx.playRespawn();
-    window.location.reload();
+    showPauseConfirm('Return to main menu?', () => {
+      closePauseMenu(false);
+      sfx.playMenuOpen();
+      showMainMenu();
+    });
   });
 }
-if (pauseRestartCancelBtn) {
-  pauseRestartCancelBtn.addEventListener('click', (e) => {
+if (pauseRestartLevelBtn) {
+  pauseRestartLevelBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
-    hidePauseRestartConfirm();
+    showPauseConfirm('Restart current level from save?', () => {
+      sfx.playRespawn();
+      restartCurrentLevelFromSave();
+    });
+  });
+}
+if (pauseConfirmAcceptBtn) {
+  pauseConfirmAcceptBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
+    const action = pauseConfirmAction;
+    hidePauseConfirm();
+    if (action) action();
+  });
+}
+if (pauseConfirmCancelBtn) {
+  pauseConfirmCancelBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
+    sfx.playCancel();
+    hidePauseConfirm();
   });
 }
 if (pauseVolumeSlider) {
@@ -543,6 +645,13 @@ if (pauseVolumeSlider) {
     sfx.setMasterVolume(normalized);
   });
   syncPauseVolumeUI();
+}
+if (saveBrowserCloseBtn) {
+  saveBrowserCloseBtn.addEventListener('click', () => {
+    sfx.unlock();
+    sfx.playMenuClose();
+    closeSaveBrowser();
+  });
 }
 
 // Bullets
@@ -638,6 +747,273 @@ function updateDeathSequence(dt) {
     deathScreenOpen = true;
     if (deathOverlayEl) deathOverlayEl.style.display = 'flex';
   }
+}
+
+function cloneSaveItem(item) {
+  if (!item || typeof item !== 'object' || typeof item.item !== 'string') return null;
+  const out = { item: item.item };
+  if (item.quantity != null) out.quantity = Math.max(1, Math.round(Number(item.quantity) || 1));
+  if (Number.isFinite(item.energy)) out.energy = Number(item.energy);
+  if (Number.isFinite(item.maxEnergy)) out.maxEnergy = Number(item.maxEnergy);
+  if (Number.isFinite(item.fuel)) out.fuel = Number(item.fuel);
+  if (Number.isFinite(item.maxFuel)) out.maxFuel = Number(item.maxFuel);
+  if (Number.isFinite(item.oxygen)) out.oxygen = Number(item.oxygen);
+  if (Number.isFinite(item.maxOxygen)) out.maxOxygen = Number(item.maxOxygen);
+  if (Number.isFinite(item.health)) out.health = Number(item.health);
+  if (Number.isFinite(item.maxHealth)) out.maxHealth = Number(item.maxHealth);
+  if (Number.isFinite(item.heat)) out.heat = Number(item.heat);
+  if (typeof item.overheated === 'boolean') out.overheated = item.overheated;
+  return out;
+}
+
+function cloneInventoryForSave(slots) {
+  if (!Array.isArray(slots)) return [];
+  return slots.map(slot => cloneSaveItem(slot));
+}
+
+function getLevelNameByIndex(levelIdx) {
+  if (!Array.isArray(KNOWN_LEVELS)) return `Level ${Number(levelIdx) + 1}`;
+  return KNOWN_LEVELS[levelIdx]?.name || `Level ${Number(levelIdx) + 1}`;
+}
+
+function buildInventorySummaryFromSlots(slots) {
+  if (!Array.isArray(slots) || slots.length === 0) return 'Inventory: empty';
+  const counts = new Map();
+  for (const slot of slots) {
+    if (!slot || typeof slot.item !== 'string') continue;
+    const qty = Math.max(1, Math.round(Number(slot.quantity) || 1));
+    counts.set(slot.item, (counts.get(slot.item) || 0) + qty);
+  }
+  if (counts.size === 0) return 'Inventory: empty';
+  const entries = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([itemKey, qty]) => `${qty}x ${(ITEM_DISPLAY_NAMES[itemKey] || itemKey)}`);
+  return `Inventory: ${entries.join(', ')}`;
+}
+
+function readProgressSaves() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(SAVE_STORAGE_KEY);
+  } catch (_) {
+    return [];
+  }
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(save => save && typeof save.id === 'string' && Number.isInteger(save.currentLevelIdx))
+      .sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeProgressSaves(saves) {
+  const payload = Array.isArray(saves) ? saves : [];
+  try {
+    localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(payload));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function refreshMainMenuLoadButton() {
+  if (!mainMenuLoadBtn) return;
+  const hasSaves = readProgressSaves().length > 0;
+  mainMenuLoadBtn.style.display = hasSaves ? 'inline-block' : 'none';
+}
+
+function createProgressSaveSnapshot(targetLevelIdx) {
+  const levelIdx = Number.isInteger(targetLevelIdx) ? targetLevelIdx : currentLevelIdx;
+  const createdAt = Date.now();
+  const shipStatsCopy = {};
+  Object.keys(shipSavedStats).forEach(shipType => {
+    const savedStats = shipSavedStats[shipType];
+    if (!savedStats) return;
+    shipStatsCopy[shipType] = {
+      health: Math.max(0, Number(savedStats.health) || 0),
+      fuel: Math.max(0, Number(savedStats.fuel) || 0),
+      oxygen: Math.max(0, Number(savedStats.oxygen) || 0)
+    };
+  });
+  const droneCounts = {};
+  for (const shipType of Object.keys(SHIP_STATS)) {
+    droneCounts[shipType] = getPurchasedDroneCount(shipType);
+  }
+  return {
+    version: SAVE_SCHEMA_VERSION,
+    id: `save-${createdAt}-${Math.floor(Math.random() * 1000000)}`,
+    createdAt,
+    currentLevelIdx: levelIdx,
+    currentLevelName: getLevelNameByIndex(levelIdx),
+    activeShip: currentShipType,
+    ownedShips: Array.from(ownedShips),
+    shipSavedStats: shipStatsCopy,
+    shipDroneCounts: droneCounts,
+    player: {
+      health: Number(player.health) || 0,
+      maxHealth: Number(player.maxHealth) || 0,
+      fuel: Number(player.fuel) || 0,
+      maxFuel: Number(player.maxFuel) || 0,
+      oxygen: Number(player.oxygen) || 0,
+      maxOxygen: Number(player.maxOxygen) || 0,
+      credits: Number(player.credits) || 0
+    },
+    selectedSlot: Math.max(0, Math.round(Number(selectedSlot) || 0)),
+    inventorySlots: cloneInventoryForSave(inventory.slots)
+  };
+}
+
+function appendProgressSave(targetLevelIdx) {
+  const saves = readProgressSaves();
+  saves.unshift(createProgressSaveSnapshot(targetLevelIdx));
+  if (!writeProgressSaves(saves)) return false;
+  refreshMainMenuLoadButton();
+  return true;
+}
+
+function formatSaveTimestamp(timestamp) {
+  const date = new Date(Number(timestamp) || Date.now());
+  return date.toLocaleString();
+}
+
+function closeSaveBrowser() {
+  saveBrowserOpen = false;
+  if (saveBrowserOverlayEl) saveBrowserOverlayEl.style.display = 'none';
+  gamePaused = computeMenuPauseState();
+}
+
+function renderSaveBrowserList() {
+  if (!saveBrowserListEl || !saveBrowserEmptyEl) return;
+  const saves = readProgressSaves();
+  saveBrowserListEl.innerHTML = '';
+  saveBrowserEmptyEl.style.display = saves.length === 0 ? 'block' : 'none';
+  if (!saves.length) return;
+  for (const save of saves) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'save-entry-btn';
+    const shipName = SHIP_STATS[save.activeShip]?.name || save.activeShip || 'Unknown ship';
+    button.innerHTML = `
+      <span class="save-entry-meta">${save.currentLevelName || getLevelNameByIndex(save.currentLevelIdx)} | ${shipName} | ${formatSaveTimestamp(save.createdAt)}</span>
+      <span class="save-entry-detail">${buildInventorySummaryFromSlots(save.inventorySlots)}</span>
+    `;
+    button.addEventListener('click', () => {
+      sfx.unlock();
+      sfx.playConfirm();
+      void loadSaveById(save.id);
+    });
+    saveBrowserListEl.appendChild(button);
+  }
+}
+
+function openSaveBrowser(context = 'main') {
+  saveBrowserContext = context;
+  renderSaveBrowserList();
+  saveBrowserOpen = true;
+  if (saveBrowserOverlayEl) saveBrowserOverlayEl.style.display = 'flex';
+  gamePaused = true;
+}
+
+async function loadSaveById(saveId) {
+  const saves = readProgressSaves();
+  const save = saves.find(entry => entry.id === saveId);
+  if (!save) return false;
+  const levelIdx = Math.max(0, Math.round(Number(save.currentLevelIdx) || 0));
+  const levelMeta = KNOWN_LEVELS[levelIdx];
+  if (!levelMeta) return false;
+
+  clearLatchedGameplayInput();
+  if (warpMenuOpen) closeWarpMenu();
+  if (shopMenuOpen) closeShopMenu();
+  if (craftingMenuOpen) closeCraftingMenu();
+  if (refineryMenuOpen) closeRefineryMenu();
+  if (shipyardMenuOpen) closeShipyardMenu();
+  if (pauseMenuOpen) closePauseMenu(false);
+  closeSaveBrowser();
+  deathSequence.active = false;
+  deathScreenOpen = false;
+  hidePlayerShip = false;
+  if (deathOverlayEl) deathOverlayEl.style.display = 'none';
+  if (mainMenuOverlay) mainMenuOverlay.style.display = 'none';
+  if (cutsceneOverlay) cutsceneOverlay.style.display = 'none';
+  if (startOverlayEl) startOverlayEl.style.display = 'none';
+  startScreenOpen = false;
+
+  ownedShips.clear();
+  const savedOwnedShips = Array.isArray(save.ownedShips) ? save.ownedShips : [];
+  for (const shipType of savedOwnedShips) {
+    if (SHIP_STATS[shipType]) ownedShips.add(shipType);
+  }
+  if (!ownedShips.size) ownedShips.add('scout');
+
+  Object.keys(shipSavedStats).forEach(shipType => delete shipSavedStats[shipType]);
+  if (save.shipSavedStats && typeof save.shipSavedStats === 'object') {
+    Object.keys(save.shipSavedStats).forEach(shipType => {
+      if (!SHIP_STATS[shipType]) return;
+      const stats = save.shipSavedStats[shipType];
+      shipSavedStats[shipType] = {
+        health: Math.max(0, Number(stats?.health) || 0),
+        fuel: Math.max(0, Number(stats?.fuel) || 0),
+        oxygen: Math.max(0, Number(stats?.oxygen) || 0)
+      };
+    });
+  }
+
+  for (const shipType of Object.keys(SHIP_STATS)) {
+    setPurchasedDroneCount(shipType, save.shipDroneCounts?.[shipType] || 0);
+  }
+
+  const savedActiveShip = SHIP_STATS[save.activeShip] && ownedShips.has(save.activeShip) ? save.activeShip : 'scout';
+  currentShipType = savedActiveShip;
+
+  for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+
+  const levelData = await fetch(levelMeta.path + '?t=' + Date.now()).then(res => res.json());
+  loadLevel(levelData, levelIdx, { preservePlayerState: true });
+  currentShipType = savedActiveShip;
+  applyShipStats(savedActiveShip);
+
+  for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+  const savedSlots = Array.isArray(save.inventorySlots) ? save.inventorySlots : [];
+  const maxSlots = inventory.slots.length;
+  for (let i = 0; i < Math.min(savedSlots.length, maxSlots); i++) {
+    const slotItem = cloneSaveItem(savedSlots[i]);
+    inventory.set(i, slotItem);
+  }
+  selectedSlot = Math.max(0, Math.min(maxSlots - 1, Math.round(Number(save.selectedSlot) || 0)));
+
+  const savedPlayer = save.player || {};
+  player.health = Math.max(0, Math.min(player.maxHealth, Number(savedPlayer.health) || player.maxHealth));
+  player.fuel = Math.max(0, Math.min(player.maxFuel, Number(savedPlayer.fuel) || player.maxFuel));
+  player.oxygen = Math.max(0, Math.min(player.maxOxygen, Number(savedPlayer.oxygen) || player.maxOxygen));
+  player.credits = Math.max(0, Number(savedPlayer.credits) || 0);
+
+  syncActiveDronesForCurrentShip();
+  syncLowResourceStateFromPlayer();
+  markHUDDirty();
+  updateHUD();
+  if (levelSelect) levelSelect.value = String(levelIdx);
+  try { localStorage.setItem(LEVEL_STORAGE_KEY, String(levelIdx)); } catch (_) {}
+  beginGame();
+  return true;
+}
+
+function restartCurrentLevelFromSave() {
+  if (currentLevelIdx === 0) {
+    window.location.reload();
+    return;
+  }
+  const checkpoint = readProgressSaves().find(save => Number(save.currentLevelIdx) === currentLevelIdx);
+  if (!checkpoint) {
+    window.location.reload();
+    return;
+  }
+  void loadSaveById(checkpoint.id);
 }
 
 // Drag state for hotbar (Legacy canvas drag removed)
@@ -3949,6 +4325,11 @@ function returnSellAreaToHotbar() {
 
 window.addEventListener('keydown', (e) => {
   sfx.resumeIfNeeded();
+  if (e.code === 'Escape' && saveBrowserOpen) {
+    e.preventDefault();
+    closeSaveBrowser();
+    return;
+  }
   if (startScreenOpen || deathScreenOpen) return;
   if (e.code === 'Escape') {
     e.preventDefault();
@@ -3959,7 +4340,7 @@ window.addEventListener('keydown', (e) => {
     if (shipyardMenuOpen) { closeShipyardMenu(); return; }
     if (pauseMenuOpen) {
       if (pauseActionsConfirm && pauseActionsConfirm.style.display !== 'none') {
-        hidePauseRestartConfirm();
+        hidePauseConfirm();
       } else {
         closePauseMenu();
       }
@@ -4404,6 +4785,7 @@ try {
   if (saved !== null && KNOWN_LEVELS[Number(saved)]) initialLevelIdx = Number(saved);
 } catch (_) {}
 if (levelSelect) levelSelect.value = initialLevelIdx;
+refreshMainMenuLoadButton();
 
 fetch(KNOWN_LEVELS[initialLevelIdx].path + '?t=' + Date.now())
   .then(res => res.json())
@@ -4518,6 +4900,7 @@ if (warpPayBtn) {
     }
     markHUDDirty();
     player.credits -= cost;
+    appendProgressSave(destinationIdx);
     sfx.playWarp();
     sfx.playConfirm();
     closeWarpMenu();

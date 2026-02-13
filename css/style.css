@@ -189,7 +189,8 @@ textarea {
   margin: 0;
 }
 
-#main-menu-start-btn {
+#main-menu-start-btn,
+#main-menu-load-btn {
   min-width: 180px;
   background: #2f2f2f;
   color: #eee;
@@ -202,8 +203,84 @@ textarea {
   cursor: pointer;
 }
 
-#main-menu-start-btn:hover {
+#main-menu-start-btn:hover,
+#main-menu-load-btn:hover {
   background: #444;
+}
+
+#save-browser-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--game-width);
+  height: var(--game-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 35;
+  pointer-events: auto;
+}
+
+#save-browser-menu {
+  width: min(760px, calc(var(--game-width) - 80px));
+  max-height: min(620px, calc(var(--game-height) - 80px));
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid #777;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#save-browser-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+  font-size: 20px;
+}
+
+#save-browser-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+#save-browser-empty {
+  color: #bbb;
+  font-size: 14px;
+}
+
+.save-entry-btn {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid #666;
+  border-radius: 8px;
+  background: #2f2f2f;
+  color: #eee;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.save-entry-btn:hover {
+  background: #444;
+}
+
+.save-entry-meta {
+  color: #fff;
+  font-size: 13px;
+}
+
+.save-entry-detail {
+  color: #c8c8c8;
+  font-size: 12px;
 }
 
 /* ── Intro Cutscene ── */
@@ -348,6 +425,7 @@ textarea {
   display: flex;
   justify-content: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 #pause-menu #pause-actions-confirm {
@@ -424,6 +502,7 @@ textarea {
   display: flex;
   justify-content: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 #death-menu button {

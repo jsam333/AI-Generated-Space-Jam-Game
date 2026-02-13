@@ -24,7 +24,18 @@
       <div id="main-menu">
         <div class="main-menu-kicker">Hostile Extraction Environment</div>
         <h1 class="main-menu-title">Sector 7</h1>
-        <button type="button" id="main-menu-start-btn">Start Mission</button>
+        <button type="button" id="main-menu-start-btn">Start</button>
+        <button type="button" id="main-menu-load-btn" style="display: none;">Load Save</button>
+      </div>
+    </div>
+    <div id="save-browser-overlay" style="display: none;">
+      <div id="save-browser-menu">
+        <div id="save-browser-header">
+          <span>Load Save</span>
+          <button type="button" id="save-browser-close-btn">Close</button>
+        </div>
+        <div id="save-browser-empty" style="display:none;">No saves found.</div>
+        <div id="save-browser-list"></div>
       </div>
     </div>
     <div id="intro-cutscene-overlay" style="display: none;">
@@ -55,13 +66,15 @@
         >
         <div class="pause-actions" id="pause-actions-main">
           <button type="button" id="pause-resume-btn">Resume</button>
-          <button type="button" id="pause-restart-btn">Restart</button>
+          <button type="button" id="pause-load-save-btn">Load Save</button>
+          <button type="button" id="pause-back-menu-btn">Back to Menu</button>
+          <button type="button" id="pause-restart-level-btn">Restart Current Level</button>
         </div>
         <div class="pause-actions" id="pause-actions-confirm" style="display: none;">
-          <span class="pause-confirm-text">Restart game? Progress will be lost.</span>
+          <span class="pause-confirm-text" id="pause-confirm-text">Confirm action?</span>
           <div class="pause-confirm-btns">
-            <button type="button" id="pause-restart-confirm-btn">Yes, Restart</button>
-            <button type="button" id="pause-restart-cancel-btn">Cancel</button>
+            <button type="button" id="pause-confirm-accept-btn">Confirm</button>
+            <button type="button" id="pause-confirm-cancel-btn">Cancel</button>
           </div>
         </div>
       </div>
@@ -237,6 +250,8 @@
         <div class="death-title">You Died</div>
         <div class="death-subtitle">Your ship was destroyed.</div>
         <div class="death-actions">
+          <button type="button" id="death-load-save-btn">Load from Save</button>
+          <button type="button" id="death-restart-level-btn">Restart Current Level</button>
           <button type="button" id="death-main-menu-btn">Main Menu</button>
         </div>
       </div>
