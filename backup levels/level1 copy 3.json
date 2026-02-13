@@ -376,24 +376,6 @@
       "y": -397.1762686932425,
       "radius": 20,
       "oreType": "cuprite"
-    },
-    {
-      "x": -819.6161464380846,
-      "y": 373.38068893290523,
-      "radius": 20,
-      "oreType": "cuprite"
-    },
-    {
-      "x": 628.3723789358648,
-      "y": 655.6929171504677,
-      "radius": 40,
-      "oreType": "cuprite"
-    },
-    {
-      "x": 660.2463401862349,
-      "y": -997.1996448330029,
-      "radius": 20,
-      "oreType": "cuprite"
     }
   ],
   "structures": [
@@ -401,7 +383,7 @@
       "x": -432.7633463745625,
       "y": 7.526319067383696,
       "type": "warpgate",
-      "warpCost": 2500,
+      "warpCost": 3000,
       "warpDestination": "level2"
     },
     {
@@ -419,13 +401,13 @@
           "item": "small energy cell",
           "energy": 5,
           "maxEnergy": 5,
-          "quantity": 9
+          "quantity": 7
         },
         {
           "item": "fuel tank",
           "fuel": 5,
           "maxFuel": 5,
-          "quantity": 5
+          "quantity": 4
         }
       ],
       "prices": {}
@@ -473,7 +455,7 @@
         },
         {
           "item": "small energy cell",
-          "quantity": 5,
+          "quantity": 3,
           "energy": 10,
           "maxEnergy": 10
         },
@@ -491,6 +473,13 @@
         }
       ],
       "prices": {}
+    },
+    {
+      "x": -1290,
+      "y": 980,
+      "type": "warpgate",
+      "warpDestination": "level6",
+      "warpCost": 3000
     }
   ],
   "spawnSettings": {

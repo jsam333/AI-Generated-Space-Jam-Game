@@ -7162,7 +7162,7 @@
       "x": -1323.8764307396814,
       "y": 1810.5373148328704,
       "type": "warpgate",
-      "warpCost": 4000,
+      "warpCost": 5000,
       "warpDestination": "level3"
     },
     {

@@ -579,8 +579,8 @@
           "quantity": 1
         }
       ],
-      "health": 500,
-      "defenseCount": 20,
+      "health": 600,
+      "defenseCount": 22,
       "spawnRate": 10
     },
     {
@@ -610,8 +610,8 @@
           "quantity": 1
         }
       ],
-      "health": 500,
-      "defenseCount": 20,
+      "health": 600,
+      "defenseCount": 22,
       "spawnRate": 10
     },
     {
@@ -641,8 +641,8 @@
           "quantity": 1
         }
       ],
-      "health": 500,
-      "defenseCount": 20,
+      "health": 600,
+      "defenseCount": 22,
       "spawnRate": 10
     },
     {
@@ -661,7 +661,7 @@
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 6,
+      "waveSpawnCount": 8,
       "drops": [
         {
           "item": "scrap",
@@ -672,8 +672,8 @@
           "quantity": 1
         }
       ],
-      "health": 500,
-      "defenseCount": 34,
+      "health": 600,
+      "defenseCount": 46,
       "spawnRate": 10
     },
     {
@@ -1939,7 +1939,7 @@
       "x": 1392.4439562999737,
       "y": 649.9783480682379,
       "type": "warpgate",
-      "warpCost": 7000,
+      "warpCost": 3000,
       "warpDestination": "level2"
     },
     {
@@ -1949,8 +1949,7 @@
       "availableShips": [
         "cutter",
         "frigate"
-      ],
-      "maxDrones": 5
+      ]
     }
   ],
   "spawnSettings": {

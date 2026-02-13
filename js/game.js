@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, BLASTER_STATS, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED } from './constants.js';
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PLAYER_BULLET_HIT_RADIUS, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, BLASTER_STATS, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED } from './constants.js';
 import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity, raycastCircle } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
@@ -126,6 +126,7 @@ ITEM_IMAGES['warp key'] = warpKeyImg;
 const warpKeyFragmentImg = new Image();
 warpKeyFragmentImg.src = 'assets/warp-key-fragment.png';
 ITEM_IMAGES['warp key fragment'] = warpKeyFragmentImg;
+const WARP_KEY_OPPORTUNITY_ITEMS = new Set(['warp key', 'warp key fragment']);
 
 // Ship (world coordinates, camera follows)
 const ship = {
@@ -220,9 +221,139 @@ function getShipCollisionRadiusByScale(stats) {
   return scoutRadius * (shipScaleValue / scoutScale);
 }
 
+function itemEntryHasWarpKeyOpportunity(entry) {
+  if (!entry || typeof entry.item !== 'string') return false;
+  return WARP_KEY_OPPORTUNITY_ITEMS.has(entry.item);
+}
+
+function structureHasWarpKeyOpportunity(st) {
+  if (!st || typeof st !== 'object') return false;
+  if (st.type === 'piratebase') {
+    const drops = Array.isArray(st.drops) ? st.drops : [];
+    return drops.some(itemEntryHasWarpKeyOpportunity);
+  }
+  if (st.type === 'shop') {
+    const inventoryItems = Array.isArray(st.inventory) ? st.inventory : [];
+    return inventoryItems.some(itemEntryHasWarpKeyOpportunity);
+  }
+  if (st.type === 'crafting') {
+    const recipes = Array.isArray(st.recipes) ? st.recipes : [];
+    return recipes.some(recipe => itemEntryHasWarpKeyOpportunity(recipe?.output));
+  }
+  return false;
+}
+
 let refineryMenuOpen = false;
 let activeShopStructure = null;
 let activeCraftingStructure = null;
+let activeWarpStructure = null;
+
+// Warp transition animation state (time-based, framerate-independent)
+const warpTransition = {
+  active: false,
+  phase: 'none',   // 'bloom-in' | 'hold' | 'bloom-out' | 'none'
+  elapsed: 0,       // seconds elapsed in current phase
+  bloomInDuration: 0.7,
+  holdDuration: 0.25,
+  bloomOutDuration: 0.6,
+  onLevelReady: null // callback: called once during 'hold' to load level
+};
+
+function startWarpTransition(onLevelReady) {
+  warpTransition.active = true;
+  warpTransition.phase = 'bloom-in';
+  warpTransition.elapsed = 0;
+  warpTransition.onLevelReady = onLevelReady;
+  interactPromptAlpha = 0;
+  interactPromptTarget = null;
+}
+
+function updateWarpTransition(dt) {
+  if (!warpTransition.active) return;
+  warpTransition.elapsed += dt;
+  if (warpTransition.phase === 'bloom-in' && warpTransition.elapsed >= warpTransition.bloomInDuration) {
+    warpTransition.phase = 'hold';
+    warpTransition.elapsed = 0;
+    // Fire the level-load callback during the white-out hold
+    if (warpTransition.onLevelReady) {
+      warpTransition.onLevelReady();
+      warpTransition.onLevelReady = null;
+    }
+  } else if (warpTransition.phase === 'hold' && warpTransition.elapsed >= warpTransition.holdDuration) {
+    warpTransition.phase = 'bloom-out';
+    warpTransition.elapsed = 0;
+  } else if (warpTransition.phase === 'bloom-out' && warpTransition.elapsed >= warpTransition.bloomOutDuration) {
+    warpTransition.active = false;
+    warpTransition.phase = 'none';
+    warpTransition.elapsed = 0;
+    gamePaused = false;
+  }
+}
+
+function getWarpTransitionAlpha() {
+  if (!warpTransition.active) return 0;
+  const { phase, elapsed, bloomInDuration, bloomOutDuration } = warpTransition;
+  if (phase === 'bloom-in') {
+    const t = Math.min(1, elapsed / bloomInDuration);
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    return 0.15 + eased * 0.85;
+  } else if (phase === 'hold') {
+    return 1;
+  } else if (phase === 'bloom-out') {
+    const t = Math.min(1, elapsed / bloomOutDuration);
+    const eased = 1 - (1 - t) * (1 - t);
+    return 1 - eased;
+  }
+  return 0;
+}
+
+function renderWarpTransitionFancy(targetCtx, w, h) {
+  // Draws the radial bloom effect (for the main game canvas layer)
+  if (!warpTransition.active) return;
+  const { phase, elapsed, bloomInDuration, bloomOutDuration } = warpTransition;
+  const maxRadius = Math.sqrt((w / 2) ** 2 + (h / 2) ** 2) * 1.15;
+  const cx = w / 2;
+  const cy = h / 2;
+  const alpha = getWarpTransitionAlpha();
+  if (alpha <= 0) return;
+
+  targetCtx.save();
+  if (phase === 'bloom-in') {
+    const t = Math.min(1, elapsed / bloomInDuration);
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const radius = eased * maxRadius;
+    // Radial gradient bloom expanding from center
+    const grad = targetCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+    grad.addColorStop(0.6, `rgba(220, 240, 255, ${alpha * 0.85})`);
+    grad.addColorStop(1, `rgba(180, 220, 255, 0)`);
+    targetCtx.fillStyle = grad;
+    targetCtx.fillRect(0, 0, w, h);
+    // Core bright circle
+    const coreGrad = targetCtx.createRadialGradient(cx, cy, 0, cx, cy, radius * 0.4);
+    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.2)})`);
+    coreGrad.addColorStop(1, `rgba(255, 255, 255, 0)`);
+    targetCtx.fillStyle = coreGrad;
+    targetCtx.fillRect(0, 0, w, h);
+  } else {
+    // Full-screen white (hold & fade-out)
+    targetCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    targetCtx.fillRect(0, 0, w, h);
+  }
+  targetCtx.restore();
+}
+
+function renderWarpTransitionSolid(targetCtx, w, h) {
+  // Draws a solid white overlay at the transition alpha (covers 3D layer beneath)
+  if (!warpTransition.active) return;
+  const alpha = getWarpTransitionAlpha();
+  if (alpha <= 0) return;
+  targetCtx.save();
+  targetCtx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+  targetCtx.fillRect(0, 0, w, h);
+  targetCtx.restore();
+}
+
 const craftingInputSlots = [null, null, null, null, null, null, null, null, null];
 let craftingOutputSlot = null;
 let activeRefineryStructure = null;
@@ -2274,7 +2405,8 @@ function update(dt) {
         const dx = b.x - ast.x;
         const dy = b.y - ast.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < ast.radius) {
+        const astHitRadius = ast.radius + (b.owner === 'player' ? PLAYER_BULLET_HIT_RADIUS : 0);
+        if (dist < astHitRadius) {
           if (b.owner === 'player') {
             ast.health -= (b.asteroidDmg ?? BULLET_DAMAGE_ASTEROID);
             lastPlayerHitAsteroid = ast;
@@ -2293,7 +2425,7 @@ function update(dt) {
           const dx = b.x - st.x;
           const dy = b.y - st.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < getPirateBaseHitRadius(st)) {
+          if (dist < getPirateBaseHitRadius(st) + PLAYER_BULLET_HIT_RADIUS) {
             st.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
             st.aggroed = true;
             remove = true;
@@ -2311,7 +2443,7 @@ function update(dt) {
             const dx = b.x - p.x;
             const dy = b.y - p.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < (p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS)) {
+            if (dist < (p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS) + PLAYER_BULLET_HIT_RADIUS) {
                 p.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
                 if (p.defendingBase) p.defendingBase.aggroed = true;
                 remove = true;
@@ -2768,10 +2900,24 @@ function render(dt = 1 / 60) {
     const r = is3D
       ? (st.type === 'piratebase' ? getPirateBaseVisualRadius(st) : STRUCTURE_RADIUS_3D)
       : STRUCTURE_SIZE;
+    const hasKeyOpportunity = structureHasWarpKeyOpportunity(st);
+    const glowPulse = hasKeyOpportunity ? (0.95 + Math.sin(levelElapsedTime * 2.4) * 0.08) : 1;
+    const glowRadius = hasKeyOpportunity ? (r + 32) * glowPulse : 0;
     const isInteractable = INTERACTABLE_TYPES_SET.has(st.type);
     const cullR = st.type === 'piratebase' ? getPirateBaseAggroRadius(st) : (isInteractable ? INTERACT_RADIUS : r);
+    const cullMargin = hasKeyOpportunity ? Math.max(cullR, glowRadius) : cullR;
     const { x, y } = worldToScreen(st.x, st.y);
-    if (x + cullR < 0 || x - cullR > WIDTH || y + cullR < 0 || y - cullR > HEIGHT) continue;
+    if (x + cullMargin < 0 || x - cullMargin > WIDTH || y + cullMargin < 0 || y - cullMargin > HEIGHT) continue;
+    if (hasKeyOpportunity) {
+      const glowGradient = ctx.createRadialGradient(x, y, Math.max(4, r * 0.2), x, y, glowRadius);
+      glowGradient.addColorStop(0, 'rgba(255, 226, 120, 0.42)');
+      glowGradient.addColorStop(0.55, 'rgba(255, 204, 64, 0.20)');
+      glowGradient.addColorStop(1, 'rgba(255, 204, 64, 0.00)');
+      ctx.fillStyle = glowGradient;
+      ctx.beginPath();
+      ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 2;
     if (is3D) {
@@ -3057,8 +3203,8 @@ function render(dt = 1 / 60) {
     if (interactPromptAlpha <= 0) interactPromptTarget = null;
   }
 
-  // Tutorial text (visible until first thrust, then 10s + 1s fade)
-  if (tutorialTextTimer > 0 || !tutorialTextTimerStarted) {
+  // Tutorial text (Level 1 only; visible until first thrust, then 10s + 1s fade)
+  if (currentLevelIdx === 0 && (tutorialTextTimer > 0 || !tutorialTextTimerStarted)) {
     if (tutorialTextTimerStarted) tutorialTextTimer -= dt;
     const fadeStart = 1; // Start fading at 1 second remaining
     const alpha = !tutorialTextTimerStarted ? 1 : (tutorialTextTimer > fadeStart ? 1 : Math.max(0, tutorialTextTimer / fadeStart));
@@ -3165,6 +3311,11 @@ function render(dt = 1 / 60) {
     drawMeter(rightmost - 50, player.fuel, player.maxFuel, FUEL_BAR_COLOR, 'Fuel');
     drawMeter(rightmost, player.health, player.maxHealth, HEALTH_BAR_COLOR, 'HP');
   }
+
+  // Warp transition bloom overlay — fancy bloom on game canvas (behind 3D),
+  // solid white on ui canvas (z-index 14, above ship-canvas z-index 2) to cover 3D objects
+  renderWarpTransitionFancy(ctx, WIDTH, HEIGHT);
+  if (uiCtx) renderWarpTransitionSolid(uiCtx, WIDTH, HEIGHT);
 }
 
 function syncResourceBarDropZones({
@@ -3640,22 +3791,10 @@ window.addEventListener('keydown', (e) => {
   }
   // Key in E position (KeyE): open warp gate/shop/crafting/refinery/shipyard menu when inside
   if (e.code === 'KeyE') {
-    if (!gamePaused && isShipInWarpGate()) {
+    const warpSt = isShipInWarpGate();
+    if (!gamePaused && warpSt) {
       e.preventDefault();
-      input.leftMouseDown = false;
-      input.rightMouseDown = false;
-      input.ctrlBrake = false;
-      sfx.stopLaserLoop();
-      sfx.stopDroneLaserLoop();
-      laserWasFiring = false;
-      droneLaserWasActive = false;
-      gamePaused = true;
-      warpMenuOpen = true;
-      sfx.playMenuOpen();
-      const overlay = document.getElementById('warp-menu-overlay');
-      if (overlay) overlay.style.display = 'flex';
-      const payBtn = document.getElementById('warp-pay-btn');
-      if (payBtn) payBtn.disabled = player.credits < 3000;
+      openWarpMenuForStructure(warpSt);
     } else if (!gamePaused) {
       const shopSt = isShipInShop();
       if (shopSt) {
@@ -3725,7 +3864,8 @@ let levelSpawnSettings = {
 let currentLevelIdx = 0;
 
 // Load level from JSON file
-function loadLevel(levelData, levelIdx) {
+function loadLevel(levelData, levelIdx, options = {}) {
+  const preservePlayerState = options.preservePlayerState === true;
   if (levelIdx !== undefined) currentLevelIdx = levelIdx;
   // Reset ship position and velocity
   ship.x = 0;
@@ -3798,7 +3938,7 @@ function loadLevel(levelData, levelIdx) {
     
     if (st.type === 'warpgate') {
         if (st.warpCost === undefined) st.warpCost = 3000;
-        if (st.warpDestination === undefined) st.warpDestination = 'level2'; // Default
+        if (st.warpDestination === undefined) st.warpDestination = `level${Math.min(currentLevelIdx + 2, 4)}`; // Default to next level
     }
 
     if (st.type === 'shipyard') {
@@ -3838,26 +3978,33 @@ function loadLevel(levelData, levelIdx) {
   refreshAsteroidMeshes();
   refreshStructureMeshes();
   
-  // Tutorial text: appears above player's starting position (timer starts on first thrust)
-  tutorialTextTimer = 11; // 10 seconds visible + 1 second fade
-  tutorialTextTimerStarted = false;
-  tutorialTextWorldX = ship.x;
-  tutorialTextWorldY = ship.y - 80; // Above the ship
+  // Tutorial text: only on Level 1 (currentLevelIdx === 0)
+  if (currentLevelIdx === 0) {
+    tutorialTextTimer = 11; // 10 seconds visible + 1 second fade
+    tutorialTextTimerStarted = false;
+    tutorialTextWorldX = ship.x;
+    tutorialTextWorldY = ship.y - 80; // Above the ship
+  } else {
+    tutorialTextTimer = 0;
+    tutorialTextTimerStarted = true;
+  }
   shipStatusTransient.length = 0;
   shipStatusPersistent.text = '';
   shipStatusPersistent.color = '#fff';
   shipStatusPersistent.active = false;
   shipStatusPersistent.alpha = 0;
 
-  // Level 3: start in transport ship
-  if (currentLevelIdx === 2) {
-    ownedShips.add('transport');
-    currentShipType = 'transport';
-  }
-  // Level 4: start in frigate ship
-  if (currentLevelIdx === 3) {
-    ownedShips.add('frigate');
-    currentShipType = 'frigate';
+  if (!preservePlayerState) {
+    // Level 3: start in transport ship
+    if (currentLevelIdx === 2) {
+      ownedShips.add('transport');
+      currentShipType = 'transport';
+    }
+    // Level 4: start in frigate ship
+    if (currentLevelIdx === 3) {
+      ownedShips.add('frigate');
+      currentShipType = 'frigate';
+    }
   }
 
   // Ensure inventory matches current ship's slot count
@@ -3866,49 +4013,121 @@ function loadLevel(levelData, levelIdx) {
     inventory.resize(shipStats.slots);
     applyShipStats(currentShipType);
   }
-  if (currentLevelIdx === 2 || currentLevelIdx === 3) {
+  if (!preservePlayerState && (currentLevelIdx === 2 || currentLevelIdx === 3)) {
     player.health = player.maxHealth;
     player.fuel = player.maxFuel;
     player.oxygen = player.maxOxygen;
   }
 
   // Per-level starting inventory
-  if (currentLevelIdx === 1) {
-    // Level 2: give player upgraded loadout
-    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
-    inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
-    inventory.set(1, { item: 'light blaster', heat: 0, overheated: false });
-    inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
-    inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
-    selectedSlot = 0;
-    hudDirty = true;
-  } else if (currentLevelIdx === 2) {
-    // Level 3: med laser, med blaster, 2 medium energy cells
-    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
-    inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
-    inventory.set(1, { item: 'medium blaster', heat: 0, overheated: false });
-    inventory.set(2, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
-    inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
-    selectedSlot = 0;
-    hudDirty = true;
-  } else if (currentLevelIdx === 3) {
-    // Level 4: large laser, large blaster, large energy cell
-    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
-    inventory.set(0, { item: 'large mining laser', heat: 0, overheated: false });
-    inventory.set(1, { item: 'large blaster', heat: 0, overheated: false });
-    inventory.set(2, { item: 'large energy cell', energy: 60, maxEnergy: 60 });
-    selectedSlot = 0;
-    hudDirty = true;
+  if (!preservePlayerState) {
+    if (currentLevelIdx === 1) {
+      // Level 2: give player upgraded loadout
+      for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+      inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
+      inventory.set(1, { item: 'light blaster', heat: 0, overheated: false });
+      inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+      inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+      selectedSlot = 0;
+      hudDirty = true;
+    } else if (currentLevelIdx === 2) {
+      // Level 3: med laser, med blaster, 2 medium energy cells
+      for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+      inventory.set(0, { item: 'medium mining laser', heat: 0, overheated: false });
+      inventory.set(1, { item: 'medium blaster', heat: 0, overheated: false });
+      inventory.set(2, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+      inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
+      selectedSlot = 0;
+      hudDirty = true;
+    } else if (currentLevelIdx === 3) {
+      // Level 4: large laser, large blaster, large energy cell
+      for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+      inventory.set(0, { item: 'large mining laser', heat: 0, overheated: false });
+      inventory.set(1, { item: 'large blaster', heat: 0, overheated: false });
+      inventory.set(2, { item: 'large energy cell', energy: 60, maxEnergy: 60 });
+      selectedSlot = 0;
+      hudDirty = true;
+    } else {
+      // Default loadout (Level 1 / Debug)
+      for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+      inventory.set(0, { item: 'mining laser', heat: 0, overheated: false });
+      inventory.set(1, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+      inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
+      selectedSlot = 0;
+      hudDirty = true;
+    }
   } else {
-    // Default loadout (Level 1 / Debug)
-    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
-    inventory.set(0, { item: 'mining laser', heat: 0, overheated: false });
-    inventory.set(1, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
-    inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
-    selectedSlot = 0;
+    if (selectedSlot >= inventory.slots.length) selectedSlot = 0;
     hudDirty = true;
   }
   syncLowResourceStateFromPlayer();
+}
+
+function getDefaultWarpDestinationIndex() {
+  const maxMainLevelIdx = Math.min(KNOWN_LEVELS.length - 1, 3);
+  return Math.max(0, Math.min(currentLevelIdx + 1, maxMainLevelIdx));
+}
+
+function getWarpCostFromStructure(st) {
+  return Math.max(0, Math.round(Number(st?.warpCost) || 3000));
+}
+
+function resolveWarpDestinationIndex(warpDestination) {
+  if (typeof warpDestination === 'number' && Number.isInteger(warpDestination) && KNOWN_LEVELS[warpDestination]) {
+    return warpDestination;
+  }
+  const token = String(warpDestination || '').trim().toLowerCase();
+  if (!token) return null;
+  if (/^\d+$/.test(token)) {
+    const numericIdx = Number(token);
+    if (KNOWN_LEVELS[numericIdx]) return numericIdx;
+  }
+  const normalized = token.replace(/\\/g, '/').replace(/\.json$/, '');
+  for (let idx = 0; idx < KNOWN_LEVELS.length; idx++) {
+    const lev = KNOWN_LEVELS[idx];
+    const pathNorm = lev.path.toLowerCase().replace(/\\/g, '/').replace(/\.json$/, '');
+    const fileNorm = pathNorm.split('/').pop();
+    const nameNorm = lev.name.toLowerCase().replace(/\s+/g, '');
+    if (normalized === pathNorm || normalized === fileNorm || normalized === nameNorm) return idx;
+  }
+  return null;
+}
+
+function getWarpDestinationIndex(st) {
+  const resolved = resolveWarpDestinationIndex(st?.warpDestination);
+  return resolved != null ? resolved : getDefaultWarpDestinationIndex();
+}
+
+function updateWarpMenuContent(st) {
+  const cost = getWarpCostFromStructure(st);
+  const destinationIdx = getWarpDestinationIndex(st);
+  const destination = KNOWN_LEVELS[destinationIdx];
+  const destinationName = destination ? destination.name : 'Unknown';
+  const destinationText = document.getElementById('warp-destination-text');
+  const costText = document.getElementById('warp-cost-text');
+  if (destinationText) destinationText.textContent = `Destination: ${destinationName}`;
+  if (costText) costText.textContent = `Cost: ${cost} credits`;
+  if (warpPayBtn) {
+    warpPayBtn.textContent = `Warp (${cost})`;
+    warpPayBtn.disabled = player.credits < cost || !destination;
+  }
+}
+
+function openWarpMenuForStructure(st) {
+  input.leftMouseDown = false;
+  input.rightMouseDown = false;
+  input.ctrlBrake = false;
+  sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
+  laserWasFiring = false;
+  droneLaserWasActive = false;
+  gamePaused = true;
+  warpMenuOpen = true;
+  activeWarpStructure = st;
+  sfx.playMenuOpen();
+  const overlay = document.getElementById('warp-menu-overlay');
+  if (overlay) overlay.style.display = 'flex';
+  updateWarpMenuContent(st);
 }
 
 // Level select: scan known levels and populate dropdown
@@ -3961,6 +4180,7 @@ fetch(KNOWN_LEVELS[initialLevelIdx].path + '?t=' + Date.now())
 function closeWarpMenu() {
   sfx.playMenuClose();
   warpMenuOpen = false;
+  activeWarpStructure = null;
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   const overlay = document.getElementById('warp-menu-overlay');
   if (overlay) overlay.style.display = 'none';
@@ -4049,14 +4269,39 @@ if (warpCancelBtn) {
 if (warpPayBtn) {
   warpPayBtn.addEventListener('click', () => {
     sfx.unlock();
-    if (player.credits >= 3000) {
-      player.credits -= 3000;
-      sfx.playWarp();
-      sfx.playConfirm();
-      closeWarpMenu();
-    } else {
+    const warpSt = activeWarpStructure || isShipInWarpGate();
+    const cost = getWarpCostFromStructure(warpSt);
+    const destinationIdx = getWarpDestinationIndex(warpSt);
+    const destination = KNOWN_LEVELS[destinationIdx];
+    if (!destination || player.credits < cost) {
       sfx.playCancel();
+      updateWarpMenuContent(warpSt);
+      return;
     }
+    player.credits -= cost;
+    sfx.playWarp();
+    sfx.playConfirm();
+    closeWarpMenu();
+    gamePaused = true; // Keep paused during warp transition
+
+    // Pre-fetch the level data so it's ready when bloom peaks
+    const levelDataPromise = fetch(destination.path + '?t=' + Date.now()).then(res => res.json());
+
+    startWarpTransition(() => {
+      // This fires at the peak of the bloom (screen fully white)
+      levelDataPromise
+        .then(level => {
+          try { localStorage.setItem(LEVEL_STORAGE_KEY, String(destinationIdx)); } catch (_) {}
+          if (levelSelect) levelSelect.value = String(destinationIdx);
+          loadLevel(level, destinationIdx, { preservePlayerState: true });
+        })
+        .catch(err => {
+          console.error('Failed to warp to ' + destination.path, err);
+          warpTransition.active = false;
+          warpTransition.phase = 'none';
+          gamePaused = false;
+        });
+    });
   });
 }
 
@@ -5662,6 +5907,9 @@ initShip3D();
 function gameLoop(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.1);
   lastTime = now;
+
+  // Warp transition updates even while paused so animation plays through
+  updateWarpTransition(dt);
 
   if (!gamePaused) update(dt);
   render(gamePaused ? 0 : dt);

@@ -7,6 +7,7 @@ export const MAX_SPEED_DEFAULT = 175;
 
 export const BULLET_SPEED = 675;
 export const FIRE_COOLDOWN = 0.03;
+export const PLAYER_BULLET_HIT_RADIUS = 3.6;  // 30% larger hitbox vs point collision (0.3 * typical pirate radius)
 
 export const PIRATE_ACCEL = 150;
 export const PIRATE_FRICTION = 0.15;
