@@ -382,7 +382,7 @@ class SpaceJamSfx {
 
   uiTick(from, to, duration) {
     if (!this.canPlay() || !this.passCooldown(`ui:${from}:${to}`, DEFAULTS.cooldowns.genericUi)) return;
-    this.tone({ group: 'ui', type: 'triangle', freqStart: from, freqEnd: to, duration, gain: 0.08, release: Math.max(0.03, duration * 0.65) });
+    this.tone({ group: 'ui', type: 'triangle', freqStart: from, freqEnd: to, duration, gain: 0.104, release: Math.max(0.03, duration * 0.65) });
   }
 }
 

@@ -1048,6 +1048,9 @@ function renderCraftingProperties(parent, obj) {
 
 function renderShipyardProperties(parent, obj) {
   if (!obj.availableShips) obj.availableShips = ['scout']; // Default
+  if (obj.maxDrones === undefined) obj.maxDrones = 5;
+
+  addPropInput(parent, 'Max Drones', obj.maxDrones, (v) => { obj.maxDrones = Math.max(0, parseInt(v) || 0); saveLevel(); });
 
   const shipsDiv = document.createElement('div');
   shipsDiv.className = 'prop-group';
@@ -1252,6 +1255,7 @@ function handlePlaceObject(world) {
     }
     if (type === 'shipyard') {
       st.availableShips = ['scout', 'cutter', 'transport', 'frigate', 'carrier'];
+      st.maxDrones = 5;
     }
     if (type === 'refinery') {
       st.acceptedOres = ['cuprite'];

@@ -263,9 +263,9 @@ if (mainMenuOverlay && mainMenuStartBtn) {
       cutsceneOverlay.style.display = 'flex';
       playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame, {
         onTypeChar: () => sfx.playCutsceneTypeTick(),
-        onSkip: () => sfx.playCutsceneSkip(),
-        onBlendStart: () => sfx.playCutsceneBlendStart(),
-        onBlendComplete: () => sfx.playCutsceneBlendComplete()
+        onSkip: () => {},
+        onBlendStart: () => {},
+        onBlendComplete: () => {}
       });
     } else {
       beginGame();
@@ -276,9 +276,9 @@ if (mainMenuOverlay && mainMenuStartBtn) {
   cutsceneOverlay.style.display = 'flex';
   playIntroCutscene(cutsceneMapCanvas, cutsceneDialogue, cutsceneOverlay, beginGame, {
     onTypeChar: () => sfx.playCutsceneTypeTick(),
-    onSkip: () => sfx.playCutsceneSkip(),
-    onBlendStart: () => sfx.playCutsceneBlendStart(),
-    onBlendComplete: () => sfx.playCutsceneBlendComplete()
+    onSkip: () => {},
+    onBlendStart: () => {},
+    onBlendComplete: () => {}
   });
 } else if (startOverlayEl) {
   // Fallback: classic click-to-start if cutscene markup is missing.
@@ -1040,9 +1040,9 @@ function getStructureCollisionRadius(st) {
 
 const PIRATE_BASE_COLLISION_RADIUS = SHIP_COLLISION_RADIUS + 4;
 const DRONE_COLLISION_RADIUS = 5;
-const DRONE_ACCEL = PIRATE_ACCEL * 0.55;
+const DRONE_ACCEL = PIRATE_ACCEL * 0.6875;
 const DRONE_FRICTION = PIRATE_FRICTION;
-const DRONE_MAX_SPEED = PIRATE_MAX_SPEED * 0.5;
+const DRONE_MAX_SPEED = PIRATE_MAX_SPEED * 0.9;
 const DRONE_IDLE_ORBIT_RADIUS = 35;
 const DRONE_IDLE_ORBIT_SPEED = 1.4;
 const DRONE_FIRE_PERIOD = 5.0;
@@ -1121,13 +1121,17 @@ function syncActiveDronesForCurrentShip() {
   for (let i = startCount; i < desired; i++) drones.push(createDrone(i, desired));
 }
 
-function addDroneToCurrentShip() {
+function addDroneToCurrentShip(shipyardStructure) {
   const cap = getShipDroneCapacity(currentShipType);
   if (cap <= 0) return false;
   const current = getPurchasedDroneCount(currentShipType);
   if (current >= cap) return false;
   if (player.credits < DRONE_PURCHASE_PRICE) return false;
+  const maxDrones = Number(shipyardStructure?.maxDrones) || 5;
+  const sold = Number(shipyardStructure?.dronesSold) || 0;
+  if (sold >= maxDrones) return false;
   player.credits -= DRONE_PURCHASE_PRICE;
+  shipyardStructure.dronesSold = sold + 1;
   setPurchasedDroneCount(currentShipType, current + 1);
   syncActiveDronesForCurrentShip();
   updateHUD();
@@ -1921,8 +1925,8 @@ function updateDrones(dt) {
             hit.target.health -= DRONE_LASER_DPS * dt;
             if (hit.target.type === 'piratebase' && hit.target.health <= 0) onPirateBaseDeath(hit.target);
             const laserLength = Math.max(0, hit.distance - 2);
-            const hitX = drone.x + dirX * hit.distance;
-            const hitY = drone.y + dirY * hit.distance;
+            const hitX = drone.x + dirX * laserLength;
+            const hitY = drone.y + dirY * laserLength;
             drone.sparkCarry = (drone.sparkCarry ?? 0) + DRONE_LASER_SPARKS_PER_SECOND * dt;
             const n = Math.floor(drone.sparkCarry);
             if (n > 0) {
@@ -2843,7 +2847,8 @@ function render(dt = 1 / 60) {
   // Update 3D asteroid positions (camera-follow; skip off-screen)
   for (const ast of asteroids) {
     if (!ast._mesh) continue;
-    const onScreen = ast.x > cullLeft && ast.x < cullRight && ast.y > cullTop && ast.y < cullBottom;
+    const r = ast.radius ?? 0;
+    const onScreen = (ast.x - r) < cullRight && (ast.x + r) > cullLeft && (ast.y - r) < cullBottom && (ast.y + r) > cullTop;
     ast._mesh.visible = onScreen;
     if (!onScreen) continue;
     ast._mesh.position.set(ast.x - ship.x, -(ast.y - ship.y), 0);
@@ -3485,7 +3490,7 @@ function syncShopBuyArea() {
 
 
 // Cached HUD DOM references (populated once, avoids querySelector per frame)
-const _hudSlots = []; // indices 0-8 = hotbar, 9-17 = extended
+const _hudSlots = []; // indices 0-8 = hotbar, 9-26 = extended rows
 let _hudCreditsVal = null;
 let _hudShopCredits = null;
 let _extInvEl = null;
@@ -3493,7 +3498,7 @@ function _cacheHUDElements() {
   for (let i = 0; i < 9; i++) {
     _hudSlots[i] = document.querySelector(`#hotbar .slot[data-slot="${i}"]`);
   }
-  for (let i = 9; i < 18; i++) {
+  for (let i = 9; i < 27; i++) {
     _hudSlots[i] = document.querySelector(`#extended-inventory .ext-slot[data-slot="${i}"]`);
   }
   _hudCreditsVal = document.querySelector('.credits-value');
@@ -3523,8 +3528,8 @@ function _flushHUD() {
     html += getSlotHTML(it);
     el.innerHTML = html;
   }
-  // Render extended slots (9-17)
-  for (let i = 9; i < 18; i++) {
+  // Render extended slots (9-26)
+  for (let i = 9; i < 27; i++) {
     const el = _hudSlots[i];
     if (!el) continue;
     if (i < totalSlots) {
@@ -3796,6 +3801,11 @@ function loadLevel(levelData, levelIdx) {
         if (st.warpDestination === undefined) st.warpDestination = 'level2'; // Default
     }
 
+    if (st.type === 'shipyard') {
+      if (st.maxDrones === undefined) st.maxDrones = 5;
+      if (st.dronesSold === undefined) st.dronesSold = 0;
+    }
+
     return st;
   });
   if (floatingOreContainer) while (floatingOreContainer.children.length) floatingOreContainer.remove(floatingOreContainer.children[0]);
@@ -3997,6 +4007,7 @@ function openShopMenu(shopStructure) {
   laserWasFiring = false;
   droneLaserWasActive = false;
   shopMenuOpen = true;
+  updateExtInvVisibility();
   for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
   syncShopBuyArea();
   updateHUD();
@@ -4014,6 +4025,7 @@ function closeShopMenu() {
   sfx.playMenuClose();
   returnSellAreaToHotbar();
   shopMenuOpen = false;
+  updateExtInvVisibility();
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   inventoryDrag = null;
   activeShopStructure = null;
@@ -4076,6 +4088,7 @@ function openCraftingMenu(structure) {
   sfx.playMenuOpen();
   activeCraftingStructure = structure;
   craftingMenuOpen = true;
+  updateExtInvVisibility();
   gamePaused = true;
   sfx.stopLaserLoop();
   sfx.stopDroneLaserLoop();
@@ -4132,6 +4145,7 @@ function closeCraftingMenu() {
   }
   
   craftingMenuOpen = false;
+  updateExtInvVisibility();
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   activeCraftingStructure = null;
   const overlay = document.getElementById('crafting-menu-overlay');
@@ -4269,6 +4283,7 @@ function openRefineryMenu(structure) {
   sfx.playMenuOpen();
   activeRefineryStructure = structure;
   refineryMenuOpen = true;
+  updateExtInvVisibility();
   gamePaused = true;
   sfx.stopLaserLoop();
   sfx.stopDroneLaserLoop();
@@ -4330,6 +4345,7 @@ function closeRefineryMenu() {
   }
 
   refineryMenuOpen = false;
+  updateExtInvVisibility();
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   activeRefineryStructure = null;
   const overlay = document.getElementById('refinery-menu-overlay');
@@ -4546,8 +4562,8 @@ function cleanupShipyardPreviews() {
 }
 
 function createShipPreview(container, shipType) {
-  const PREVIEW_W = 200;
-  const PREVIEW_H = 100;
+  const PREVIEW_W = 96;
+  const PREVIEW_H = 64;
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
   const cvs = document.createElement('canvas');
@@ -4647,6 +4663,7 @@ function openShipyardMenu(structure) {
   if (shipyardMenuOpen) return;
   sfx.playMenuOpen();
   shipyardMenuOpen = true;
+  updateExtInvVisibility();
   activeShipyardStructure = structure;
   gamePaused = true;
   sfx.stopLaserLoop();
@@ -4667,6 +4684,14 @@ function renderShipyardDroneControls(structure) {
   const menu = document.getElementById('shipyard-menu');
   const anchor = document.getElementById('shipyard-for-sale-section');
   if (!menu || !anchor) return;
+
+  const anyOwnedShipHasDroneBay = [...ownedShips].some(t => getShipDroneCapacity(t) > 0);
+  if (!anyOwnedShipHasDroneBay) {
+    let controls = document.getElementById('shipyard-drone-controls');
+    if (controls) controls.style.display = 'none';
+    return;
+  }
+
   let controls = document.getElementById('shipyard-drone-controls');
   if (!controls) {
     controls = document.createElement('div');
@@ -4674,6 +4699,7 @@ function renderShipyardDroneControls(structure) {
     controls.className = 'shipyard-drone-controls';
     menu.insertBefore(controls, anchor);
   }
+  controls.style.display = '';
 
   const cap = getShipDroneCapacity(currentShipType);
   const owned = getPurchasedDroneCount(currentShipType);
@@ -4691,7 +4717,9 @@ function renderShipyardDroneControls(structure) {
     controls.appendChild(status);
     return;
   }
-  status.textContent = `Active drones: ${owned}/${cap}`;
+  const maxDrones = Number(structure?.maxDrones) || 5;
+  const dronesRemaining = Math.max(0, maxDrones - (Number(structure?.dronesSold) || 0));
+  status.textContent = `Active drones: ${owned}/${cap} • Stock: ${dronesRemaining}/${maxDrones}`;
   controls.appendChild(status);
 
   const buyBtn = document.createElement('button');
@@ -4699,9 +4727,10 @@ function renderShipyardDroneControls(structure) {
   buyBtn.type = 'button';
   buyBtn.textContent = `Buy Drone - ${DRONE_PURCHASE_PRICE} cr`;
   const atCap = owned >= cap;
-  buyBtn.disabled = atCap || player.credits < DRONE_PURCHASE_PRICE;
+  const outOfStock = dronesRemaining <= 0;
+  buyBtn.disabled = atCap || outOfStock || player.credits < DRONE_PURCHASE_PRICE;
   buyBtn.onclick = () => {
-    const bought = addDroneToCurrentShip();
+    const bought = addDroneToCurrentShip(structure);
     if (!bought) return;
     const creditsEl = document.getElementById('shipyard-credits');
     if (creditsEl) creditsEl.textContent = `${player.credits} credits`;
@@ -4739,25 +4768,32 @@ function renderShipyardCards(structure) {
     const card = document.createElement('div');
     card.className = 'shipyard-card' + (mode === 'current' ? ' current' : '');
 
-    // 3D Preview area
-    const previewDiv = document.createElement('div');
-    previewDiv.className = 'shipyard-card-preview';
-    createShipPreview(previewDiv, type);
-    card.appendChild(previewDiv);
-
-    // Card body
-    const body = document.createElement('div');
-    body.className = 'shipyard-card-body';
+    // Title row (name + desc) - full width across top including ship demo area
+    const titleRow = document.createElement('div');
+    titleRow.className = 'shipyard-card-title-row';
 
     const nameEl = document.createElement('div');
     nameEl.className = 'shipyard-card-name';
     nameEl.textContent = stats.name;
-    body.appendChild(nameEl);
+    titleRow.appendChild(nameEl);
 
     const descEl = document.createElement('div');
     descEl.className = 'shipyard-card-desc';
     descEl.textContent = stats.desc;
-    body.appendChild(descEl);
+    titleRow.appendChild(descEl);
+
+    card.appendChild(titleRow);
+
+    // Content row: body (stats, button) | preview
+    const contentRow = document.createElement('div');
+    contentRow.className = 'shipyard-card-content-row';
+
+    const body = document.createElement('div');
+    body.className = 'shipyard-card-body';
+
+    const previewDiv = document.createElement('div');
+    previewDiv.className = 'shipyard-card-preview';
+    createShipPreview(previewDiv, type);
 
     // Stats grid
     const statsGrid = document.createElement('div');
@@ -4766,10 +4802,11 @@ function renderShipyardCards(structure) {
       ['HP', stats.health],
       ['Fuel', stats.fuel],
       ['O2', stats.oxygen],
-      ['Speed', stats.speed],
-      ['Slots', stats.slots],
-      ['Drones', stats.droneSlots ?? 0],
+      ['Inv Slots', stats.slots],
     ];
+    if ((stats.droneSlots ?? 0) > 0) {
+      statEntries.push(['Drone bay', stats.droneSlots]);
+    }
     if ((stats.damageReduction ?? 0) > 0) {
       statEntries.push(['Dmg Resist', `${Math.round((stats.damageReduction || 0) * 100)}%`]);
     }
@@ -4821,7 +4858,9 @@ function renderShipyardCards(structure) {
     actionDiv.appendChild(btn);
     body.appendChild(actionDiv);
 
-    card.appendChild(body);
+    contentRow.appendChild(body);
+    contentRow.appendChild(previewDiv);
+    card.appendChild(contentRow);
     return card;
   }
 
@@ -4855,6 +4894,7 @@ function closeShipyardMenu() {
   sfx.playMenuClose();
   cleanupShipyardPreviews();
   shipyardMenuOpen = false;
+  updateExtInvVisibility();
   activeShipyardStructure = null;
   gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
   const overlay = document.getElementById('shipyard-menu-overlay');

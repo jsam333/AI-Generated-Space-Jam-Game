@@ -865,7 +865,8 @@
       "availableShips": [
         "frigate",
         "carrier"
-      ]
+      ],
+      "maxDrones": 5
     },
     {
       "x": 304.4940491520893,
