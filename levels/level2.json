@@ -6879,11 +6879,11 @@
           "inputs": [
             {
               "item": "copper",
-              "quantity": 30
+              "quantity": 40
             },
             {
               "item": "hematite",
-              "quantity": 30
+              "quantity": 40
             },
             {
               "item": "scrap",
@@ -7402,6 +7402,18 @@
         "waveIntervalMax": 60,
         "waveSizeMin": 1,
         "waveSizeMax": 3,
+        "pirateTypePercentages": {
+          "normal": 100,
+          "sturdy": 0,
+          "fast": 0
+        }
+      },
+      {
+        "startTime": 1200,
+        "waveIntervalMin": 30,
+        "waveIntervalMax": 50,
+        "waveSizeMin": 3,
+        "waveSizeMax": 5,
         "pirateTypePercentages": {
           "normal": 100,
           "sturdy": 0,

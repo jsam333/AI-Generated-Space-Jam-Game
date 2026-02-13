@@ -610,10 +610,10 @@
         }
       },
       {
-        "startTime": 600,
-        "waveIntervalMin": 70,
+        "startTime": 800,
+        "waveIntervalMin": 60,
         "waveIntervalMax": 100,
-        "waveSizeMin": 2,
+        "waveSizeMin": 3,
         "waveSizeMax": 5,
         "pirateTypePercentages": {
           "normal": 100,

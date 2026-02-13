@@ -149,7 +149,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 10000  // TEST: start with 10k credits
+  credits: 0
 };
 
 // Inventory
@@ -2615,7 +2615,7 @@ function updateDrones(dt) {
         if (maxDist > 0) {
           const hit = getDroneLaserHit(drone, target, dirX, dirY, maxDist);
           if (hit) {
-            hit.target.health -= DRONE_LASER_DPS * dt;
+            hit.target.health -= DRONE_LASER_DPS * dt * shipDamageMult;
             if (hit.target.type === 'piratebase' && hit.target.health <= 0) onPirateBaseDeath(hit.target);
             const laserLength = Math.max(0, hit.distance - 2);
             const hitX = drone.x + dirX * laserLength;
@@ -3276,7 +3276,7 @@ function update(dt) {
   maybeNotifyLowResource('oxygen', player.oxygen, player.maxOxygen, 'low oxygen', OXYGEN_BAR_COLOR);
   updateShipStatus(dt);
 
-  if (!deathScreenOpen && !deathSequence.active && player.health <= 0) startDeathSequence();
+  if (!saveLoadInProgress && !deathScreenOpen && !deathSequence.active && player.health <= 0) startDeathSequence();
 }
 
 function render(dt = 1 / 60) {
@@ -3927,25 +3927,20 @@ function syncResourceBarDropZones({
 
 // Input
 
-
-
-
-
-canvas.addEventListener('wheel', (e) => {
+function handleHotbarScroll(e) {
+  if (startScreenOpen || deathScreenOpen || warpMenuOpen || shopMenuOpen) return;
   e.preventDefault();
-  if (startScreenOpen || deathScreenOpen) return;
-  if (warpMenuOpen) return;
-  if (shopMenuOpen) return;
-  const slotCount = inventory.slots.length;
-  if (slotCount <= 0) return;
+  const hotbarSize = 9; // Only scroll through hotbar slots 0-8
   if (e.deltaY > 0) {
-    selectedSlot = (selectedSlot + 1) % slotCount;
+    selectedSlot = (selectedSlot + 1) % hotbarSize;
   } else {
-    selectedSlot = (selectedSlot - 1 + slotCount) % slotCount;
+    selectedSlot = (selectedSlot - 1 + hotbarSize) % hotbarSize;
   }
   sfx.playHotbarSelect();
   markHUDDirty();
-});
+}
+
+canvas.addEventListener('wheel', handleHotbarScroll, { passive: false });
 
 function getNearbyStructureByType(type) {
   for (const st of structures) {
@@ -4656,12 +4651,11 @@ function loadLevel(levelData, levelIdx, options = {}) {
       selectedSlot = 0;
       hudDirty = true;
     } else {
-      // Default loadout (Level 1 / Debug) - TEST: includes warp key
+      // Default loadout (Level 1 / Debug)
       for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
       inventory.set(0, { item: 'mining laser', heat: 0, overheated: false });
       inventory.set(1, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
       inventory.set(2, { item: 'small energy cell', energy: 10, maxEnergy: 10 });
-      inventory.set(3, { item: 'warp key', quantity: 1 });
       selectedSlot = 0;
       hudDirty = true;
     }
@@ -5818,6 +5812,7 @@ const hudOverlayEl = document.getElementById('hud-overlay');
 if (hudOverlayEl) {
   hudOverlayEl.addEventListener('mouseenter', () => { _extInvHovered = true; updateExtInvVisibility(); });
   hudOverlayEl.addEventListener('mouseleave', () => { _extInvHovered = false; updateExtInvVisibility(); });
+  hudOverlayEl.addEventListener('wheel', handleHotbarScroll, { passive: false });
 }
 
 function showShopTooltip(itemKey, price, isBuy, slotEl) {

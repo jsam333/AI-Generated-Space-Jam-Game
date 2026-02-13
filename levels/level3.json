@@ -106,8 +106,8 @@
       "oreType": "diamite"
     },
     {
-      "x": 1393.630886706794,
-      "y": -573.3388759458488,
+      "x": 1607.6997026971096,
+      "y": -466.30446795069093,
       "radius": 120,
       "oreType": "diamite"
     },
@@ -398,6 +398,144 @@
       "y": -385.3848314242923,
       "radius": 60,
       "oreType": "platinite"
+    },
+    {
+      "x": 1305.691289557572,
+      "y": -385.8368932360832,
+      "radius": 30,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1177.2499999633824,
+      "y": -377.80931263644635,
+      "radius": 50,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1257.5258059597509,
+      "y": -281.4783454408042,
+      "radius": 30,
+      "oreType": "platinite"
+    },
+    {
+      "x": 1321.7464507568457,
+      "y": -313.58866783935156,
+      "radius": 10,
+      "oreType": "platinite"
+    },
+    {
+      "x": -579.8981979571263,
+      "y": 837.0312181085958,
+      "radius": 30,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -490.70285796116144,
+      "y": 881.6288881065782,
+      "radius": 40,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -499.62239196075797,
+      "y": 783.5140141110169,
+      "radius": 40,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -579.8981979571263,
+      "y": 935.1460921041573,
+      "radius": 30,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -624.4958679551089,
+      "y": 872.7093541069817,
+      "radius": 20,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -472.8637899619685,
+      "y": 979.7437621021397,
+      "radius": 20,
+      "oreType": "cuprite"
+    },
+    {
+      "x": -245.415672972258,
+      "y": -728.3469988205886,
+      "radius": 30,
+      "oreType": "aurite"
+    },
+    {
+      "x": -120.54219697790711,
+      "y": -710.5079308213956,
+      "radius": 40,
+      "oreType": "aurite"
+    },
+    {
+      "x": -290.0133429702404,
+      "y": -835.3814068157465,
+      "radius": 40,
+      "oreType": "aurite"
+    },
+    {
+      "x": -200.8180029742755,
+      "y": -648.0711928242201,
+      "radius": 20,
+      "oreType": "aurite"
+    },
+    {
+      "x": -316.77194496902985,
+      "y": -701.588396821799,
+      "radius": 20,
+      "oreType": "aurite"
+    },
+    {
+      "x": -182.97893497508255,
+      "y": -790.7837368177641,
+      "radius": 20,
+      "oreType": "aurite"
+    },
+    {
+      "x": 1404.6981169530932,
+      "y": -1263.519038796378,
+      "radius": 50,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1538.4911269470404,
+      "y": -1174.323698800413,
+      "radius": 60,
+      "oreType": "diamite"
+    },
+    {
+      "x": 1413.6176509526895,
+      "y": -1147.5650968016237,
+      "radius": 40,
+      "oreType": "diamite"
+    },
+    {
+      "x": 440.14026047668926,
+      "y": -859.7682513940374,
+      "radius": 40,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 474.590980558337,
+      "y": -739.1907311082703,
+      "radius": 50,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 354.0134602725699,
+      "y": -610.0005308020911,
+      "radius": 70,
+      "oreType": "cuprite"
+    },
+    {
+      "x": 259.27398004803854,
+      "y": -713.3526910470343,
+      "radius": 30,
+      "oreType": "cuprite"
     }
   ],
   "structures": [
@@ -528,19 +666,19 @@
       "drops": [
         {
           "item": "oxygen canister",
-          "quantity": 2
+          "quantity": 1
         },
         {
           "item": "fuel tank",
-          "quantity": 2
+          "quantity": 1
         },
         {
           "item": "health pack",
-          "quantity": 2
+          "quantity": 1
         },
         {
           "item": "small energy cell",
-          "quantity": 4
+          "quantity": 3
         },
         {
           "item": "scrap",
@@ -695,19 +833,19 @@
         },
         {
           "item": "medium oxygen canister",
-          "quantity": 3,
+          "quantity": 4,
           "oxygen": 30,
           "maxOxygen": 30
         },
         {
           "item": "medium fuel tank",
-          "quantity": 3,
+          "quantity": 4,
           "fuel": 30,
           "maxFuel": 30
         },
         {
           "item": "medium health pack",
-          "quantity": 3,
+          "quantity": 4,
           "health": 30
         }
       ],
@@ -1957,16 +2095,28 @@
   "spawnSettings": {
     "initialDelay": 60,
     "waveIntervalMin": 20,
-    "waveIntervalMax": 40,
+    "waveIntervalMax": 50,
     "waveSizeMin": 1,
     "waveSizeMax": 1,
     "tiers": [
       {
-        "startTime": 600,
+        "startTime": 500,
         "waveIntervalMin": 50,
         "waveIntervalMax": 80,
         "waveSizeMin": 3,
-        "waveSizeMax": 5,
+        "waveSizeMax": 6,
+        "pirateTypePercentages": {
+          "normal": 34,
+          "sturdy": 33,
+          "fast": 33
+        }
+      },
+      {
+        "startTime": 1200,
+        "waveIntervalMin": 50,
+        "waveIntervalMax": 80,
+        "waveSizeMin": 5,
+        "waveSizeMax": 8,
         "pirateTypePercentages": {
           "normal": 34,
           "sturdy": 33,
