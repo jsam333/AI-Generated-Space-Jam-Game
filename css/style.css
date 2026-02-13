@@ -834,6 +834,49 @@ textarea {
   border: 1px solid #3a3a3a;
 }
 
+.shipyard-drone-controls {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(20, 20, 20, 0.9);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shipyard-drone-title {
+  color: #dbeeff;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.shipyard-drone-status {
+  color: #9fb5c9;
+  font-size: 12px;
+  flex: 1;
+}
+
+.shipyard-drone-buy-btn {
+  border: 1px solid #4f6c86;
+  background: #34516a;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.shipyard-drone-buy-btn:hover:not(:disabled) {
+  background: #406789;
+}
+
+.shipyard-drone-buy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 #shop-menu-overlay {
   position: absolute;
   left: 0;

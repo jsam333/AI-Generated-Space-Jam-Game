@@ -55,11 +55,15 @@ let levelSeed = 0;
 
 // Pirate Globals
 const pirates = [];
+const drones = [];
 let levelElapsedTime = 0;
 // Pirate wave spawning is scheduled against levelElapsedTime (seconds since level load).
 // Keep an absolute "next wave at time T" so tier/phase changes don't reset the timer.
 let pirateNextWaveTime = 120; // default; overwritten by loadLevel()
 let levelIsDebug = false;
+let nextDroneId = 1;
+let lastPlayerHitAsteroid = null;
+const shipDroneCounts = { scout: 0, cutter: 0, transport: 0, frigate: 0, carrier: 0 };
 
 // Dynamic ship properties (updated when switching ships)
 let MAX_SPEED = MAX_SPEED_DEFAULT;
@@ -153,6 +157,7 @@ let selectedSlot = 0;
 let blasterFireAccum = 0;
 let hudDirty = true; // When true, updateHUD() will re-render; set by any mutation
 let laserWasFiring = false;
+let droneLaserWasActive = false;
 
 // Input
 const input = new InputHandler(canvas);
@@ -236,6 +241,7 @@ function beginGame() {
   input.rightMouseDown = false;
   input.ctrlBrake = false;
   sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
   if (canvas && canvas.focus) canvas.focus();
 }
 
@@ -1033,6 +1039,174 @@ function getStructureCollisionRadius(st) {
 }
 
 const PIRATE_BASE_COLLISION_RADIUS = SHIP_COLLISION_RADIUS + 4;
+const DRONE_COLLISION_RADIUS = 5;
+const DRONE_ACCEL = PIRATE_ACCEL * 0.55;
+const DRONE_FRICTION = PIRATE_FRICTION;
+const DRONE_MAX_SPEED = PIRATE_MAX_SPEED * 0.5;
+const DRONE_IDLE_ORBIT_RADIUS = 35;
+const DRONE_IDLE_ORBIT_SPEED = 1.4;
+const DRONE_FIRE_PERIOD = 5.0;
+const DRONE_FIRE_ACTIVE_TIME = 0.5;
+const DRONE_LASER_RANGE = 300;
+const DRONE_LASER_DPS = 5;
+const DRONE_PURCHASE_PRICE = 1200;
+const DRONE_AVOID_FORCE = 350;
+const DRONE_SCREEN_MARGIN = 80;
+const DRONE_STAY_ON_SCREEN_FORCE = 300;
+const DRONE_PLAYER_PROXIMITY_BIAS = 120;
+const DRONE_LASER_OUTER_COLOR = 'rgba(255,180,120,0.9)';
+const DRONE_LASER_INNER_COLOR = 'rgba(255,220,170,0.95)';
+const DRONE_LASER_SPARKS_PER_SECOND = 12.6; // time-based, ~20% of original rate
+
+function isWorldOnScreen(x, y, padding = 0) {
+  return x >= ship.x - WIDTH / 2 - padding &&
+    x <= ship.x + WIDTH / 2 + padding &&
+    y >= ship.y - HEIGHT / 2 - padding &&
+    y <= ship.y + HEIGHT / 2 + padding;
+}
+
+function getRayMaxDistanceToScreen(wx, wy, dirX, dirY) {
+  const sx = wx - ship.x + WIDTH / 2;
+  const sy = wy - ship.y + HEIGHT / 2;
+  let maxL = Infinity;
+  if (dirX > 0) maxL = Math.min(maxL, (WIDTH - sx) / dirX);
+  else if (dirX < 0) maxL = Math.min(maxL, -sx / dirX);
+  if (dirY > 0) maxL = Math.min(maxL, (HEIGHT - sy) / dirY);
+  else if (dirY < 0) maxL = Math.min(maxL, -sy / dirY);
+  if (!Number.isFinite(maxL)) return 0;
+  return Math.max(0, maxL);
+}
+
+function getShipDroneCapacity(shipType) {
+  const slots = Number(SHIP_STATS?.[shipType]?.droneSlots) || 0;
+  return Math.max(0, Math.round(slots));
+}
+
+function getPurchasedDroneCount(shipType) {
+  return Math.max(0, Math.round(Number(shipDroneCounts[shipType]) || 0));
+}
+
+function setPurchasedDroneCount(shipType, count) {
+  const cap = getShipDroneCapacity(shipType);
+  shipDroneCounts[shipType] = Math.max(0, Math.min(cap, Math.round(Number(count) || 0)));
+}
+
+function createDrone(index = 0, total = 1) {
+  const angle = (index / Math.max(1, total)) * Math.PI * 2;
+  const radius = DRONE_IDLE_ORBIT_RADIUS;
+  return {
+    id: nextDroneId++,
+    x: ship.x + Math.cos(angle) * radius,
+    y: ship.y + Math.sin(angle) * radius,
+    vx: 0,
+    vy: 0,
+    facingAngle: angle,
+    tilt: 0,
+    orbitAngle: angle,
+    state: 'chase',
+    stateTimer: 1 + Math.random() * 2,
+    fireTimer: Math.random() * DRONE_FIRE_PERIOD,
+    target: null,
+    laserLength: 0,
+    laserDirX: 0,
+    laserDirY: 0,
+    laserActive: false
+  };
+}
+
+function syncActiveDronesForCurrentShip() {
+  const desired = Math.min(getPurchasedDroneCount(currentShipType), getShipDroneCapacity(currentShipType));
+  for (let i = drones.length - 1; i >= desired; i--) drones.pop();
+  const startCount = drones.length;
+  for (let i = startCount; i < desired; i++) drones.push(createDrone(i, desired));
+}
+
+function addDroneToCurrentShip() {
+  const cap = getShipDroneCapacity(currentShipType);
+  if (cap <= 0) return false;
+  const current = getPurchasedDroneCount(currentShipType);
+  if (current >= cap) return false;
+  if (player.credits < DRONE_PURCHASE_PRICE) return false;
+  player.credits -= DRONE_PURCHASE_PRICE;
+  setPurchasedDroneCount(currentShipType, current + 1);
+  syncActiveDronesForCurrentShip();
+  updateHUD();
+  sfx.playBuy();
+  return true;
+}
+
+function getNearestEligiblePirateForDrone(drone) {
+  let best = null;
+  let bestDistSq = Infinity;
+  for (const p of pirates) {
+    if (p.health <= 0) continue;
+    if (!isWorldOnScreen(p.x, p.y, p.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS)) continue;
+    if (p.defendingBase && !p.defendingBase.aggroed) continue;
+    const dx = p.x - drone.x;
+    const dy = p.y - drone.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestDistSq) {
+      bestDistSq = d2;
+      best = p;
+    }
+  }
+  return best;
+}
+
+function getNearestEligibleAggroBaseForDrone(drone) {
+  let best = null;
+  let bestDistSq = Infinity;
+  for (const st of structures) {
+    if (st.type !== 'piratebase' || st.dead || st.health <= 0 || !st.aggroed) continue;
+    if (!isWorldOnScreen(st.x, st.y, getPirateBaseHitRadius(st))) continue;
+    const dx = st.x - drone.x;
+    const dy = st.y - drone.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < bestDistSq) {
+      bestDistSq = d2;
+      best = st;
+    }
+  }
+  return best;
+}
+
+function pickDroneTarget(drone) {
+  const pirateTarget = getNearestEligiblePirateForDrone(drone);
+  if (pirateTarget) {
+    const dx = pirateTarget.x - drone.x;
+    const dy = pirateTarget.y - drone.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const distToSurface = Math.max(0, dist - getDroneTargetRadius(pirateTarget));
+    if (distToSurface <= DRONE_LASER_RANGE) return pirateTarget;
+    if (lastPlayerHitAsteroid && lastPlayerHitAsteroid.health > 0 && asteroids.includes(lastPlayerHitAsteroid) &&
+        isWorldOnScreen(lastPlayerHitAsteroid.x, lastPlayerHitAsteroid.y, lastPlayerHitAsteroid.radius)) {
+      return lastPlayerHitAsteroid;
+    }
+    return pirateTarget;
+  }
+  const baseTarget = getNearestEligibleAggroBaseForDrone(drone);
+  if (baseTarget) return baseTarget;
+  if (!lastPlayerHitAsteroid) return null;
+  if (lastPlayerHitAsteroid.health <= 0 || !asteroids.includes(lastPlayerHitAsteroid)) {
+    lastPlayerHitAsteroid = null;
+    return null;
+  }
+  if (!isWorldOnScreen(lastPlayerHitAsteroid.x, lastPlayerHitAsteroid.y, lastPlayerHitAsteroid.radius)) return null;
+  return lastPlayerHitAsteroid;
+}
+
+function getDroneTargetRadius(target) {
+  return target?.type === 'piratebase'
+    ? getPirateBaseHitRadius(target)
+    : (target?.radius ?? target?.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS);
+}
+
+function getDroneLaserHit(drone, target, dirX, dirY, maxLen) {
+  const targetRadius = getDroneTargetRadius(target);
+  const d = raycastCircle(drone.x, drone.y, dirX, dirY, target.x, target.y, targetRadius, maxLen);
+  if (d < 0) return null;
+  return { target, distance: d };
+}
 const PIRATE_TYPE_CONFIG = Object.freeze({
   normal: { health: PIRATE_HEALTH, speedMult: 1, sizeMult: 1, tint: 0xff6666, emissiveIntensity: 1.5 },
   sturdy: { health: PIRATE_HEALTH * 2, speedMult: 0.7, sizeMult: 1.3, tint: 0xff6666, emissiveIntensity: 1.5 },
@@ -1607,6 +1781,166 @@ function updatePirates(dt) {
   }
 }
 
+function updateDrones(dt) {
+  for (let i = 0; i < drones.length; i++) {
+    const drone = drones[i];
+    drone.orbitAngle += DRONE_IDLE_ORBIT_SPEED * dt;
+    drone.stateTimer -= dt;
+    if (drone.stateTimer <= 0) {
+      drone.state = drone.state === 'chase' ? 'circle' : 'chase';
+      drone.stateTimer = 1.4 + Math.random() * 1.8;
+    }
+    drone.target = pickDroneTarget(drone);
+    const target = drone.target;
+
+    let ax = 0;
+    let ay = 0;
+    if (target) {
+      const dx = target.x - drone.x;
+      const dy = target.y - drone.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dir = dist > 0 ? { x: dx / dist, y: dy / dist } : { x: 0, y: 0 };
+      if (drone.state === 'chase') {
+        ax += dir.x * DRONE_ACCEL;
+        ay += dir.y * DRONE_ACCEL;
+      } else {
+        const cw = (drone.id % 2 === 0) ? 1 : -1;
+        ax += -dir.y * cw * DRONE_ACCEL;
+        ay += dir.x * cw * DRONE_ACCEL;
+      }
+    } else {
+      const orbitRadius = DRONE_IDLE_ORBIT_RADIUS + i * 4;
+      const targetX = ship.x + Math.cos(drone.orbitAngle + i * 0.45) * orbitRadius;
+      const targetY = ship.y + Math.sin(drone.orbitAngle + i * 0.45) * orbitRadius;
+      const dx = targetX - drone.x;
+      const dy = targetY - drone.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        ax += (dx / dist) * DRONE_ACCEL;
+        ay += (dy / dist) * DRONE_ACCEL;
+      }
+    }
+
+    const lookAhead = 20;
+    for (const ast of asteroids) {
+      const adx = ast.x - drone.x;
+      const ady = ast.y - drone.y;
+      const adist = Math.sqrt(adx * adx + ady * ady);
+      if (adist > 0 && adist < ast.radius + lookAhead) {
+        ax -= (adx / adist) * DRONE_AVOID_FORCE;
+        ay -= (ady / adist) * DRONE_AVOID_FORCE;
+      }
+    }
+    for (const st of structures) {
+      if (!isCollidableStructure(st)) continue;
+      const sdx = st.x - drone.x;
+      const sdy = st.y - drone.y;
+      const sdist = Math.sqrt(sdx * sdx + sdy * sdy);
+      if (sdist > 0 && sdist < getStructureCollisionRadius(st) + lookAhead) {
+        ax -= (sdx / sdist) * DRONE_AVOID_FORCE;
+        ay -= (sdy / sdist) * DRONE_AVOID_FORCE;
+      }
+    }
+    const pdx = ship.x - drone.x;
+    const pdy = ship.y - drone.y;
+    const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+    if (pdist > 0 && pdist < shipCollisionRadius + 24) {
+      ax -= (pdx / pdist) * DRONE_AVOID_FORCE;
+      ay -= (pdy / pdist) * DRONE_AVOID_FORCE;
+    }
+
+    // Stay-on-screen: pull toward center when near/past viewport edges
+    const left = ship.x - WIDTH / 2 + DRONE_SCREEN_MARGIN;
+    const right = ship.x + WIDTH / 2 - DRONE_SCREEN_MARGIN;
+    const top = ship.y - HEIGHT / 2 + DRONE_SCREEN_MARGIN;
+    const bottom = ship.y + HEIGHT / 2 - DRONE_SCREEN_MARGIN;
+    if (drone.x < left) ax += (left - drone.x) / DRONE_SCREEN_MARGIN * DRONE_STAY_ON_SCREEN_FORCE;
+    if (drone.x > right) ax -= (drone.x - right) / DRONE_SCREEN_MARGIN * DRONE_STAY_ON_SCREEN_FORCE;
+    if (drone.y < top) ay += (top - drone.y) / DRONE_SCREEN_MARGIN * DRONE_STAY_ON_SCREEN_FORCE;
+    if (drone.y > bottom) ay -= (drone.y - bottom) / DRONE_SCREEN_MARGIN * DRONE_STAY_ON_SCREEN_FORCE;
+
+    // Player-proximity bias: pull toward player, stronger when farther
+    if (pdist > 30) {
+      const bias = DRONE_PLAYER_PROXIMITY_BIAS * Math.min(1, pdist / 150);
+      ax += (pdx / pdist) * bias;
+      ay += (pdy / pdist) * bias;
+    }
+
+    drone.vx += ax * dt;
+    drone.vy += ay * dt;
+    drone.vx *= Math.max(0, 1 - DRONE_FRICTION * dt);
+    drone.vy *= Math.max(0, 1 - DRONE_FRICTION * dt);
+    const speed = Math.sqrt(drone.vx * drone.vx + drone.vy * drone.vy);
+    if (speed > DRONE_MAX_SPEED) {
+      const s = DRONE_MAX_SPEED / speed;
+      drone.vx *= s;
+      drone.vy *= s;
+    }
+
+    drone.x += drone.vx * dt;
+    drone.y += drone.vy * dt;
+
+    for (const ast of asteroids) {
+      const hit = pushOutOverlap(drone, ast, DRONE_COLLISION_RADIUS, ast.radius);
+      if (hit) bounceEntity(drone, hit.nx, hit.ny, BOUNCE_RESTITUTION);
+    }
+    for (const st of structures) {
+      if (!isCollidableStructure(st)) continue;
+      const hit = pushOutOverlap(drone, st, DRONE_COLLISION_RADIUS, getStructureCollisionRadius(st));
+      if (hit) bounceEntity(drone, hit.nx, hit.ny, BOUNCE_RESTITUTION);
+    }
+    const shipHit = pushOutOverlap(drone, ship, DRONE_COLLISION_RADIUS, shipCollisionRadius);
+    if (shipHit) bounceEntity(drone, shipHit.nx, shipHit.ny, BOUNCE_RESTITUTION);
+
+    const thrustMag = Math.sqrt(ax * ax + ay * ay);
+    if (thrustMag > 10) {
+      const targetAngle = Math.atan2(ay, ax);
+      let angleDiff = targetAngle - drone.facingAngle;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      drone.facingAngle += angleDiff * Math.min(1, 5 * dt);
+    }
+
+    drone.fireTimer = (drone.fireTimer + dt) % DRONE_FIRE_PERIOD;
+    const fireActive = drone.fireTimer <= DRONE_FIRE_ACTIVE_TIME;
+    drone.laserActive = false;
+    drone.laserLength = 0;
+    if (fireActive && target) {
+      const dx = target.x - drone.x;
+      const dy = target.y - drone.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const targetRadius = getDroneTargetRadius(target);
+      const distToSurface = Math.max(0, dist - targetRadius);
+      if (dist > 0 && distToSurface <= DRONE_LASER_RANGE) {
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        const maxDist = Math.min(DRONE_LASER_RANGE, getRayMaxDistanceToScreen(drone.x, drone.y, dirX, dirY));
+        if (maxDist > 0) {
+          const hit = getDroneLaserHit(drone, target, dirX, dirY, maxDist);
+          if (hit) {
+            hit.target.health -= DRONE_LASER_DPS * dt;
+            if (hit.target.type === 'piratebase' && hit.target.health <= 0) onPirateBaseDeath(hit.target);
+            const laserLength = Math.max(0, hit.distance - 2);
+            const hitX = drone.x + dirX * hit.distance;
+            const hitY = drone.y + dirY * hit.distance;
+            drone.sparkCarry = (drone.sparkCarry ?? 0) + DRONE_LASER_SPARKS_PER_SECOND * dt;
+            const n = Math.floor(drone.sparkCarry);
+            if (n > 0) {
+              spawnSparks(hitX, hitY, n);
+              sfx.playImpact('laser');
+              drone.sparkCarry -= n;
+            }
+            drone.laserActive = true;
+            drone.laserDirX = dirX;
+            drone.laserDirY = dirY;
+            drone.laserLength = laserLength;
+          }
+        }
+      }
+    }
+  }
+}
+
 function update(dt) {
   levelElapsedTime += dt;
   shipSlowTimer = Math.max(0, shipSlowTimer - dt);
@@ -1814,6 +2148,7 @@ function update(dt) {
         }
 
         if (target) {
+          if (target.radius != null) lastPlayerHitAsteroid = target;
           // Apply damage multiplier only to pirates/pirate bases, not asteroids
           const isEnemy = target.defendingBase !== undefined || target.type === 'piratebase';
           // Mining lasers deal 30% less damage to pirates than to asteroids
@@ -1877,6 +2212,15 @@ function update(dt) {
   }
 
   updatePirates(dt);
+  updateDrones(dt);
+
+  const droneLaserActiveNow = drones.some(d => d.laserActive);
+  if (droneLaserActiveNow) {
+    if (!droneLaserWasActive) sfx.startDroneLaserLoop();
+  } else if (droneLaserWasActive) {
+    sfx.stopDroneLaserLoop();
+  }
+  droneLaserWasActive = droneLaserActiveNow;
 
   // Pirate base wave spawning while aggroed
   const BASE_SPAWN_OFFSET = 80;
@@ -1927,7 +2271,10 @@ function update(dt) {
         const dy = b.y - ast.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist < ast.radius) {
-          if (b.owner === 'player') ast.health -= (b.asteroidDmg ?? BULLET_DAMAGE_ASTEROID);
+          if (b.owner === 'player') {
+            ast.health -= (b.asteroidDmg ?? BULLET_DAMAGE_ASTEROID);
+            lastPlayerHitAsteroid = ast;
+          }
           remove = true;
           spawnSparks(b.x, b.y, 3);
           sfx.playImpact('bullet');
@@ -2030,6 +2377,7 @@ function update(dt) {
   for (let i = asteroids.length - 1; i >= 0; i--) {
     if (asteroids[i].health <= 0) {
       const ast = asteroids[i];
+      if (lastPlayerHitAsteroid === ast) lastPlayerHitAsteroid = null;
       sfx.playExplosion('asteroid');
       if (ast._mesh && asteroidContainer) asteroidContainer.remove(ast._mesh);
       const oreCount = calculateOreCount(ast.radius);
@@ -2226,6 +2574,7 @@ function update(dt) {
   if (!deathScreenOpen && player.health <= 0) {
     sfx.playDeath();
     sfx.stopLaserLoop();
+    sfx.stopDroneLaserLoop();
     deathScreenOpen = true;
     gamePaused = true;
     // Clear latched inputs so nothing keeps firing/thrusting
@@ -2301,6 +2650,50 @@ function render(dt = 1 / 60) {
           ctx.fillStyle = '#ff3333';
           ctx.fillRect(x - barW/2, y - yOffset, barW * pct, barH);
       }
+  }
+
+  // Drones (2D temporary visuals)
+  for (const d of drones) {
+    if (!d.laserActive || d.laserLength <= 0) continue;
+    const sx = d.x - ship.x + WIDTH / 2;
+    const sy = d.y - ship.y + HEIGHT / 2;
+    if (sx < 0 || sx > WIDTH || sy < 0 || sy > HEIGHT) continue;
+    const ex = sx + d.laserDirX * d.laserLength;
+    const ey = sy + d.laserDirY * d.laserLength;
+    ctx.strokeStyle = DRONE_LASER_OUTER_COLOR;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+    ctx.strokeStyle = DRONE_LASER_INNER_COLOR;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+  }
+  for (const d of drones) {
+    const { x, y } = worldToScreen(d.x, d.y);
+    if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
+    const size = 7;
+    const angle = d.facingAngle;
+    const tipX = x + Math.cos(angle) * size;
+    const tipY = y + Math.sin(angle) * size;
+    const leftX = x + Math.cos(angle + 2.5) * size * 0.8;
+    const leftY = y + Math.sin(angle + 2.5) * size * 0.8;
+    const rightX = x + Math.cos(angle - 2.5) * size * 0.8;
+    const rightY = y + Math.sin(angle - 2.5) * size * 0.8;
+    ctx.fillStyle = '#8ec8ff';
+    ctx.strokeStyle = '#d9eeff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(leftX, leftY);
+    ctx.lineTo(rightX, rightY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
 
   // Floating items in space — thin white glow for ore-type (3D) pellets
@@ -3248,7 +3641,9 @@ window.addEventListener('keydown', (e) => {
       input.rightMouseDown = false;
       input.ctrlBrake = false;
       sfx.stopLaserLoop();
+      sfx.stopDroneLaserLoop();
       laserWasFiring = false;
+      droneLaserWasActive = false;
       gamePaused = true;
       warpMenuOpen = true;
       sfx.playMenuOpen();
@@ -3406,6 +3801,7 @@ function loadLevel(levelData, levelIdx) {
   if (floatingOreContainer) while (floatingOreContainer.children.length) floatingOreContainer.remove(floatingOreContainer.children[0]);
   floatingItems.length = 0; // Clear floating items on level load
   pirates.length = 0; // Clear pirates on level load
+  drones.length = 0; // Rebuild drones for the active ship
   for (const st of structures) {
     if (st.type === 'piratebase') spawnBaseDefensePirates(st);
   }
@@ -3448,6 +3844,11 @@ function loadLevel(levelData, levelIdx) {
     ownedShips.add('transport');
     currentShipType = 'transport';
   }
+  // Level 4: start in frigate ship
+  if (currentLevelIdx === 3) {
+    ownedShips.add('frigate');
+    currentShipType = 'frigate';
+  }
 
   // Ensure inventory matches current ship's slot count
   const shipStats = SHIP_STATS[currentShipType];
@@ -3455,7 +3856,7 @@ function loadLevel(levelData, levelIdx) {
     inventory.resize(shipStats.slots);
     applyShipStats(currentShipType);
   }
-  if (currentLevelIdx === 2) {
+  if (currentLevelIdx === 2 || currentLevelIdx === 3) {
     player.health = player.maxHealth;
     player.fuel = player.maxFuel;
     player.oxygen = player.maxOxygen;
@@ -3480,6 +3881,14 @@ function loadLevel(levelData, levelIdx) {
     inventory.set(3, { item: 'medium energy cell', energy: 30, maxEnergy: 30 });
     selectedSlot = 0;
     hudDirty = true;
+  } else if (currentLevelIdx === 3) {
+    // Level 4: large laser, large blaster, large energy cell
+    for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
+    inventory.set(0, { item: 'large mining laser', heat: 0, overheated: false });
+    inventory.set(1, { item: 'large blaster', heat: 0, overheated: false });
+    inventory.set(2, { item: 'large energy cell', energy: 60, maxEnergy: 60 });
+    selectedSlot = 0;
+    hudDirty = true;
   } else {
     // Default loadout (Level 1 / Debug)
     for (let i = 0; i < inventory.slots.length; i++) inventory.set(i, null);
@@ -3497,6 +3906,7 @@ const KNOWN_LEVELS = [
   { name: 'Level 1', path: 'levels/level1.json' },
   { name: 'Level 2', path: 'levels/level2.json' },
   { name: 'Level 3', path: 'levels/level3.json' },
+  { name: 'Level 4', path: 'levels/level4.json' },
   { name: 'Debug', path: 'levels/debug.json' }
 ];
 
@@ -3583,7 +3993,9 @@ function openShopMenu(shopStructure) {
 
   gamePaused = true;
   sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
   laserWasFiring = false;
+  droneLaserWasActive = false;
   shopMenuOpen = true;
   for (let i = 0; i < shopSellSlots.length; i++) shopSellSlots[i] = null;
   syncShopBuyArea();
@@ -3666,7 +4078,9 @@ function openCraftingMenu(structure) {
   craftingMenuOpen = true;
   gamePaused = true;
   sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
   laserWasFiring = false;
+  droneLaserWasActive = false;
   
   // Clear slots
   for(let i=0; i<craftingInputSlots.length; i++) craftingInputSlots[i] = null;
@@ -3857,7 +4271,9 @@ function openRefineryMenu(structure) {
   refineryMenuOpen = true;
   gamePaused = true;
   sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
   laserWasFiring = false;
+  droneLaserWasActive = false;
 
   // Clear slots
   for (let i = 0; i < 4; i++) refineryInputSlots[i] = null;
@@ -4068,6 +4484,8 @@ function applyShipStats(type) {
     });
   }
   if (selectedSlot >= stats.slots) selectedSlot = 0;
+  setPurchasedDroneCount(currentShipType, getPurchasedDroneCount(currentShipType));
+  syncActiveDronesForCurrentShip();
 }
 
 function switchShip(type) {
@@ -4232,7 +4650,9 @@ function openShipyardMenu(structure) {
   activeShipyardStructure = structure;
   gamePaused = true;
   sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
   laserWasFiring = false;
+  droneLaserWasActive = false;
 
   renderShipyardCards(structure);
 
@@ -4243,8 +4663,56 @@ function openShipyardMenu(structure) {
   if (overlay) overlay.style.display = 'flex';
 }
 
+function renderShipyardDroneControls(structure) {
+  const menu = document.getElementById('shipyard-menu');
+  const anchor = document.getElementById('shipyard-for-sale-section');
+  if (!menu || !anchor) return;
+  let controls = document.getElementById('shipyard-drone-controls');
+  if (!controls) {
+    controls = document.createElement('div');
+    controls.id = 'shipyard-drone-controls';
+    controls.className = 'shipyard-drone-controls';
+    menu.insertBefore(controls, anchor);
+  }
+
+  const cap = getShipDroneCapacity(currentShipType);
+  const owned = getPurchasedDroneCount(currentShipType);
+  controls.innerHTML = '';
+
+  const title = document.createElement('div');
+  title.className = 'shipyard-drone-title';
+  title.textContent = 'Drone Bay';
+  controls.appendChild(title);
+
+  const status = document.createElement('div');
+  status.className = 'shipyard-drone-status';
+  if (cap <= 0) {
+    status.textContent = 'Current ship has no drone bays.';
+    controls.appendChild(status);
+    return;
+  }
+  status.textContent = `Active drones: ${owned}/${cap}`;
+  controls.appendChild(status);
+
+  const buyBtn = document.createElement('button');
+  buyBtn.className = 'shipyard-drone-buy-btn';
+  buyBtn.type = 'button';
+  buyBtn.textContent = `Buy Drone - ${DRONE_PURCHASE_PRICE} cr`;
+  const atCap = owned >= cap;
+  buyBtn.disabled = atCap || player.credits < DRONE_PURCHASE_PRICE;
+  buyBtn.onclick = () => {
+    const bought = addDroneToCurrentShip();
+    if (!bought) return;
+    const creditsEl = document.getElementById('shipyard-credits');
+    if (creditsEl) creditsEl.textContent = `${player.credits} credits`;
+    renderShipyardCards(structure);
+  };
+  controls.appendChild(buyBtn);
+}
+
 function renderShipyardCards(structure) {
   cleanupShipyardPreviews();
+  renderShipyardDroneControls(structure);
 
   const forSaleContainer = document.getElementById('shipyard-for-sale');
   const ownedContainer = document.getElementById('shipyard-owned');

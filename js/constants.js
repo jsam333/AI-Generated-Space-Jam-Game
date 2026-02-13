@@ -39,7 +39,7 @@ export const BLASTER_FIRE_RATE = 10;
 export const BLASTER_STATS = {
   'light blaster':  { energyPerShot: 0.105, heatPerShot: 0.09, coolRate: 1 / 3, fireRate: 10, pirateDmg: 3, asteroidDmg: 0.5 },
   'medium blaster': { energyPerShot: 0.1575, heatPerShot: 0.08, coolRate: 1 / 3, fireRate: 10, pirateDmg: 6, asteroidDmg: 1 },
-  'large blaster':  { energyPerShot: 0.2625, heatPerShot: 0.07, coolRate: 1 / 3, fireRate: 10, pirateDmg: 11, asteroidDmg: 2 }
+  'large blaster':  { energyPerShot: 0.2625, heatPerShot: 0.06, coolRate: 1 / 3, fireRate: 10, pirateDmg: 11, asteroidDmg: 2 }
 };
 
 export const OXYGEN_DEPLETION_RATE = 1 / 25;

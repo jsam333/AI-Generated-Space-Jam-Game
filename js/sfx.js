@@ -33,6 +33,7 @@ class SpaceJamSfx {
     this.cooldowns = new Map();
     this.started = false;
     this.laserLoop = null;
+    this.droneLaserLoop = null;
   }
 
   ensureContext() {
@@ -258,6 +259,40 @@ class SpaceJamSfx {
     amp.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
     try { osc.stop(now + 0.08); } catch (_) {}
     this.laserLoop = null;
+  }
+
+  startDroneLaserLoop() {
+    if (!this.canPlay() || this.droneLaserLoop) return;
+    const now = this.now();
+    const osc = this.ctx.createOscillator();
+    const filter = this.ctx.createBiquadFilter();
+    const amp = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(95, now);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1100, now);
+    filter.Q.setValueAtTime(0.6, now);
+    amp.gain.setValueAtTime(0.0001, now);
+    amp.gain.exponentialRampToValueAtTime(0.022, now + 0.03);
+
+    osc.connect(filter);
+    filter.connect(amp);
+    amp.connect(this.groups.weapons);
+    osc.start(now);
+
+    this.droneLaserLoop = { osc, filter, amp };
+  }
+
+  stopDroneLaserLoop() {
+    if (!this.droneLaserLoop) return;
+    const now = this.now();
+    const { osc, amp } = this.droneLaserLoop;
+    amp.gain.cancelScheduledValues(now);
+    amp.gain.setValueAtTime(Math.max(0.0001, amp.gain.value || 0.01), now);
+    amp.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+    try { osc.stop(now + 0.06); } catch (_) {}
+    this.droneLaserLoop = null;
   }
 
   playOverheat() {
