@@ -350,6 +350,22 @@ textarea {
   gap: 10px;
 }
 
+#pause-menu #pause-actions-confirm {
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+#pause-menu .pause-confirm-text {
+  color: #ccc;
+  font-size: 13px;
+}
+
+#pause-menu .pause-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+
 #pause-menu button {
   padding: 10px 16px;
   border-radius: 8px;
@@ -473,6 +489,14 @@ textarea {
 #warp-menu button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+#warp-menu .warp-req-met {
+  color: #8c8;
+}
+
+#warp-menu .warp-req-missing {
+  color: #c66;
 }
 
 #crafting-menu-overlay {

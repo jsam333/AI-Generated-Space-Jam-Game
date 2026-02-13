@@ -1940,7 +1940,8 @@
       "y": 649.9783480682379,
       "type": "warpgate",
       "warpCost": 7000,
-      "warpDestination": "level2"
+      "warpDestination": "level2",
+      "warpRequirement": "fragments"
     },
     {
       "x": -682.635698168105,

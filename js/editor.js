@@ -1183,6 +1183,16 @@ function renderPirateBaseProperties(parent, obj) {
 function renderWarpGateProperties(parent, obj) {
   addPropInput(parent, 'Warp Cost', obj.warpCost || 3000, (v) => { obj.warpCost = parseInt(v); saveLevel(); });
   
+  const reqDiv = document.createElement('div');
+  reqDiv.className = 'prop-group';
+  reqDiv.innerHTML = `<label>Warp Key Requirement</label>`;
+  const reqSelect = document.createElement('select');
+  reqSelect.innerHTML = '<option value="key">Warp Key</option><option value="fragments">4 Warp Key Fragments</option>';
+  reqSelect.value = (obj.warpRequirement || 'key').toLowerCase();
+  reqSelect.onchange = (e) => { obj.warpRequirement = e.target.value; saveLevel(); };
+  reqDiv.appendChild(reqSelect);
+  parent.appendChild(reqDiv);
+
   const destDiv = document.createElement('div');
   destDiv.className = 'prop-group';
   destDiv.innerHTML = `<label>Destination Level</label>`;
@@ -1249,6 +1259,7 @@ function handlePlaceObject(world) {
     if (type === 'warpgate') {
       st.warpCost = 3000;
       st.warpDestination = 'level2';
+      st.warpRequirement = 'key';
     }
     if (type === 'crafting') {
       st.recipes = [];
@@ -1622,6 +1633,7 @@ document.getElementById('export-level').addEventListener('click', () => {
       if (out.type === 'warpgate') {
         if (out.warpCost == null || Number.isNaN(out.warpCost)) out.warpCost = 3000;
         if (!out.warpDestination) out.warpDestination = 'level2';
+        if (!out.warpRequirement) out.warpRequirement = 'key';
       }
       return out;
     }),

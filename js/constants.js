@@ -47,6 +47,7 @@ export const OXYGEN_DEPLETION_RATE = 1 / 25;
 export const FUEL_DEPLETION_RATE = 1 / 4;
 
 export const MAX_ORE_STACK = 20;
+export const MAX_WARP_KEY_FRAGMENT_STACK = 20;
 export const ORE_ITEMS = ['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'copper', 'iron', 'gold', 'diamond', 'platinum'];
 
 // --- Raw ore -> Refined ore mapping (used by Refinery) ---
@@ -90,14 +91,14 @@ export const ITEM_USAGE = {
   'medium energy cell': 'Powers mining lasers and blasters. Holds 3x more charge.',
   'large energy cell': 'Powers mining lasers and blasters. Holds 6x more charge.',
   'fuel tank': 'Drag to fuel bar to refill ship fuel.',
-  'medium fuel tank': 'Medium capacity fuel tank.',
-  'large fuel tank': 'Large capacity fuel tank.',
+  'medium fuel tank': 'Medium capacity fuel tank. Drag to fuel bar to refill ship fuel.',
+  'large fuel tank': 'Large capacity fuel tank. Drag to fuel bar to refill ship fuel.',
   'oxygen canister': 'Drag to O2 bar to refill ship oxygen.',
-  'medium oxygen canister': 'Medium capacity oxygen canister.',
-  'large oxygen canister': 'Large capacity oxygen canister.',
+  'medium oxygen canister': 'Medium capacity oxygen canister. Drag to O2 bar to refill ship oxygen.',
+  'large oxygen canister': 'Large capacity oxygen canister. Drag to O2 bar to refill ship oxygen.',
   'health pack': 'Drag to health bar to repair ship.',
-  'medium health pack': 'Medium capacity repair kit.',
-  'large health pack': 'Large capacity repair kit.',
+  'medium health pack': 'Medium capacity repair kit. Drag to health bar to repair ship.',
+  'large health pack': 'Large capacity repair kit. Drag to health bar to repair ship.',
   'light blaster': 'Select and left-click to fire rapid projectiles at enemies.',
   'medium blaster': 'Medium blaster. Higher damage per shot.',
   'large blaster': 'Heavy blaster. Devastating damage per shot.',
@@ -110,8 +111,8 @@ export const ITEM_USAGE = {
   'diamite': 'Precious ore. High value.',
   'platinite': 'Extremely rare ore. Most valuable.',
   'scrap': 'Salvaged material. Can be sold for credits.',
-  'warp key': 'Required to activate warp gates.',
-  'warp key fragment': 'A broken piece of a warp key. No known use yet.',
+  'warp key': 'Required to activate warp gates. Consumed when warping.',
+  'warp key fragment': 'Broken piece of a warp key. 4 fragments can substitute for a warp key. Stackable to 20. Consumed when warping.',
   'copper': 'Refined copper. More valuable than raw cuprite.',
   'iron': 'Refined iron. More valuable than raw hematite.',
   'gold': 'Refined gold. More valuable than raw aurite.',
@@ -269,10 +270,10 @@ export const ITEM_BUY_PRICE = {
   'fuel tank': 150,
   'medium fuel tank': 350,
   'large fuel tank': 600,
-  'light blaster': 1000,
+  'light blaster': 800,
   'medium blaster': 2000,
   'large blaster': 4000,
-  'medium mining laser': 1500,
+  'medium mining laser': 1200,
   'large mining laser': 3000,
   'health pack': 175,
   'medium health pack': 400,

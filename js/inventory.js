@@ -82,4 +82,33 @@ export class Inventory {
   getFirstCellWithMinEnergy(min) {
     return this.findFirstEnergyCell((cell) => cell.energy >= min);
   }
+
+  /** Returns total count of item across all slots (quantity or 1 for non-stackable). */
+  countItem(itemName) {
+    let total = 0;
+    for (const slot of this.slots) {
+      if (!slot || slot.item !== itemName) continue;
+      total += slot.quantity != null ? slot.quantity : 1;
+    }
+    return total;
+  }
+
+  /** Remove up to `quantity` of `itemName` from inventory. Returns true if all removed. */
+  removeItem(itemName, quantity) {
+    if (quantity <= 0) return true;
+    let remaining = quantity;
+    for (let i = 0; i < this.slots.length && remaining > 0; i++) {
+      const slot = this.slots[i];
+      if (!slot || slot.item !== itemName) continue;
+      const have = slot.quantity != null ? slot.quantity : 1;
+      const take = Math.min(remaining, have);
+      remaining -= take;
+      if (have <= take) {
+        this.slots[i] = null;
+      } else {
+        slot.quantity = have - take;
+      }
+    }
+    return remaining === 0;
+  }
 }

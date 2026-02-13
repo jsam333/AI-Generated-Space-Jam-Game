@@ -53,9 +53,16 @@
           step="1"
           value="70"
         >
-        <div class="pause-actions">
+        <div class="pause-actions" id="pause-actions-main">
           <button type="button" id="pause-resume-btn">Resume</button>
           <button type="button" id="pause-restart-btn">Restart</button>
+        </div>
+        <div class="pause-actions" id="pause-actions-confirm" style="display: none;">
+          <span class="pause-confirm-text">Restart game? Progress will be lost.</span>
+          <div class="pause-confirm-btns">
+            <button type="button" id="pause-restart-confirm-btn">Yes, Restart</button>
+            <button type="button" id="pause-restart-cancel-btn">Cancel</button>
+          </div>
         </div>
       </div>
     </div>
@@ -64,6 +71,7 @@
         <p>Use warp gate?</p>
         <p id="warp-destination-text">Destination: Level 2</p>
         <p id="warp-cost-text">Cost: 3000 credits</p>
+        <p id="warp-requirement-text">Requires: Warp Key</p>
         <button type="button" id="warp-pay-btn">Warp</button>
         <button type="button" id="warp-cancel-btn">Cancel</button>
       </div>

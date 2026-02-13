@@ -1,4 +1,4 @@
-import { ORE_ITEMS, MAX_ORE_STACK, ITEM_IMAGE_PATHS, ITEM_LABELS, ITEM_DEFAULTS } from './constants.js';
+import { ORE_ITEMS, MAX_ORE_STACK, MAX_WARP_KEY_FRAGMENT_STACK, ITEM_IMAGE_PATHS, ITEM_LABELS, ITEM_DEFAULTS } from './constants.js';
 
 export function normalize(x, y) {
   const len = Math.sqrt(x * x + y * y);
@@ -16,6 +16,7 @@ export function createSeededRandom(seed) {
 }
 
 export function getMaxStack(itemName) {
+  if (itemName === 'warp key fragment') return MAX_WARP_KEY_FRAGMENT_STACK;
   return ORE_ITEMS.includes(itemName) ? MAX_ORE_STACK : 1;
 }
 

@@ -146,7 +146,7 @@ const player = {
   maxFuel: 25.0,
   oxygen: 30.0,
   maxOxygen: 30.0,
-  credits: 10000
+  credits: 0
 };
 
 // Inventory
@@ -457,10 +457,15 @@ const pauseOverlayEl = document.getElementById('pause-menu-overlay');
 const pauseResumeBtn = document.getElementById('pause-resume-btn');
 const pauseRestartBtn = document.getElementById('pause-restart-btn');
 const pauseVolumeSlider = document.getElementById('pause-volume-slider');
+const pauseActionsMain = document.getElementById('pause-actions-main');
+const pauseActionsConfirm = document.getElementById('pause-actions-confirm');
+const pauseRestartConfirmBtn = document.getElementById('pause-restart-confirm-btn');
+const pauseRestartCancelBtn = document.getElementById('pause-restart-cancel-btn');
 
 function closePauseMenu(playCloseSfx = true) {
   if (!pauseMenuOpen) return;
   pauseMenuOpen = false;
+  hidePauseRestartConfirm();
   if (pauseOverlayEl) pauseOverlayEl.style.display = 'none';
   if (playCloseSfx) sfx.playMenuClose();
   gamePaused = computeMenuPauseState();
@@ -497,13 +502,39 @@ if (pauseResumeBtn) {
     closePauseMenu();
   });
 }
+function showPauseRestartConfirm() {
+  if (pauseActionsMain) pauseActionsMain.style.display = 'none';
+  if (pauseActionsConfirm) pauseActionsConfirm.style.display = 'flex';
+}
+
+function hidePauseRestartConfirm() {
+  if (pauseActionsMain) pauseActionsMain.style.display = 'flex';
+  if (pauseActionsConfirm) pauseActionsConfirm.style.display = 'none';
+}
+
 if (pauseRestartBtn) {
   pauseRestartBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
+    showPauseRestartConfirm();
+  });
+}
+if (pauseRestartConfirmBtn) {
+  pauseRestartConfirmBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
     sfx.playRespawn();
     window.location.reload();
+  });
+}
+if (pauseRestartCancelBtn) {
+  pauseRestartCancelBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
+    hidePauseRestartConfirm();
   });
 }
 if (pauseVolumeSlider) {
@@ -1275,7 +1306,7 @@ function applyOreEmissiveMaterial(mesh, oreType) {
 }
 
 // Floating ore drops: self-lit like asteroids with ore-colored emissive tint
-const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'warp key', 'warp key fragment', 'copper', 'iron', 'gold', 'diamond', 'platinum']);
+const FLOATING_ORE_ITEMS = new Set(['cuprite', 'hematite', 'aurite', 'diamite', 'platinite', 'scrap', 'copper', 'iron', 'gold', 'diamond', 'platinum']);
 const FLOATING_ORE_EMISSIVE = { cuprite: 0x7A6D5F, hematite: 0x804224, aurite: 0xCCAC00, diamite: 0x737373, platinite: 0xB7B6B5, scrap: 0x888888, 'warp key': 0xAE841A, 'warp key fragment': 0x8A7A44, copper: 0xB87333, iron: 0x696969, gold: 0xFFD700, diamond: 0xB9F2FF, platinum: 0xE5E4E2 };
 const ORE_ICON_DATA_URLS = {}; // itemKey -> data URL for inventory slot (3D ore, no rotation)
 
@@ -3914,7 +3945,14 @@ window.addEventListener('keydown', (e) => {
     if (craftingMenuOpen) { closeCraftingMenu(); return; }
     if (refineryMenuOpen) { closeRefineryMenu(); return; }
     if (shipyardMenuOpen) { closeShipyardMenu(); return; }
-    if (pauseMenuOpen) { closePauseMenu(); return; }
+    if (pauseMenuOpen) {
+      if (pauseActionsConfirm && pauseActionsConfirm.style.display !== 'none') {
+        hidePauseRestartConfirm();
+      } else {
+        closePauseMenu();
+      }
+      return;
+    }
     openPauseMenu();
     return;
   }
@@ -4093,6 +4131,7 @@ function loadLevel(levelData, levelIdx, options = {}) {
     if (st.type === 'warpgate') {
         if (st.warpCost === undefined) st.warpCost = 3000;
         if (st.warpDestination === undefined) st.warpDestination = `level${Math.min(currentLevelIdx + 2, 4)}`; // Default to next level
+        if (st.warpRequirement === undefined) st.warpRequirement = 'key';
     }
 
     if (st.type === 'shipyard') {
@@ -4103,6 +4142,7 @@ function loadLevel(levelData, levelIdx, options = {}) {
     return st;
   });
   if (floatingOreContainer) while (floatingOreContainer.children.length) floatingOreContainer.remove(floatingOreContainer.children[0]);
+  if (pirateContainer) while (pirateContainer.children.length) pirateContainer.remove(pirateContainer.children[0]);
   floatingItems.length = 0; // Clear floating items on level load
   pirates.length = 0; // Clear pirates on level load
   drones.length = 0; // Rebuild drones for the active ship
@@ -4226,6 +4266,25 @@ function getWarpCostFromStructure(st) {
   return Math.max(0, Math.round(Number(st?.warpCost) || 3000));
 }
 
+const WARP_KEY_FRAGMENTS_REQUIRED = 4;
+
+function getWarpRequirement(st) {
+  const req = (st?.warpRequirement || 'key').toLowerCase();
+  return req === 'fragments' ? 'fragments' : 'key';
+}
+
+function hasWarpRequirement(st) {
+  const req = getWarpRequirement(st);
+  if (req === 'key') return inventory.countItem('warp key') >= 1;
+  return inventory.countItem('warp key fragment') >= WARP_KEY_FRAGMENTS_REQUIRED;
+}
+
+function consumeWarpRequirement(st) {
+  const req = getWarpRequirement(st);
+  if (req === 'key') return inventory.removeItem('warp key', 1);
+  return inventory.removeItem('warp key fragment', WARP_KEY_FRAGMENTS_REQUIRED);
+}
+
 function resolveWarpDestinationIndex(warpDestination) {
   if (typeof warpDestination === 'number' && Number.isInteger(warpDestination) && KNOWN_LEVELS[warpDestination]) {
     return warpDestination;
@@ -4257,13 +4316,21 @@ function updateWarpMenuContent(st) {
   const destinationIdx = getWarpDestinationIndex(st);
   const destination = KNOWN_LEVELS[destinationIdx];
   const destinationName = destination ? destination.name : 'Unknown';
+  const req = getWarpRequirement(st);
+  const reqLabel = req === 'key' ? 'Warp Key' : `${WARP_KEY_FRAGMENTS_REQUIRED} Warp Key Fragments`;
+  const hasReq = hasWarpRequirement(st);
   const destinationText = document.getElementById('warp-destination-text');
   const costText = document.getElementById('warp-cost-text');
+  const reqText = document.getElementById('warp-requirement-text');
   if (destinationText) destinationText.textContent = `Destination: ${destinationName}`;
   if (costText) costText.textContent = `Cost: ${cost} credits`;
+  if (reqText) {
+    reqText.textContent = `Requires: ${reqLabel}`;
+    reqText.className = hasReq ? 'warp-req-met' : 'warp-req-missing';
+  }
   if (warpPayBtn) {
     warpPayBtn.textContent = `Warp (${cost})`;
-    warpPayBtn.disabled = player.credits < cost || !destination;
+    warpPayBtn.disabled = player.credits < cost || !destination || !hasReq;
   }
 }
 
@@ -4427,11 +4494,17 @@ if (warpPayBtn) {
     const cost = getWarpCostFromStructure(warpSt);
     const destinationIdx = getWarpDestinationIndex(warpSt);
     const destination = KNOWN_LEVELS[destinationIdx];
-    if (!destination || player.credits < cost) {
+    if (!destination || player.credits < cost || !hasWarpRequirement(warpSt)) {
       sfx.playCancel();
       updateWarpMenuContent(warpSt);
       return;
     }
+    if (!consumeWarpRequirement(warpSt)) {
+      sfx.playCancel();
+      updateWarpMenuContent(warpSt);
+      return;
+    }
+    markHUDDirty();
     player.credits -= cost;
     sfx.playWarp();
     sfx.playConfirm();
@@ -5546,6 +5619,7 @@ function tryHandleJettisonDrop(drag, targetSlotEl) {
 
   const from = drag.fromSlot;
   const it = hotbar[from];
+  if (it && WARP_KEY_OPPORTUNITY_ITEMS.has(it.item)) return false; // Can't drop warp keys
   if (it) {
     const dx = input.mouseX - WIDTH / 2;
     const dy = input.mouseY - HEIGHT / 2;
@@ -5616,6 +5690,7 @@ function tryHandleHotbarDrag(drag, targetSlotEl, slotKinds) {
   if (!it) return false;
 
   if (slotKinds.isSell && shopMenuOpen) {
+    if (WARP_KEY_OPPORTUNITY_ITEMS.has(it.item)) return false; // Can't sell warp keys
     const sellIndex = parseInt(targetSlotEl.dataset.sellSlot, 10);
     if (sellIndex >= 0 && !shopSellSlots[sellIndex]) {
       shopSellSlots[sellIndex] = { ...it };
@@ -5843,12 +5918,14 @@ window.addEventListener('mousedown', (e) => {
       // Shift+click (with shop open): transfer item to first empty sell slot
       if (e.shiftKey && shopMenuOpen) {
         const it = hotbar[slotIndex];
-        const firstEmpty = shopSellSlots.findIndex(s => !s);
-        if (firstEmpty >= 0) {
-          shopSellSlots[firstEmpty] = { ...it };
-          hotbar[slotIndex] = null;
-          syncShopSellArea();
-          updateHUD();
+        if (!WARP_KEY_OPPORTUNITY_ITEMS.has(it.item)) {
+          const firstEmpty = shopSellSlots.findIndex(s => !s);
+          if (firstEmpty >= 0) {
+            shopSellSlots[firstEmpty] = { ...it };
+            hotbar[slotIndex] = null;
+            syncShopSellArea();
+            updateHUD();
+          }
         }
         return;
       }
