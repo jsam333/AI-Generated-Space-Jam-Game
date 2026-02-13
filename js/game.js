@@ -14,7 +14,7 @@ import {
   ensureSpawnSettingsDefaults,
   ensurePirateBaseSpawnDefaults
 } from './pirateShared.js';
-import { playIntroCutscene } from './introCutscene.js';
+import { playIntroCutscene, drawStarfieldFirstFrame } from './introCutscene.js';
 import { sfx } from './sfx.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -77,6 +77,8 @@ const SHIP_SLOW_DURATION = 3;
 const SHIP_SLOW_FACTOR = 0.8;
 const SHIP_SLOW_EMISSIVE_COLOR = 0xaa55ff;
 const SHIP_SLOW_EMISSIVE_INTENSITY = 0.1;
+const ASTEROID_VIBRATE_DURATION = 0.12;
+const ASTEROID_VIBRATE_AMPLITUDE = 0.4;
 
 canvas.width = WIDTH;
 canvas.height = HEIGHT;
@@ -176,6 +178,8 @@ let craftingMenuOpen = false;
 let shipyardMenuOpen = false;
 let startScreenOpen = true;
 let deathScreenOpen = false;
+let pauseMenuOpen = false;
+let hidePlayerShip = false;
 let interactPromptAlpha = 0; // Fade alpha for interaction prompt (0-1)
 let interactPromptTarget = null; // Current structure showing prompt
 let tutorialTextTimer = 0; // Time remaining for tutorial text (seconds)
@@ -204,6 +208,26 @@ const lowResourceState = {
   fuel: false,
   oxygen: false
 };
+const deathSequence = {
+  active: false,
+  elapsed: 0,
+  menuDelay: 1.0,
+  scatteredItems: []
+};
+
+function computeMenuPauseState() {
+  return warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen || pauseMenuOpen;
+}
+
+function clearLatchedGameplayInput() {
+  input.leftMouseDown = false;
+  input.rightMouseDown = false;
+  input.ctrlBrake = false;
+  sfx.stopLaserLoop();
+  sfx.stopDroneLaserLoop();
+  laserWasFiring = false;
+  droneLaserWasActive = false;
+}
 
 function applyPlayerDamage(amount) {
   const damage = Math.max(0, Number(amount) || 0);
@@ -367,12 +391,8 @@ const startOverlayEl = document.getElementById('start-menu-overlay');
 function beginGame() {
   if (startOverlayEl) startOverlayEl.style.display = 'none';
   startScreenOpen = false;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
-  input.leftMouseDown = false;
-  input.rightMouseDown = false;
-  input.ctrlBrake = false;
-  sfx.stopLaserLoop();
-  sfx.stopDroneLaserLoop();
+  gamePaused = computeMenuPauseState();
+  clearLatchedGameplayInput();
   if (canvas && canvas.focus) canvas.focus();
 }
 
@@ -385,6 +405,10 @@ const cutsceneDialogue = document.getElementById('intro-dialogue-text');
 if (mainMenuOverlay && mainMenuStartBtn) {
   // Show main menu; game loads in background. On Start Game, play cutscene then begin.
   mainMenuOverlay.style.display = 'flex';
+  const starfieldCanvas = document.getElementById('main-menu-starfield-canvas');
+  if (starfieldCanvas) {
+    requestAnimationFrame(() => drawStarfieldFirstFrame(starfieldCanvas));
+  }
   mainMenuStartBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -428,16 +452,66 @@ if (mainMenuOverlay && mainMenuStartBtn) {
 
 // Death screen overlay (shown when HP reaches 0)
 const deathOverlayEl = document.getElementById('death-menu-overlay');
-const deathRestartBtn = document.getElementById('death-restart-btn');
-if (deathRestartBtn) {
-  deathRestartBtn.addEventListener('click', (e) => {
+const deathMainMenuBtn = document.getElementById('death-main-menu-btn');
+const pauseOverlayEl = document.getElementById('pause-menu-overlay');
+const pauseResumeBtn = document.getElementById('pause-resume-btn');
+const pauseRestartBtn = document.getElementById('pause-restart-btn');
+const pauseVolumeSlider = document.getElementById('pause-volume-slider');
+
+function closePauseMenu(playCloseSfx = true) {
+  if (!pauseMenuOpen) return;
+  pauseMenuOpen = false;
+  if (pauseOverlayEl) pauseOverlayEl.style.display = 'none';
+  if (playCloseSfx) sfx.playMenuClose();
+  gamePaused = computeMenuPauseState();
+  if (!gamePaused && canvas && canvas.focus) canvas.focus();
+}
+
+function syncPauseVolumeUI() {
+  if (!pauseVolumeSlider) return;
+  pauseVolumeSlider.value = String(Math.round(sfx.getMasterVolume() * 100));
+}
+
+function openPauseMenu() {
+  if (pauseMenuOpen || startScreenOpen || deathScreenOpen || deathSequence.active) return;
+  pauseMenuOpen = true;
+  clearLatchedGameplayInput();
+  gamePaused = true;
+  syncPauseVolumeUI();
+  if (pauseOverlayEl) pauseOverlayEl.style.display = 'flex';
+  sfx.playMenuOpen();
+}
+
+if (deathMainMenuBtn) {
+  deathMainMenuBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.location.reload();
+  });
+}
+if (pauseResumeBtn) {
+  pauseResumeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    sfx.unlock();
+    closePauseMenu();
+  });
+}
+if (pauseRestartBtn) {
+  pauseRestartBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     sfx.unlock();
     sfx.playRespawn();
-    // Hard reset: reload page to reset all runtime state
     window.location.reload();
   });
+}
+if (pauseVolumeSlider) {
+  pauseVolumeSlider.addEventListener('input', () => {
+    const normalized = (Number(pauseVolumeSlider.value) || 0) / 100;
+    sfx.setMasterVolume(normalized);
+  });
+  syncPauseVolumeUI();
 }
 
 // Bullets
@@ -471,6 +545,63 @@ function spawnSparks(x, y, count) {
       maxLife: life,
       size: 1 + Math.random() * 2
     });
+  }
+}
+
+function scatterInventoryOnDeath() {
+  deathSequence.scatteredItems.length = 0;
+  for (let i = 0; i < hotbar.length; i++) {
+    const slotItem = hotbar[i];
+    if (!slotItem || !slotItem.item) continue;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 90 + Math.random() * 180;
+    const dropped = { ...slotItem };
+    delete dropped._mesh;
+    delete dropped._spinAxis;
+    delete dropped._spinDirection;
+    delete dropped._spinSpeed;
+    if (dropped.quantity == null) dropped.quantity = 1;
+    const scattered = {
+      ...dropped,
+      x: ship.x,
+      y: ship.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed
+    };
+    floatingItems.push(scattered);
+    deathSequence.scatteredItems.push(scattered);
+    hotbar[i] = null;
+  }
+  markHUDDirty();
+}
+
+function startDeathSequence() {
+  if (deathSequence.active || deathScreenOpen) return;
+  if (pauseMenuOpen) closePauseMenu(false);
+  sfx.playDeath();
+  clearLatchedGameplayInput();
+  deathSequence.active = true;
+  deathSequence.elapsed = 0;
+  deathSequence.scatteredItems.length = 0;
+  hidePlayerShip = true;
+  deathScreenOpen = false;
+  inventoryDrag = null;
+  try { setDragGhostVisible(false); } catch (e) {}
+  if (deathOverlayEl) deathOverlayEl.style.display = 'none';
+  spawnSparks(ship.x, ship.y, 65);
+  scatterInventoryOnDeath();
+}
+
+function updateDeathSequence(dt) {
+  if (!deathSequence.active) return;
+  deathSequence.elapsed += dt;
+
+  if (deathSequence.elapsed >= deathSequence.menuDelay) {
+    deathSequence.active = false;
+    deathSequence.scatteredItems.length = 0;
+    gamePaused = true;
+    deathScreenOpen = true;
+    if (deathOverlayEl) deathOverlayEl.style.display = 'flex';
   }
 }
 
@@ -2084,7 +2215,7 @@ function update(dt) {
   const effectiveAccel = shipSlowActive ? ACCEL * SHIP_SLOW_FACTOR : ACCEL;
   const effectiveMaxSpeed = shipSlowActive ? MAX_SPEED * SHIP_SLOW_FACTOR : MAX_SPEED;
   // Ship movement (right-click) - only if there's a direction to move
-  if (input.rightMouseDown && player.fuel > 0) {
+  if (input.rightMouseDown && player.fuel > 0 && !deathSequence.active) {
     const dx = input.mouseX - WIDTH / 2;
     const dy = input.mouseY - HEIGHT / 2;
     const dir = normalize(dx, dy);
@@ -2097,22 +2228,22 @@ function update(dt) {
     }
   }
 
-  // Friction (low when coasting, high when braking with Ctrl)
-  const friction = input.ctrlBrake ? BRAKE_FRICTION : FRICTION;
-  ship.vx *= Math.max(0, 1 - friction * dt);
-  ship.vy *= Math.max(0, 1 - friction * dt);
+  // Friction / speed / position (skip when dead — ship stays in place)
+  if (!deathSequence.active) {
+    const friction = input.ctrlBrake ? BRAKE_FRICTION : FRICTION;
+    ship.vx *= Math.max(0, 1 - friction * dt);
+    ship.vy *= Math.max(0, 1 - friction * dt);
 
-  // Max speed cap
-  const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-  if (speed > effectiveMaxSpeed) {
-    const scale = effectiveMaxSpeed / speed;
-    ship.vx *= scale;
-    ship.vy *= scale;
+    const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+    if (speed > effectiveMaxSpeed) {
+      const scale = effectiveMaxSpeed / speed;
+      ship.vx *= scale;
+      ship.vy *= scale;
+    }
+
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
   }
-
-  // Position
-  ship.x += ship.vx * dt;
-  ship.y += ship.vy * dt;
   const halfLevelWidth = levelWidth * 0.5;
   const halfLevelHeight = levelHeight * 0.5;
   const outsideLevelBorder =
@@ -2122,7 +2253,8 @@ function update(dt) {
     ship.y > halfLevelHeight;
   setShipStatusPersistent('oxygen---', OXYGEN_BAR_COLOR, outsideLevelBorder);
 
-  // Ship–asteroid collision: bounce + damage
+  // Ship–asteroid collision: bounce + damage (skip when dead)
+  if (!deathSequence.active)
   for (const ast of asteroids) {
     const hit = pushOutOverlap(ship, ast, shipCollisionRadius, ast.radius);
     if (hit) {
@@ -2141,7 +2273,8 @@ function update(dt) {
     }
   }
 
-  // Ship–structure collision
+  // Ship–structure collision (skip when dead)
+  if (!deathSequence.active)
   for (const st of structures) {
     if (!isCollidableStructure(st)) continue;
     const hit = pushOutOverlap(ship, st, shipCollisionRadius, getStructureCollisionRadius(st));
@@ -2165,14 +2298,16 @@ function update(dt) {
     }
   }
 
-  // Oxygen depletion
-  let oxygenDrainPerSecond = OXYGEN_DEPLETION_RATE;
-  if (outsideLevelBorder) oxygenDrainPerSecond += OUTSIDE_BORDER_OXYGEN_DRAIN_RATE;
-  player.oxygen = Math.max(0, player.oxygen - oxygenDrainPerSecond * dt);
-  
-  // No oxygen: drain health at 1 per second
-  if (player.oxygen <= 0) {
-    applyPlayerDamage(1 * dt);
+  // Oxygen depletion (skip when dead)
+  if (!deathSequence.active) {
+    let oxygenDrainPerSecond = OXYGEN_DEPLETION_RATE;
+    if (outsideLevelBorder) oxygenDrainPerSecond += OUTSIDE_BORDER_OXYGEN_DRAIN_RATE;
+    player.oxygen = Math.max(0, player.oxygen - oxygenDrainPerSecond * dt);
+    
+    // No oxygen: drain health at 1 per second
+    if (player.oxygen <= 0) {
+      applyPlayerDamage(1 * dt);
+    }
   }
 
   // Mining lasers (light + medium): unified logic via MINING_LASER_STATS
@@ -2283,7 +2418,10 @@ function update(dt) {
         }
 
         if (target) {
-          if (target.radius != null) lastPlayerHitAsteroid = target;
+          if (target.radius != null) {
+            lastPlayerHitAsteroid = target;
+            target._vibrateUntil = levelElapsedTime + ASTEROID_VIBRATE_DURATION;
+          }
           // Apply damage multiplier only to pirates/pirate bases, not asteroids
           const isEnemy = target.defendingBase !== undefined || target.type === 'piratebase';
           // Mining lasers deal 30% less damage to pirates than to asteroids
@@ -2410,6 +2548,7 @@ function update(dt) {
           if (b.owner === 'player') {
             ast.health -= (b.asteroidDmg ?? BULLET_DAMAGE_ASTEROID);
             lastPlayerHitAsteroid = ast;
+            ast._vibrateUntil = levelElapsedTime + ASTEROID_VIBRATE_DURATION;
           }
           remove = true;
           spawnSparks(b.x, b.y, 3);
@@ -2454,8 +2593,8 @@ function update(dt) {
         }
       }
       
-      // Check Player (Pirate bullets)
-      if (!remove && b.owner === 'pirate') {
+      // Check Player (Pirate bullets) — skip when dead
+      if (!remove && b.owner === 'pirate' && !deathSequence.active) {
           const dx = b.x - ship.x;
           const dy = b.y - ship.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
@@ -2544,7 +2683,7 @@ function update(dt) {
     const dx = ship.x - item.x;
     const dy = ship.y - item.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > 0 && dist < MAGNET_RADIUS && dist > shipCollisionRadius && canAcceptFloatingItem(item)) {
+    if (dist > 0 && dist < MAGNET_RADIUS && dist > shipCollisionRadius && canAcceptFloatingItem(item) && !deathSequence.active) {
       const inv = 1 / dist;
       const pull = MAGNET_STRENGTH * (1 - dist / MAGNET_RADIUS);
       item.vx += dx * inv * pull * dt;
@@ -2609,14 +2748,14 @@ function update(dt) {
     }
   }
 
-  // Pickup floating items only when within ship collision radius
+  // Pickup floating items only when within ship collision radius (skip when dead)
   const prevFloatingCount = floatingItems.length;
   for (let i = floatingItems.length - 1; i >= 0; i--) {
     const item = floatingItems[i];
     const dx = item.x - ship.x;
     const dy = item.y - ship.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < SHIP_COLLECTION_RADIUS) {
+    if (dist < SHIP_COLLECTION_RADIUS && !deathSequence.active) {
       // Energy cells restore their charge - find empty slot
       if (item.energy != null) {
         let added = false;
@@ -2706,22 +2845,7 @@ function update(dt) {
   maybeNotifyLowResource('oxygen', player.oxygen, player.maxOxygen, 'low oxygen', OXYGEN_BAR_COLOR);
   updateShipStatus(dt);
 
-  // Death: show overlay + pause game (one-shot)
-  if (!deathScreenOpen && player.health <= 0) {
-    sfx.playDeath();
-    sfx.stopLaserLoop();
-    sfx.stopDroneLaserLoop();
-    deathScreenOpen = true;
-    gamePaused = true;
-    // Clear latched inputs so nothing keeps firing/thrusting
-    input.leftMouseDown = false;
-    input.rightMouseDown = false;
-    input.ctrlBrake = false;
-    // Cancel any inventory drag state
-    inventoryDrag = null;
-    try { setDragGhostVisible(false); } catch (e) {}
-    if (deathOverlayEl) deathOverlayEl.style.display = 'flex';
-  }
+  if (!deathScreenOpen && !deathSequence.active && player.health <= 0) startDeathSequence();
 }
 
 function render(dt = 1 / 60) {
@@ -2997,7 +3121,16 @@ function render(dt = 1 / 60) {
     const onScreen = (ast.x - r) < cullRight && (ast.x + r) > cullLeft && (ast.y - r) < cullBottom && (ast.y + r) > cullTop;
     ast._mesh.visible = onScreen;
     if (!onScreen) continue;
-    ast._mesh.position.set(ast.x - ship.x, -(ast.y - ship.y), 0);
+    let wobbleX = 0, wobbleY = 0;
+    if (ast._vibrateUntil != null && levelElapsedTime < ast._vibrateUntil) {
+      const remain = (ast._vibrateUntil - levelElapsedTime) / ASTEROID_VIBRATE_DURATION;
+      const amp = ASTEROID_VIBRATE_AMPLITUDE * remain;
+      wobbleX = (Math.sin(levelElapsedTime * 45) + Math.sin(levelElapsedTime * 70) * 0.5) * amp;
+      wobbleY = (Math.cos(levelElapsedTime * 55) + Math.cos(levelElapsedTime * 65) * 0.5) * amp;
+    } else if (ast._vibrateUntil != null) {
+      ast._vibrateUntil = null;
+    }
+    ast._mesh.position.set(ast.x - ship.x + wobbleX, -(ast.y - ship.y) + wobbleY, 0);
     const spin = (ast._spinSpeed ?? 0.3) * (ast._spinDirection ?? 1) * dt;
     if (ast._spinAxis === 0) ast._mesh.rotation.x += spin;
     else if (ast._spinAxis === 1) ast._mesh.rotation.y += spin;
@@ -3040,7 +3173,14 @@ function render(dt = 1 / 60) {
   const aimAngle = Math.atan2(input.mouseY - cy, input.mouseX - cx);
   // Always clear the ship canvas so it stays transparent before model load.
   if (shipRenderer) shipRenderer.clear();
-  if (shipModelLoaded && shipMesh && shipRenderer && shipScene && shipCamera) {
+  if (hidePlayerShip) {
+    shipTiltInitialized = false;
+    // Hide only the player ship mesh but still render the rest of the 3D scene
+    if (shipMesh) shipMesh.visible = false;
+    for (const flame of shipFlames) flame.visible = false;
+    if (shipRenderer && shipScene && shipCamera) shipRenderer.render(shipScene, shipCamera);
+  } else if (shipModelLoaded && shipMesh && shipRenderer && shipScene && shipCamera) {
+    if (shipMesh) shipMesh.visible = true;
     // Tilt when turning, decay when resting
     if (!shipTiltInitialized) {
       prevAimAngle = aimAngle;
@@ -3072,7 +3212,7 @@ function render(dt = 1 / 60) {
   } else {
     drawShip2D();
   }
-  drawCrosshairAndHeatBar();
+  if (!hidePlayerShip) drawCrosshairAndHeatBar();
 
   // Mining laser beam (orange-red line) - any mining laser in MINING_LASER_STATS
   const hasEnergy = inventory.getFirstChargedCell() != null;
@@ -3247,19 +3387,21 @@ function render(dt = 1 / 60) {
       visible.push({ text: msg.text, color: msg.color, alpha });
     }
     if (visible.length > 0) {
+      // Draw on the UI canvas so alerts are always above the 3D scene.
+      const statusCtx = uiCtx || ctx;
       const { x, y } = worldToScreen(ship.x, ship.y);
-      ctx.font = 'bold 13px Oxanium';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      statusCtx.font = 'bold 13px Oxanium';
+      statusCtx.textAlign = 'center';
+      statusCtx.textBaseline = 'middle';
       for (let i = 0; i < visible.length; i++) {
         const msg = visible[i];
         const msgY = y - SHIP_STATUS_BASE_Y_OFFSET - (i * SHIP_STATUS_LINE_SPACING);
-        ctx.fillStyle = `rgba(0,0,0,${msg.alpha})`;
-        ctx.fillText(msg.text, x + 1, msgY + 1);
-        ctx.fillStyle = msg.color;
-        ctx.globalAlpha = msg.alpha;
-        ctx.fillText(msg.text, x, msgY);
-        ctx.globalAlpha = 1;
+        statusCtx.fillStyle = `rgba(0,0,0,${msg.alpha})`;
+        statusCtx.fillText(msg.text, x + 1, msgY + 1);
+        statusCtx.fillStyle = msg.color;
+        statusCtx.globalAlpha = msg.alpha;
+        statusCtx.fillText(msg.text, x, msgY);
+        statusCtx.globalAlpha = 1;
       }
     }
   }
@@ -3765,6 +3907,18 @@ function returnSellAreaToHotbar() {
 window.addEventListener('keydown', (e) => {
   sfx.resumeIfNeeded();
   if (startScreenOpen || deathScreenOpen) return;
+  if (e.code === 'Escape') {
+    e.preventDefault();
+    if (warpMenuOpen) { closeWarpMenu(); return; }
+    if (shopMenuOpen) { closeShopMenu(); return; }
+    if (craftingMenuOpen) { closeCraftingMenu(); return; }
+    if (refineryMenuOpen) { closeRefineryMenu(); return; }
+    if (shipyardMenuOpen) { closeShipyardMenu(); return; }
+    if (pauseMenuOpen) { closePauseMenu(); return; }
+    openPauseMenu();
+    return;
+  }
+  if (pauseMenuOpen) return;
   if (warpMenuOpen) return;
   // Allow E to close any open menu
   if (shopMenuOpen) {
@@ -3836,7 +3990,7 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => {
   if (startScreenOpen || deathScreenOpen) return;
-  if (warpMenuOpen) return;
+  if (warpMenuOpen || pauseMenuOpen) return;
   if (shopMenuOpen || craftingMenuOpen || refineryMenuOpen || shipyardMenuOpen) return;
 });
 
@@ -4181,7 +4335,7 @@ function closeWarpMenu() {
   sfx.playMenuClose();
   warpMenuOpen = false;
   activeWarpStructure = null;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  gamePaused = computeMenuPauseState();
   const overlay = document.getElementById('warp-menu-overlay');
   if (overlay) overlay.style.display = 'none';
 }
@@ -4246,7 +4400,7 @@ function closeShopMenu() {
   returnSellAreaToHotbar();
   shopMenuOpen = false;
   updateExtInvVisibility();
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  gamePaused = computeMenuPauseState();
   inventoryDrag = null;
   activeShopStructure = null;
   const overlay = document.getElementById('shop-menu-overlay');
@@ -4391,7 +4545,7 @@ function closeCraftingMenu() {
   
   craftingMenuOpen = false;
   updateExtInvVisibility();
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  gamePaused = computeMenuPauseState();
   activeCraftingStructure = null;
   const overlay = document.getElementById('crafting-menu-overlay');
   if (overlay) overlay.style.display = 'none';
@@ -4591,7 +4745,7 @@ function closeRefineryMenu() {
 
   refineryMenuOpen = false;
   updateExtInvVisibility();
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  gamePaused = computeMenuPauseState();
   activeRefineryStructure = null;
   const overlay = document.getElementById('refinery-menu-overlay');
   if (overlay) overlay.style.display = 'none';
@@ -5141,7 +5295,7 @@ function closeShipyardMenu() {
   shipyardMenuOpen = false;
   updateExtInvVisibility();
   activeShipyardStructure = null;
-  gamePaused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen;
+  gamePaused = computeMenuPauseState();
   const overlay = document.getElementById('shipyard-menu-overlay');
   if (overlay) overlay.style.display = 'none';
 }
@@ -5911,7 +6065,10 @@ function gameLoop(now) {
   // Warp transition updates even while paused so animation plays through
   updateWarpTransition(dt);
 
-  if (!gamePaused) update(dt);
+  if (!gamePaused) {
+    if (deathSequence.active) updateDeathSequence(dt);
+    update(dt);
+  }
   render(gamePaused ? 0 : dt);
   _flushHUD(); // Only re-renders DOM when hudDirty is true
 

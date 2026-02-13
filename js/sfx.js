@@ -100,6 +100,20 @@ class SpaceJamSfx {
     return !!(this.ctx && this.ctx.state === 'running' && this.groups);
   }
 
+  setMasterVolume(value) {
+    const normalized = clamp(Number(value), 0, 1);
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return normalized;
+    this.masterGain.gain.setTargetAtTime(normalized, ctx.currentTime, 0.015);
+    return normalized;
+  }
+
+  getMasterVolume() {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return DEFAULTS.masterVolume;
+    return clamp(Number(this.masterGain.gain.value), 0, 1);
+  }
+
   now() {
     return this.ctx.currentTime;
   }

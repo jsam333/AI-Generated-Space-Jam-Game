@@ -20,9 +20,11 @@
     <canvas id="ship-canvas"></canvas>
     <canvas id="ui-canvas"></canvas>
     <div id="main-menu-overlay">
+      <canvas id="main-menu-starfield-canvas" aria-hidden="true"></canvas>
       <div id="main-menu">
-        <h1 class="main-menu-title">Space Jam</h1>
-        <button type="button" id="main-menu-start-btn">Start Game</button>
+        <div class="main-menu-kicker">Hostile Extraction Environment</div>
+        <h1 class="main-menu-title">Sector 7</h1>
+        <button type="button" id="main-menu-start-btn">Start Mission</button>
       </div>
     </div>
     <div id="intro-cutscene-overlay" style="display: none;">
@@ -36,6 +38,25 @@
     <div id="start-menu-overlay" style="display: none;">
       <div id="start-menu">
         <div class="start-title">Click to start</div>
+      </div>
+    </div>
+    <div id="pause-menu-overlay" style="display: none;">
+      <div id="pause-menu">
+        <div class="pause-title">Paused</div>
+        <label class="pause-volume-label" for="pause-volume-slider">Master Volume</label>
+        <input
+          id="pause-volume-slider"
+          class="pause-volume-slider"
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value="70"
+        >
+        <div class="pause-actions">
+          <button type="button" id="pause-resume-btn">Resume</button>
+          <button type="button" id="pause-restart-btn">Restart</button>
+        </div>
       </div>
     </div>
     <div id="warp-menu-overlay" style="display: none;">
@@ -202,7 +223,9 @@
       <div id="death-menu">
         <div class="death-title">You Died</div>
         <div class="death-subtitle">Your ship was destroyed.</div>
-        <button type="button" id="death-restart-btn">Restart</button>
+        <div class="death-actions">
+          <button type="button" id="death-main-menu-btn">Main Menu</button>
+        </div>
       </div>
     </div>
     <div id="shop-drag-ghost" style="display: none;" aria-hidden="true"></div>

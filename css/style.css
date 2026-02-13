@@ -142,47 +142,68 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
   z-index: 30;
   pointer-events: auto;
   box-sizing: border-box;
 }
 
+#main-menu-starfield-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  display: block;
+}
+
 #main-menu {
-  background: rgba(20, 20, 20, 0.95);
-  border: 1px solid #555;
+  position: relative;
+  z-index: 1;
+  width: min(680px, calc(var(--game-width) - 100px));
+  background: rgba(20, 20, 20, 0.92);
+  border: 1px solid #777;
   border-radius: 10px;
-  padding: 32px 40px;
+  padding: 40px 44px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
+}
+
+#main-menu .main-menu-kicker {
+  color: #bbb;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
 }
 
 #main-menu .main-menu-title {
   color: #fff;
   font-family: 'Oxanium', Arial, sans-serif;
-  font-size: 28px;
+  font-size: 58px;
   font-weight: 600;
-  letter-spacing: 1px;
+  line-height: 1;
+  letter-spacing: 2px;
   margin: 0;
 }
 
 #main-menu-start-btn {
-  background: #444;
-  color: #fff;
+  min-width: 180px;
+  background: #2f2f2f;
+  color: #eee;
   border: 1px solid #666;
-  border-radius: 6px;
-  padding: 12px 28px;
+  border-radius: 8px;
+  padding: 12px 30px;
   font-family: 'Oxanium', Arial, sans-serif;
-  font-size: 16px;
+  font-size: 17px;
+  letter-spacing: 0.5px;
   cursor: pointer;
 }
 
 #main-menu-start-btn:hover {
-  background: #555;
-  border-color: #777;
+  background: #444;
 }
 
 /* ── Intro Cutscene ── */
@@ -277,6 +298,71 @@ textarea {
   letter-spacing: 0.5px;
 }
 
+#pause-menu-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--game-width);
+  height: var(--game-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: grayscale(1) blur(2px);
+  -webkit-backdrop-filter: grayscale(1) blur(2px);
+  z-index: 31;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+#pause-menu {
+  background: rgba(20, 20, 20, 0.92);
+  border: 1px solid #777;
+  border-radius: 10px;
+  padding: 22px 24px;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#pause-menu .pause-title {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+#pause-menu .pause-volume-label {
+  color: #bbb;
+  font-size: 13px;
+}
+
+#pause-menu .pause-volume-slider {
+  width: 100%;
+  cursor: pointer;
+}
+
+#pause-menu .pause-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+#pause-menu button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #2f2f2f;
+  border: 1px solid #666;
+  color: #eee;
+  cursor: pointer;
+}
+
+#pause-menu button:hover {
+  background: #444;
+}
+
 #death-menu-overlay {
   position: absolute;
   left: 0;
@@ -316,6 +402,12 @@ textarea {
 #death-menu .death-subtitle {
   color: #ccc;
   font-size: 14px;
+}
+
+#death-menu .death-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 
 #death-menu button {

@@ -19,7 +19,7 @@ const MAP_H = 2400;
 //                                    charDelay (s per character) }
 const SCRIPT = [
   { text: 'Day 260.',                                          preDelay: 1.0,  charDelay: 0.06 },
-  { text: 'The search continues... I need better gear.',       preDelay: 1.5,  charDelay: 0.04 },
+  { text: 'The search continues... but I need better gear.',    preDelay: 1.5,  charDelay: 0.04 },
   { text: 'Continuing in the Gamene Belt. The edge of space.', preDelay: 1.5,  charDelay: 0.04 },
   { text: 'Checking Sector 7....',                             preDelay: 1.5,  charDelay: 0.055 },
 ];
@@ -256,6 +256,268 @@ function runTypewriter(el, script, onDone, onCharTyped = null) {
   return { tick, skipToEnd };
 }
 
+// ─── Shared Starfield Frame Renderer ─────────────────────────────────────────
+// Renders one frame of the procedural starfield map. Used by both the intro
+// cutscene and the main menu background.
+
+function renderStarfieldFrame(mCtx, cw, ch, mapImage, tradeRoutes, elapsedSeconds) {
+  function mapToScreen(x, y, sx, sy, srcW, srcH) {
+    return {
+      x: ((x - sx) / srcW) * cw,
+      y: ((y - sy) / srcH) * ch
+    };
+  }
+  function getWorldToScreenScale(srcW) { return cw / srcW; }
+  function wrapDashOffset(value, period) {
+    if (!Number.isFinite(period) || period <= 0) return 0;
+    const mod = value % period;
+    return (mod + period) % period;
+  }
+  function drawGridLayer(sx, sy, srcW, srcH, step, color, lineWidth) {
+    const startX = Math.floor(sx / step) * step;
+    const endX = sx + srcW;
+    const startY = Math.floor(sy / step) * step;
+    const endY = sy + srcH;
+    mCtx.save();
+    mCtx.strokeStyle = color;
+    mCtx.lineWidth = lineWidth;
+    mCtx.setLineDash([]);
+    mCtx.lineCap = 'butt';
+    for (let gx = startX; gx <= endX; gx += step) {
+      const p1 = mapToScreen(gx, sy, sx, sy, srcW, srcH);
+      const p2 = mapToScreen(gx, sy + srcH, sx, sy, srcW, srcH);
+      mCtx.beginPath();
+      mCtx.moveTo(p1.x, p1.y);
+      mCtx.lineTo(p2.x, p2.y);
+      mCtx.stroke();
+    }
+    for (let gy = startY; gy <= endY; gy += step) {
+      const p1 = mapToScreen(sx, gy, sx, sy, srcW, srcH);
+      const p2 = mapToScreen(sx + srcW, gy, sx, sy, srcW, srcH);
+      mCtx.beginPath();
+      mCtx.moveTo(p1.x, p1.y);
+      mCtx.lineTo(p2.x, p2.y);
+      mCtx.stroke();
+    }
+    mCtx.restore();
+  }
+  function drawTradeRoutesLayer(sx, sy, srcW, srcH, lodLevel, alpha, lineWidth) {
+    const margin = 100;
+    const scale = getWorldToScreenScale(srcW);
+    const dashWorld = [14, 16];
+    const dashPx = [dashWorld[0] * scale, dashWorld[1] * scale];
+    const periodPx = dashPx[0] + dashPx[1];
+    mCtx.save();
+    mCtx.strokeStyle = `rgba(100,180,220,${alpha})`;
+    mCtx.lineWidth = lineWidth;
+    mCtx.setLineDash(dashPx);
+    mCtx.lineCap = 'butt';
+    for (const r of tradeRoutes) {
+      if (r.lodLevel !== lodLevel) continue;
+      const pa = mapToScreen(r.ax, r.ay, sx, sy, srcW, srcH);
+      const pb = mapToScreen(r.bx, r.by, sx, sy, srcW, srcH);
+      if (pa.x < -margin && pb.x < -margin) continue;
+      if (pa.x > cw + margin && pb.x > cw + margin) continue;
+      if (pa.y < -margin && pb.y < -margin) continue;
+      if (pa.y > ch + margin && pb.y > ch + margin) continue;
+      const dx = r.bx - r.ax;
+      const dy = r.by - r.ay;
+      const len = Math.hypot(dx, dy);
+      if (len <= 0.0001) continue;
+      const ux = dx / len;
+      const uy = dy / len;
+      const anchor = (r.ax * ux) + (r.ay * uy);
+      mCtx.lineDashOffset = -wrapDashOffset(anchor * scale, periodPx);
+      mCtx.beginPath();
+      mCtx.moveTo(pa.x, pa.y);
+      mCtx.lineTo(pb.x, pb.y);
+      mCtx.stroke();
+    }
+    mCtx.restore();
+  }
+  function drawMapLabel(text, x, y, fontPx, color, sx, sy, srcW, srcH, align = 'center') {
+    const screen = mapToScreen(x, y, sx, sy, srcW, srcH);
+    if (screen.x < -140 || screen.x > cw + 140 || screen.y < -30 || screen.y > ch + 30) return;
+    mCtx.save();
+    mCtx.font = `${fontPx}px 'Oxanium', Arial, sans-serif`;
+    mCtx.textAlign = align;
+    mCtx.textBaseline = 'middle';
+    mCtx.fillStyle = color;
+    mCtx.fillText(text, screen.x, screen.y);
+    mCtx.restore();
+  }
+  function drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed) {
+    const cellStartX = Math.floor(sx / cellSize) - 1;
+    const cellEndX = Math.floor((sx + srcW) / cellSize) + 1;
+    const cellStartY = Math.floor(sy / cellSize) - 1;
+    const cellEndY = Math.floor((sy + srcH) / cellSize) + 1;
+    for (let cxCell = cellStartX; cxCell <= cellEndX; cxCell++) {
+      for (let cyCell = cellStartY; cyCell <= cellEndY; cyCell++) {
+        if (hash2ToUnit(cxCell, cyCell, seed) > density) continue;
+        const ox = hash2ToUnit(cxCell, cyCell, seed + 13);
+        const oy = hash2ToUnit(cxCell, cyCell, seed + 29);
+        const twinkle = hash2ToUnit(cxCell, cyCell, seed + 41);
+        const wx = (cxCell + ox) * cellSize;
+        const wy = (cyCell + oy) * cellSize;
+        const p = mapToScreen(wx, wy, sx, sy, srcW, srcH);
+        if (p.x < -6 || p.x > cw + 6 || p.y < -6 || p.y > ch + 6) continue;
+        const size = minSize + (maxSize - minSize) * twinkle;
+        const alpha = alphaMin + (alphaMax - alphaMin) * twinkle;
+        mCtx.fillStyle = `rgba(235,245,255,${alpha})`;
+        mCtx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+      }
+    }
+  }
+  function drawProceduralStarLODTriple(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed) {
+    drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed);
+    drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed + 100003);
+    drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed + 200009);
+  }
+  function drawStarAt(sx, sy, srcW, srcH, mapX, mapY, size, alpha) {
+    const p = mapToScreen(mapX, mapY, sx, sy, srcW, srcH);
+    if (p.x < -6 || p.x > cw + 6 || p.y < -6 || p.y > ch + 6) return;
+    mCtx.fillStyle = `rgba(235,245,255,${alpha})`;
+    mCtx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
+  }
+  function drawTier1Overview(sx, sy, srcW, srcH) {
+    drawGridLayer(sx, sy, srcW, srcH, 420, 'rgba(70,110,150,0.12)', 1);
+    drawTradeRoutesLayer(sx, sy, srcW, srcH, 1, 0.20, 1.1);
+    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 85, 0.28, 0.6, 1.2, 0.3, 0.65, 5001);
+    drawStarAt(sx, sy, srcW, srcH, SECTOR7_X, SECTOR7_Y, 0.9, 0.5);
+    drawMapLabel('CORE WORLDS', MAP_W * 0.38, MAP_H * 0.50, 26, 'rgba(140,180,220,0.20)', sx, sy, srcW, srcH);
+    drawMapLabel('OUTER RIM', MAP_W * 0.15, MAP_H * 0.22, 18, 'rgba(140,180,220,0.16)', sx, sy, srcW, srcH);
+    drawMapLabel('GAMENE BELT', MAP_W * 0.72, MAP_H * 0.18, 20, 'rgba(160,220,210,0.24)', sx, sy, srcW, srcH);
+    drawMapLabel('FRONTIER', MAP_W * 0.55, MAP_H * 0.82, 16, 'rgba(140,180,220,0.13)', sx, sy, srcW, srcH);
+  }
+  function drawTier2SectorMap(sx, sy, srcW, srcH) {
+    drawGridLayer(sx, sy, srcW, srcH, 220, 'rgba(90,140,190,0.18)', 1);
+    drawTradeRoutesLayer(sx, sy, srcW, srcH, 2, 0.18, 1.0);
+    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 46, 0.34, 0.8, 1.4, 0.35, 0.7, 1001);
+    drawStarAt(sx, sy, srcW, srcH, SECTOR7_X, SECTOR7_Y, 1.1, 0.55);
+    const sectorDots = [
+      { name: 'S-3', x: MAP_W * 0.68, y: MAP_H * 0.22 },
+      { name: 'S-5', x: MAP_W * 0.73, y: MAP_H * 0.13 },
+      { name: 'S-9', x: MAP_W * 0.82, y: MAP_H * 0.25 },
+      { name: 'S-12', x: MAP_W * 0.70, y: MAP_H * 0.30 },
+      { name: 'S-1', x: MAP_W * 0.60, y: MAP_H * 0.28 }
+    ];
+    mCtx.save();
+    for (const s of sectorDots) {
+      const p = mapToScreen(s.x, s.y, sx, sy, srcW, srcH);
+      if (p.x < -30 || p.x > cw + 30 || p.y < -30 || p.y > ch + 30) continue;
+      mCtx.fillStyle = 'rgba(170,210,240,0.50)';
+      mCtx.beginPath();
+      mCtx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+      mCtx.fill();
+      drawMapLabel(s.name, s.x + 20, s.y, 10, 'rgba(170,210,240,0.40)', sx, sy, srcW, srcH, 'left');
+    }
+    mCtx.restore();
+  }
+  function drawTier3LocalDetails(sx, sy, srcW, srcH) {
+    drawGridLayer(sx, sy, srcW, srcH, 120, 'rgba(110,170,220,0.22)', 1);
+    drawGridLayer(sx, sy, srcW, srcH, 60, 'rgba(110,170,220,0.08)', 1);
+    drawTradeRoutesLayer(sx, sy, srcW, srcH, 3, 0.14, 0.95);
+    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 28, 0.48, 0.9, 1.7, 0.4, 0.78, 2003);
+    drawStarAt(sx, sy, srcW, srcH, SECTOR7_X, SECTOR7_Y, 1.3, 0.6);
+    const localNodes = [
+      { name: 'NODE A', x: SECTOR7_X - 80, y: SECTOR7_Y + 50 },
+      { name: 'NODE B', x: SECTOR7_X + 95, y: SECTOR7_Y - 45 },
+      { name: 'NODE C', x: SECTOR7_X - 120, y: SECTOR7_Y - 70 },
+      { name: 'NODE D', x: SECTOR7_X + 140, y: SECTOR7_Y + 65 }
+    ];
+    for (const node of localNodes) {
+      const p = mapToScreen(node.x, node.y, sx, sy, srcW, srcH);
+      if (p.x < -30 || p.x > cw + 30 || p.y < -30 || p.y > ch + 30) continue;
+      mCtx.fillStyle = 'rgba(160,210,240,0.35)';
+      mCtx.beginPath();
+      mCtx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
+      mCtx.fill();
+      drawMapLabel(node.name, node.x + 16, node.y, 9, 'rgba(160,210,240,0.28)', sx, sy, srcW, srcH, 'left');
+    }
+  }
+  function drawTier4FinalApproach(sx, sy, srcW, srcH, zoom) {
+    drawGridLayer(sx, sy, srcW, srcH, 45, 'rgba(120,200,240,0.18)', 1);
+    drawTradeRoutesLayer(sx, sy, srcW, srcH, 4, 0.12, 0.9);
+    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 18, 0.62, 1.0, 2.0, 0.45, 0.88, 3007);
+    for (let i = 0; i < 70; i++) {
+      const angle = i * 0.27;
+      const radius = 25 + ((i * 17) % 90);
+      const x = SECTOR7_X + Math.cos(angle) * radius;
+      const y = SECTOR7_Y + Math.sin(angle) * radius * 0.8;
+      const p = mapToScreen(x, y, sx, sy, srcW, srcH);
+      if (p.x < -10 || p.x > cw + 10 || p.y < -10 || p.y > ch + 10) continue;
+      const starSize = (i % 3 === 0) ? 1.5 : 1;
+      mCtx.fillStyle = (i % 4 === 0) ? 'rgba(190,220,255,0.60)' : 'rgba(230,230,255,0.55)';
+      mCtx.fillRect(p.x - starSize / 2, p.y - starSize / 2, starSize, starSize);
+    }
+  }
+
+  const tNorm = Math.max(0, Math.min(1, elapsedSeconds / TOTAL_DURATION));
+  const { cx, cy, zoom } = getContinuousCameraPose(tNorm);
+  const lastLabelT = elapsedSeconds >= TOTAL_DURATION - FINAL_LABEL_SECONDS
+    ? Math.max(0, Math.min(1, (elapsedSeconds - (TOTAL_DURATION - FINAL_LABEL_SECONDS)) / FINAL_LABEL_SECONDS))
+    : 0;
+
+  const viewW = MAP_W / zoom;
+  const viewH = MAP_H / zoom;
+  const aspect = cw / ch;
+  let srcW = viewW;
+  let srcH = viewW / aspect;
+  if (srcH > viewH) {
+    srcH = viewH;
+    srcW = viewH * aspect;
+  }
+  const sx = cx - srcW / 2;
+  const sy = cy - srcH / 2;
+
+  mCtx.clearRect(0, 0, cw, ch);
+  mCtx.fillStyle = '#050510';
+  mCtx.fillRect(0, 0, cw, ch);
+  mCtx.drawImage(mapImage, sx, sy, srcW, srcH, 0, 0, cw, ch);
+
+  drawTier1Overview(sx, sy, srcW, srcH);
+  if (zoom >= LOD_TIER_2_ZOOM) drawTier2SectorMap(sx, sy, srcW, srcH);
+  if (zoom >= LOD_TIER_3_ZOOM) drawTier3LocalDetails(sx, sy, srcW, srcH);
+  if (zoom >= LOD_TIER_4_ZOOM) drawTier4FinalApproach(sx, sy, srcW, srcH, zoom);
+
+  if (lastLabelT > 0) {
+    const labelFadeIn = smoothstep(0, 0.25, lastLabelT);
+    const labelAlpha = Math.max(0, Math.min(1, labelFadeIn));
+    if (labelAlpha > 0) {
+      const sector7Screen = mapToScreen(SECTOR7_X, SECTOR7_Y, sx, sy, srcW, srcH);
+      mCtx.save();
+      mCtx.font = `16px 'Oxanium', Arial, sans-serif`;
+      mCtx.textAlign = 'center';
+      mCtx.textBaseline = 'bottom';
+      mCtx.fillStyle = `rgba(185,245,255,${(0.84 * labelAlpha).toFixed(3)})`;
+      mCtx.fillText('Sector 7', sector7Screen.x, sector7Screen.y - 14);
+      mCtx.restore();
+    }
+  }
+
+  const vigGrad = mCtx.createRadialGradient(cw / 2, ch / 2, ch * 0.3, cw / 2, ch / 2, ch * 0.8);
+  vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
+  vigGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
+  mCtx.fillStyle = vigGrad;
+  mCtx.fillRect(0, 0, cw, ch);
+}
+
+/** Renders the first frame (t=0) of the starfield to a canvas. Used for main menu background. */
+export function drawStarfieldFirstFrame(canvas) {
+  if (!canvas?.getContext) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  const dpr = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+  canvas.width = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
+  const mCtx = canvas.getContext('2d');
+  mCtx.imageSmoothingEnabled = true;
+  mCtx.imageSmoothingQuality = 'high';
+  const mapImage = generateMap();
+  const tradeRoutes = generateTradeRoutes();
+  renderStarfieldFrame(mCtx, canvas.width, canvas.height, mapImage, tradeRoutes, 0);
+}
+
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
 export function playIntroCutscene(mapCanvas, dialogueEl, overlayEl, onComplete, transitionHooks = null) {
@@ -364,287 +626,8 @@ export function playIntroCutscene(mapCanvas, dialogueEl, overlayEl, onComplete, 
     if (originalOnComplete) originalOnComplete();
   };
 
-  function mapToScreen(x, y, sx, sy, srcW, srcH) {
-    return {
-      x: ((x - sx) / srcW) * cw,
-      y: ((y - sy) / srcH) * ch
-    };
-  }
-
-  function getWorldToScreenScale(srcW) {
-    return cw / srcW;
-  }
-
-  function wrapDashOffset(value, period) {
-    if (!Number.isFinite(period) || period <= 0) return 0;
-    const mod = value % period;
-    return (mod + period) % period;
-  }
-
-  // Draw grid lines in map-anchored vector space (always solid).
-  function drawGridLayer(sx, sy, srcW, srcH, step, color, lineWidth) {
-    const startX = Math.floor(sx / step) * step;
-    const endX = sx + srcW;
-    const startY = Math.floor(sy / step) * step;
-    const endY = sy + srcH;
-    const scale = getWorldToScreenScale(srcW);
-    const dashPx = [];
-
-    mCtx.save();
-    mCtx.strokeStyle = color;
-    mCtx.lineWidth = lineWidth;
-    mCtx.setLineDash(dashPx);
-    mCtx.lineCap = 'butt';
-
-    for (let gx = startX; gx <= endX; gx += step) {
-      const p1 = mapToScreen(gx, sy, sx, sy, srcW, srcH);
-      const p2 = mapToScreen(gx, sy + srcH, sx, sy, srcW, srcH);
-      mCtx.beginPath();
-      mCtx.moveTo(p1.x, p1.y);
-      mCtx.lineTo(p2.x, p2.y);
-      mCtx.stroke();
-    }
-    for (let gy = startY; gy <= endY; gy += step) {
-      const p1 = mapToScreen(sx, gy, sx, sy, srcW, srcH);
-      const p2 = mapToScreen(sx + srcW, gy, sx, sy, srcW, srcH);
-      mCtx.beginPath();
-      mCtx.moveTo(p1.x, p1.y);
-      mCtx.lineTo(p2.x, p2.y);
-      mCtx.stroke();
-    }
-    mCtx.restore();
-  }
-
-  // Draw route layer per LOD in vector space for crisp lines at all zoom levels.
-  function drawTradeRoutesLayer(sx, sy, srcW, srcH, lodLevel, alpha, lineWidth) {
-    const margin = 100;
-    const scale = getWorldToScreenScale(srcW);
-    const dashWorld = [14, 16];
-    const dashPx = [dashWorld[0] * scale, dashWorld[1] * scale];
-    const periodPx = dashPx[0] + dashPx[1];
-
-    mCtx.save();
-    mCtx.strokeStyle = `rgba(100,180,220,${alpha})`;
-    mCtx.lineWidth = lineWidth;
-    mCtx.setLineDash(dashPx);
-    mCtx.lineCap = 'butt';
-
-    for (const r of tradeRoutes) {
-      if (r.lodLevel !== lodLevel) continue;
-      const pa = mapToScreen(r.ax, r.ay, sx, sy, srcW, srcH);
-      const pb = mapToScreen(r.bx, r.by, sx, sy, srcW, srcH);
-      if (pa.x < -margin && pb.x < -margin) continue;
-      if (pa.x > cw + margin && pb.x > cw + margin) continue;
-      if (pa.y < -margin && pb.y < -margin) continue;
-      if (pa.y > ch + margin && pb.y > ch + margin) continue;
-
-      const dx = r.bx - r.ax;
-      const dy = r.by - r.ay;
-      const len = Math.hypot(dx, dy);
-      if (len <= 0.0001) continue;
-      const ux = dx / len;
-      const uy = dy / len;
-      const anchor = (r.ax * ux) + (r.ay * uy);
-      mCtx.lineDashOffset = -wrapDashOffset(anchor * scale, periodPx);
-
-      mCtx.beginPath();
-      mCtx.moveTo(pa.x, pa.y);
-      mCtx.lineTo(pb.x, pb.y);
-      mCtx.stroke();
-    }
-    mCtx.restore();
-  }
-
-  function drawMapLabel(text, x, y, fontPx, color, sx, sy, srcW, srcH, align = 'center') {
-    const screen = mapToScreen(x, y, sx, sy, srcW, srcH);
-    if (screen.x < -140 || screen.x > cw + 140 || screen.y < -30 || screen.y > ch + 30) return;
-    mCtx.save();
-    mCtx.font = `${fontPx}px 'Oxanium', Arial, sans-serif`;
-    mCtx.textAlign = align;
-    mCtx.textBaseline = 'middle';
-    mCtx.fillStyle = color;
-    mCtx.fillText(text, screen.x, screen.y);
-    mCtx.restore();
-  }
-
-  function drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed) {
-    const cellStartX = Math.floor(sx / cellSize) - 1;
-    const cellEndX = Math.floor((sx + srcW) / cellSize) + 1;
-    const cellStartY = Math.floor(sy / cellSize) - 1;
-    const cellEndY = Math.floor((sy + srcH) / cellSize) + 1;
-
-    for (let cxCell = cellStartX; cxCell <= cellEndX; cxCell++) {
-      for (let cyCell = cellStartY; cyCell <= cellEndY; cyCell++) {
-        const appear = hash2ToUnit(cxCell, cyCell, seed);
-        if (appear > density) continue;
-
-        const ox = hash2ToUnit(cxCell, cyCell, seed + 13);
-        const oy = hash2ToUnit(cxCell, cyCell, seed + 29);
-        const twinkle = hash2ToUnit(cxCell, cyCell, seed + 41);
-
-        const wx = (cxCell + ox) * cellSize;
-        const wy = (cyCell + oy) * cellSize;
-        const p = mapToScreen(wx, wy, sx, sy, srcW, srcH);
-        if (p.x < -6 || p.x > cw + 6 || p.y < -6 || p.y > ch + 6) continue;
-
-        const size = minSize + (maxSize - minSize) * twinkle;
-        const alpha = alphaMin + (alphaMax - alphaMin) * twinkle;
-        mCtx.fillStyle = `rgba(235,245,255,${alpha})`;
-        mCtx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
-      }
-    }
-  }
-
-  // Draw three deterministic star fields per LOD tier (3x star count).
-  function drawProceduralStarLODTriple(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed) {
-    drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed);
-    drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed + 100003);
-    drawProceduralStarLOD(sx, sy, srcW, srcH, cellSize, density, minSize, maxSize, alphaMin, alphaMax, seed + 200009);
-  }
-
-  function drawStarAt(sx, sy, srcW, srcH, mapX, mapY, size, alpha) {
-    const p = mapToScreen(mapX, mapY, sx, sy, srcW, srcH);
-    if (p.x < -6 || p.x > cw + 6 || p.y < -6 || p.y > ch + 6) return;
-    mCtx.fillStyle = `rgba(235,245,255,${alpha})`;
-    mCtx.fillRect(p.x - size / 2, p.y - size / 2, size, size);
-  }
-
-  function drawTier1Overview(sx, sy, srcW, srcH) {
-    drawGridLayer(sx, sy, srcW, srcH, 420, 'rgba(70,110,150,0.12)', 1);
-    drawTradeRoutesLayer(sx, sy, srcW, srcH, 1, 0.20, 1.1);
-    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 85, 0.28, 0.6, 1.2, 0.3, 0.65, 5001);
-    drawStarAt(sx, sy, srcW, srcH, SECTOR7_X, SECTOR7_Y, 0.9, 0.5);
-    drawMapLabel('CORE WORLDS', MAP_W * 0.38, MAP_H * 0.50, 26, 'rgba(140,180,220,0.20)', sx, sy, srcW, srcH);
-    drawMapLabel('OUTER RIM', MAP_W * 0.15, MAP_H * 0.22, 18, 'rgba(140,180,220,0.16)', sx, sy, srcW, srcH);
-    drawMapLabel('GAMENE BELT', MAP_W * 0.72, MAP_H * 0.18, 20, 'rgba(160,220,210,0.24)', sx, sy, srcW, srcH);
-    drawMapLabel('FRONTIER', MAP_W * 0.55, MAP_H * 0.82, 16, 'rgba(140,180,220,0.13)', sx, sy, srcW, srcH);
-  }
-
-  function drawTier2SectorMap(sx, sy, srcW, srcH) {
-    drawGridLayer(sx, sy, srcW, srcH, 220, 'rgba(90,140,190,0.18)', 1);
-    drawTradeRoutesLayer(sx, sy, srcW, srcH, 2, 0.18, 1.0);
-    // Higher-detail star points that stay sharp as zoom increases.
-    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 46, 0.34, 0.8, 1.4, 0.35, 0.7, 1001);
-    drawStarAt(sx, sy, srcW, srcH, SECTOR7_X, SECTOR7_Y, 1.1, 0.55);
-    const sectorDots = [
-      { name: 'S-3', x: MAP_W * 0.68, y: MAP_H * 0.22 },
-      { name: 'S-5', x: MAP_W * 0.73, y: MAP_H * 0.13 },
-      { name: 'S-9', x: MAP_W * 0.82, y: MAP_H * 0.25 },
-      { name: 'S-12', x: MAP_W * 0.70, y: MAP_H * 0.30 },
-      { name: 'S-1', x: MAP_W * 0.60, y: MAP_H * 0.28 }
-    ];
-    mCtx.save();
-    for (const s of sectorDots) {
-      const p = mapToScreen(s.x, s.y, sx, sy, srcW, srcH);
-      if (p.x < -30 || p.x > cw + 30 || p.y < -30 || p.y > ch + 30) continue;
-      mCtx.fillStyle = 'rgba(170,210,240,0.50)';
-      mCtx.beginPath();
-      mCtx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-      mCtx.fill();
-      drawMapLabel(s.name, s.x + 20, s.y, 10, 'rgba(170,210,240,0.40)', sx, sy, srcW, srcH, 'left');
-    }
-    mCtx.restore();
-  }
-
-  function drawTier3LocalDetails(sx, sy, srcW, srcH) {
-    drawGridLayer(sx, sy, srcW, srcH, 120, 'rgba(110,170,220,0.22)', 1);
-    drawGridLayer(sx, sy, srcW, srcH, 60, 'rgba(110,170,220,0.08)', 1);
-    drawTradeRoutesLayer(sx, sy, srcW, srcH, 3, 0.14, 0.95);
-    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 28, 0.48, 0.9, 1.7, 0.4, 0.78, 2003);
-    drawStarAt(sx, sy, srcW, srcH, SECTOR7_X, SECTOR7_Y, 1.3, 0.6);
-
-    // Local neighborhood markers around Sector 7 (still no special S7 label yet).
-    const localNodes = [
-      { name: 'NODE A', x: SECTOR7_X - 80, y: SECTOR7_Y + 50 },
-      { name: 'NODE B', x: SECTOR7_X + 95, y: SECTOR7_Y - 45 },
-      { name: 'NODE C', x: SECTOR7_X - 120, y: SECTOR7_Y - 70 },
-      { name: 'NODE D', x: SECTOR7_X + 140, y: SECTOR7_Y + 65 }
-    ];
-    for (const node of localNodes) {
-      const p = mapToScreen(node.x, node.y, sx, sy, srcW, srcH);
-      if (p.x < -30 || p.x > cw + 30 || p.y < -30 || p.y > ch + 30) continue;
-      mCtx.fillStyle = 'rgba(160,210,240,0.35)';
-      mCtx.beginPath();
-      mCtx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
-      mCtx.fill();
-      drawMapLabel(node.name, node.x + 16, node.y, 9, 'rgba(160,210,240,0.28)', sx, sy, srcW, srcH, 'left');
-    }
-  }
-
-  function drawTier4FinalApproach(sx, sy, srcW, srcH, zoom) {
-    drawGridLayer(sx, sy, srcW, srcH, 45, 'rgba(120,200,240,0.18)', 1);
-    drawTradeRoutesLayer(sx, sy, srcW, srcH, 4, 0.12, 0.9);
-    drawProceduralStarLODTriple(sx, sy, srcW, srcH, 18, 0.62, 1.0, 2.0, 0.45, 0.88, 3007);
-
-    // Add dense close-up star detail only at final LOD.
-    for (let i = 0; i < 70; i++) {
-      const angle = i * 0.27;
-      const radius = 25 + ((i * 17) % 90);
-      const x = SECTOR7_X + Math.cos(angle) * radius;
-      const y = SECTOR7_Y + Math.sin(angle) * radius * 0.8;
-      const p = mapToScreen(x, y, sx, sy, srcW, srcH);
-      if (p.x < -10 || p.x > cw + 10 || p.y < -10 || p.y > ch + 10) continue;
-      const starSize = (i % 3 === 0) ? 1.5 : 1;
-      mCtx.fillStyle = (i % 4 === 0) ? 'rgba(190,220,255,0.60)' : 'rgba(230,230,255,0.55)';
-      mCtx.fillRect(p.x - starSize / 2, p.y - starSize / 2, starSize, starSize);
-    }
-
-    // No fixed Sector 7 marker in the final section; zoom drives the transition.
-  }
-
   function drawMapFrame(elapsedSeconds) {
-    const tNorm = Math.max(0, Math.min(1, elapsedSeconds / TOTAL_DURATION));
-    const { cx, cy, zoom } = getContinuousCameraPose(tNorm);
-    const lastLabelT = getLastLabelT(elapsedSeconds);
-    const blendT = getBlendT(elapsedSeconds);
-
-    // Source rect on offscreen map
-    const viewW = MAP_W / zoom;
-    const viewH = MAP_H / zoom;
-    // Maintain aspect ratio of destination canvas
-    const aspect = cw / ch;
-    let srcW = viewW;
-    let srcH = viewW / aspect;
-    if (srcH > viewH) {
-      srcH = viewH;
-      srcW = viewH * aspect;
-    }
-    const sx = cx - srcW / 2;
-    const sy = cy - srcH / 2;
-
-    mCtx.clearRect(0, 0, cw, ch);
-    mCtx.fillStyle = '#050510';
-    mCtx.fillRect(0, 0, cw, ch);
-    mCtx.drawImage(mapImage, sx, sy, srcW, srcH, 0, 0, cw, ch);
-
-    // Progressive map detail levels (4 LOD tiers).
-    drawTier1Overview(sx, sy, srcW, srcH);
-    if (zoom >= LOD_TIER_2_ZOOM) drawTier2SectorMap(sx, sy, srcW, srcH);
-    if (zoom >= LOD_TIER_3_ZOOM) drawTier3LocalDetails(sx, sy, srcW, srcH);
-    if (zoom >= LOD_TIER_4_ZOOM) drawTier4FinalApproach(sx, sy, srcW, srcH, zoom);
-
-    // Last 5s: show a basic Sector 7 label above the target star.
-    if (lastLabelT > 0) {
-      const labelFadeIn = smoothstep(0, 0.25, lastLabelT);
-      const labelAlpha = Math.max(0, Math.min(1, labelFadeIn));
-      if (labelAlpha > 0) {
-        const sector7Screen = mapToScreen(SECTOR7_X, SECTOR7_Y, sx, sy, srcW, srcH);
-        mCtx.save();
-        mCtx.font = `16px 'Oxanium', Arial, sans-serif`;
-        mCtx.textAlign = 'center';
-        mCtx.textBaseline = 'bottom';
-        mCtx.fillStyle = `rgba(185,245,255,${(0.84 * labelAlpha).toFixed(3)})`;
-        mCtx.fillText('Sector 7', sector7Screen.x, sector7Screen.y - 14);
-        mCtx.restore();
-      }
-    }
-
-    // Slight scanline / vignette overlay for atmosphere
-    const vigGrad = mCtx.createRadialGradient(cw / 2, ch / 2, ch * 0.3, cw / 2, ch / 2, ch * 0.8);
-    vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    vigGrad.addColorStop(1, 'rgba(0,0,0,0.35)');
-    mCtx.fillStyle = vigGrad;
-    mCtx.fillRect(0, 0, cw, ch);
+    renderStarfieldFrame(mCtx, cw, ch, mapImage, tradeRoutes, elapsedSeconds);
   }
 
   function frame(now) {
