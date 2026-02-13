@@ -45,6 +45,10 @@ export class Inventory {
   }
 
   set(index, item) {
+    if (item && item.quantity != null) {
+      const max = getMaxStack(item.item);
+      item.quantity = Math.min(item.quantity, max);
+    }
     this.slots[index] = item;
   }
 

@@ -583,6 +583,17 @@ textarea {
   color: #fff;
 }
 
+.recipe-item.recipe-warp-key {
+  position: relative;
+  border: 1px solid rgba(255, 226, 120, 0.5);
+  animation: recipe-warp-key-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes recipe-warp-key-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 204, 64, 0.35), 0 0 24px rgba(255, 204, 64, 0.12); }
+  50% { box-shadow: 0 0 16px rgba(255, 204, 64, 0.5), 0 0 32px rgba(255, 204, 64, 0.2); }
+}
+
 #crafting-work-area {
   flex: 1;
   display: flex;
@@ -720,7 +731,8 @@ textarea {
   text-transform: uppercase;
 }
 
-#refinery-input-grid {
+#refinery-input-grid,
+#refinery-output-grid {
   display: grid;
   grid-template-columns: repeat(2, 50px);
   gap: 4px;

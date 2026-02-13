@@ -6923,7 +6923,7 @@
           "inputs": [
             {
               "item": "cuprite",
-              "quantity": 20
+              "quantity": 15
             }
           ],
           "output": {
@@ -6935,7 +6935,7 @@
           "inputs": [
             {
               "item": "hematite",
-              "quantity": 10
+              "quantity": 5
             },
             {
               "item": "aurite",
@@ -6956,7 +6956,8 @@
       "availableShips": [
         "cutter",
         "transport"
-      ]
+      ],
+      "maxDrones": 0
     },
     {
       "x": 57.42769730348129,
@@ -6986,16 +6987,16 @@
       "pirateArchetype": "standard"
     },
     {
-      "x": 2105.595917514832,
-      "y": 2359.6222346412865,
+      "x": 2154.9786335642148,
+      "y": 2269.087255217418,
       "type": "piratebase",
-      "tier": 2,
+      "tier": 1,
       "defenseTypePercentages": {
         "normal": 100,
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4,
+      "waveSpawnCount": 2,
       "waveSpawnTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -7013,16 +7014,16 @@
       "pirateArchetype": "standard"
     },
     {
-      "x": 2015.0775340700911,
-      "y": 1746.2037906960295,
+      "x": 2089.1516081441655,
+      "y": 1836.7387701198977,
       "type": "piratebase",
-      "tier": 2,
+      "tier": 1,
       "defenseTypePercentages": {
         "normal": 100,
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4,
+      "waveSpawnCount": 2,
       "waveSpawnTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -7155,14 +7156,15 @@
       "y": -2475.9746094539246,
       "type": "refinery",
       "acceptedOres": [
-        "cuprite"
+        "cuprite",
+        "hematite"
       ]
     },
     {
       "x": -1323.8764307396814,
       "y": 1810.5373148328704,
       "type": "warpgate",
-      "warpCost": 4000,
+      "warpCost": 5000,
       "warpDestination": "level3",
       "warpRequirement": "key"
     },
@@ -7170,13 +7172,13 @@
       "x": 2539.0102782666168,
       "y": 1987.0845089778209,
       "type": "piratebase",
-      "tier": 2,
+      "tier": 1,
       "defenseTypePercentages": {
         "normal": 100,
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4,
+      "waveSpawnCount": 2,
       "waveSpawnTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -7197,7 +7199,8 @@
       "y": 46.472174651664176,
       "type": "refinery",
       "acceptedOres": [
-        "aurite"
+        "aurite",
+        "hematite"
       ]
     },
     {
@@ -7239,7 +7242,7 @@
         }
       ],
       "health": 200,
-      "spawnRate": 30,
+      "spawnRate": 35,
       "defenseCount": 12,
       "pirateArchetype": "standard"
     },
@@ -7272,7 +7275,7 @@
           "inputs": [
             {
               "item": "hematite",
-              "quantity": 20
+              "quantity": 15
             }
           ],
           "output": {
@@ -7299,7 +7302,8 @@
       "y": 762.4932623474627,
       "type": "refinery",
       "acceptedOres": [
-        "hematite"
+        "aurite",
+        "diamite"
       ]
     },
     {
@@ -7307,7 +7311,8 @@
       "y": 2267.234428029313,
       "type": "refinery",
       "acceptedOres": [
-        "diamite"
+        "diamite",
+        "cuprite"
       ]
     },
     {
@@ -7333,7 +7338,7 @@
         }
       ],
       "defenseCount": 12,
-      "spawnRate": 30,
+      "spawnRate": 40,
       "health": 250,
       "pirateArchetype": "standard"
     },
@@ -7367,6 +7372,16 @@
         }
       ],
       "prices": {}
+    },
+    {
+      "x": -551.5080695693407,
+      "y": 673.610052668123,
+      "type": "shipyard",
+      "availableShips": [
+        "cutter",
+        "transport"
+      ],
+      "maxDrones": 5
     }
   ],
   "spawnSettings": {

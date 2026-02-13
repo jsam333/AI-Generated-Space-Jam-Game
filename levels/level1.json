@@ -531,7 +531,7 @@
         "sturdy": 0,
         "fast": 0
       },
-      "waveSpawnCount": 4,
+      "waveSpawnCount": 3,
       "waveSpawnTypePercentages": {
         "normal": 100,
         "sturdy": 0,
@@ -549,7 +549,8 @@
       ],
       "pirateArchetype": "standard",
       "spawnRate": 40,
-      "defenseCount": 8
+      "defenseCount": 7,
+      "health": 125
     },
     {
       "x": 730,

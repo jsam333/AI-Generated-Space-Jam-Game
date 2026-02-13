@@ -382,7 +382,7 @@ const craftingInputSlots = [null, null, null, null, null, null, null, null, null
 let craftingOutputSlot = null;
 let activeRefineryStructure = null;
 const refineryInputSlots = [null, null, null, null];
-let refineryOutputSlot = null;
+const refineryOutputSlots = [null, null, null, null];
 
 // Start screen overlay — hidden during cutscene, shown as fallback.
 const startOverlayEl = document.getElementById('start-menu-overlay');
@@ -584,6 +584,10 @@ function scatterInventoryOnDeath() {
   for (let i = 0; i < hotbar.length; i++) {
     const slotItem = hotbar[i];
     if (!slotItem || !slotItem.item) continue;
+    if (WARP_KEY_OPPORTUNITY_ITEMS.has(slotItem.item)) {
+      hotbar[i] = null; // Lost on death, don't scatter into space
+      continue;
+    }
     const angle = Math.random() * Math.PI * 2;
     const speed = 90 + Math.random() * 180;
     const dropped = { ...slotItem };
@@ -3083,17 +3087,6 @@ function render(dt = 1 / 60) {
         ctx.arc(x, y, getPirateBaseAggroRadius(st), 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        // Health bar when damaged
-        if (st.health < st.maxHealth) {
-          const barW = 90;
-          const barH = 6;
-          const pct = Math.max(0, st.health / st.maxHealth);
-          const barUpOffset = st.tier === 1 ? 28 : 20; // tier 1 bar slightly higher
-          ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(x - barW/2, y - r - barUpOffset, barW, barH);
-          ctx.fillStyle = '#ff3333';
-          ctx.fillRect(x - barW/2, y - r - barUpOffset, barW * pct, barH);
-        }
       } else {
         // Shop, warpgate (3D) -- dashed interact ring
         ctx.setLineDash([8, 8]);
@@ -3434,6 +3427,25 @@ function render(dt = 1 / 60) {
         statusCtx.fillText(msg.text, x, msgY);
         statusCtx.globalAlpha = 1;
       }
+    }
+  }
+
+  // Pirate base health bars (same layer as ship alerts, above 3D models)
+  const pbCtx = uiCtx || ctx;
+  if (pbCtx) {
+    const barW = 90;
+    const barH = 6;
+    for (const st of structures) {
+      if (st.type !== 'piratebase' || st.dead || st.health <= 0 || st.health >= st.maxHealth) continue;
+      const r = getPirateBaseVisualRadius(st);
+      const { x, y } = worldToScreen(st.x, st.y);
+      if (x + barW / 2 < 0 || x - barW / 2 > WIDTH || y - r - 30 < 0 || y + 30 > HEIGHT) continue;
+      const pct = Math.max(0, st.health / st.maxHealth);
+      const barUpOffset = st.tier === 1 ? 28 : 20;
+      pbCtx.fillStyle = 'rgba(0,0,0,0.5)';
+      pbCtx.fillRect(x - barW / 2, y - r - barUpOffset, barW, barH);
+      pbCtx.fillStyle = '#ff3333';
+      pbCtx.fillRect(x - barW / 2, y - r - barUpOffset, barW * pct, barH);
     }
   }
 
@@ -4579,6 +4591,7 @@ function openCraftingMenu(structure) {
       structure.recipes.forEach(r => {
         const div = document.createElement('div');
         div.className = 'recipe-item';
+        if (itemEntryHasWarpKeyOpportunity(r?.output)) div.classList.add('recipe-warp-key');
         const inputs = r.inputs.map(i => `${i.quantity}x ${i.item}`).join(', ');
         div.textContent = `${inputs} -> ${r.output.quantity}x ${r.output.item}`;
         list.appendChild(div);
@@ -4764,14 +4777,18 @@ function openRefineryMenu(structure) {
 
   // Clear slots
   for (let i = 0; i < 4; i++) refineryInputSlots[i] = null;
-  refineryOutputSlot = null;
+  for (let i = 0; i < 4; i++) refineryOutputSlots[i] = null;
 
-  // Show accepted ores label
+  // Show accepted ores label and what they refine into
   const acceptedOres = structure.acceptedOres || [];
   const acceptedLabel = document.getElementById('refinery-accepted-label');
   if (acceptedLabel) {
-    const names = acceptedOres.map(o => ITEM_DISPLAY_NAMES[o] || o);
-    acceptedLabel.textContent = 'Accepts: ' + (names.length > 0 ? names.join(', ') : 'None');
+    const parts = acceptedOres.map(o => {
+      const inputName = ITEM_DISPLAY_NAMES[o] || o;
+      const refined = RAW_TO_REFINED[o];
+      return refined ? `${inputName} → ${ITEM_DISPLAY_NAMES[refined] || refined}` : inputName;
+    });
+    acceptedLabel.textContent = 'Accepts: ' + (parts.length > 0 ? parts.join(', ') : 'None');
   }
 
   const overlay = document.getElementById('refinery-menu-overlay');
@@ -4801,19 +4818,21 @@ function closeRefineryMenu() {
     }
   }
   // Return output
-  if (refineryOutputSlot && refineryOutputSlot.real) {
-    if (!inventory.add(refineryOutputSlot.item, refineryOutputSlot.quantity)) {
+  for (let i = 0; i < 4; i++) {
+    const it = refineryOutputSlots[i];
+    if (!it || !it.real) continue;
+    if (!inventory.add(it.item, it.quantity)) {
       const angle = Math.random() * Math.PI * 2;
       floatingItems.push({
         x: ship.x + Math.cos(angle) * 30,
         y: ship.y + Math.sin(angle) * 30,
         vx: Math.cos(angle) * 40,
         vy: Math.sin(angle) * 40,
-        item: refineryOutputSlot.item,
-        quantity: refineryOutputSlot.quantity
+        item: it.item,
+        quantity: it.quantity
       });
     }
-    refineryOutputSlot = null;
+    refineryOutputSlots[i] = null;
   }
 
   refineryMenuOpen = false;
@@ -4835,15 +4854,7 @@ function syncRefineryUI() {
       el.classList.toggle('has-item', !!refineryInputSlots[i]);
     }
   }
-  // Sync output slot
-  const outEl = document.getElementById('refinery-output-slot');
-  if (outEl) {
-    outEl.innerHTML = getSlotHTML(refineryOutputSlot);
-    outEl.classList.toggle('has-item', !!refineryOutputSlot && refineryOutputSlot.real);
-    if (refineryOutputSlot && !refineryOutputSlot.real) outEl.style.opacity = '0.5';
-    else outEl.style.opacity = '1';
-  }
-
+  syncRefineryOutputSlots();
   checkRefineryRecipe();
 }
 
@@ -4851,10 +4862,12 @@ function checkRefineryRecipe() {
   if (!activeRefineryStructure) return;
   const acceptedOres = activeRefineryStructure.acceptedOres || [];
 
-  // If output is real (already refined but not taken), disable button
-  if (refineryOutputSlot && refineryOutputSlot.real) {
+  // If any output slot has real (refined but not taken) content, disable button
+  const hasRealOutput = refineryOutputSlots.some(it => it && it.real);
+  if (hasRealOutput) {
     const btn = document.getElementById('refine-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Output Full'; }
+    syncRefineryOutputSlots();
     return;
   }
 
@@ -4865,7 +4878,6 @@ function checkRefineryRecipe() {
   for (const slot of refineryInputSlots) {
     if (!slot) continue;
     if (!acceptedOres.includes(slot.item)) {
-      // Non-accepted ore - can't refine
       mixedTypes = true;
       break;
     }
@@ -4878,9 +4890,17 @@ function checkRefineryRecipe() {
   if (!mixedTypes && oreType && totalOre >= 2 && RAW_TO_REFINED[oreType]) {
     const refinedName = RAW_TO_REFINED[oreType];
     const outputQty = Math.floor(totalOre / 2);
-    refineryOutputSlot = { item: refinedName, quantity: outputQty, real: false };
     const payload = getItemPayload(refinedName);
-    Object.assign(refineryOutputSlot, payload);
+    // Split across output slots, max MAX_ORE_STACK (20) per slot
+    let remaining = outputQty;
+    let slotIdx = 0;
+    for (let i = 0; i < 4; i++) refineryOutputSlots[i] = null;
+    while (remaining > 0 && slotIdx < 4) {
+      const qty = Math.min(remaining, MAX_ORE_STACK);
+      refineryOutputSlots[slotIdx] = { item: refinedName, quantity: qty, real: false, ...payload };
+      remaining -= qty;
+      slotIdx++;
+    }
 
     if (btn) {
       btn.disabled = false;
@@ -4888,7 +4908,7 @@ function checkRefineryRecipe() {
       btn.onclick = () => refineOre(oreType, totalOre, refinedName, outputQty);
     }
   } else {
-    refineryOutputSlot = null;
+    for (let i = 0; i < 4; i++) refineryOutputSlots[i] = null;
     if (btn) {
       btn.disabled = true;
       btn.textContent = totalOre > 0 && mixedTypes ? 'Single ore type only' : totalOre === 1 ? 'Need 2+ ore' : 'Refine';
@@ -4896,17 +4916,24 @@ function checkRefineryRecipe() {
     }
   }
 
-  // Update output preview
-  const outEl = document.getElementById('refinery-output-slot');
-  if (outEl) {
-    outEl.innerHTML = getSlotHTML(refineryOutputSlot);
-    if (refineryOutputSlot && !refineryOutputSlot.real) outEl.style.opacity = '0.5';
-    else outEl.style.opacity = '1';
+  syncRefineryOutputSlots();
+}
+
+function syncRefineryOutputSlots() {
+  for (let i = 0; i < 4; i++) {
+    const el = document.querySelector(`.refinery-output-slot[data-refinery-output="${i}"]`);
+    if (el) {
+      const it = refineryOutputSlots[i];
+      el.innerHTML = getSlotHTML(it);
+      el.classList.toggle('has-item', !!it && it.real);
+      if (it && !it.real) el.style.opacity = '0.5';
+      else el.style.opacity = '1';
+    }
   }
 }
 
 function refineOre(oreType, totalOre, refinedName, outputQty) {
-  if (refineryOutputSlot && refineryOutputSlot.real) return;
+  if (refineryOutputSlots.some(it => it && it.real)) return;
   sfx.playRefine();
 
   // Consume input ores: consume outputQty * 2 ores
@@ -4920,9 +4947,9 @@ function refineOre(oreType, totalOre, refinedName, outputQty) {
     if (toConsume <= 0) break;
   }
 
-  // Mark output as real
-  if (refineryOutputSlot) {
-    refineryOutputSlot.real = true;
+  // Mark all filled output slots as real
+  for (let i = 0; i < 4; i++) {
+    if (refineryOutputSlots[i]) refineryOutputSlots[i].real = true;
   }
   syncRefineryUI();
 }
@@ -5744,7 +5771,7 @@ function tryHandleBuyDrag(drag, targetSlotEl, slotKinds) {
 
   player.credits -= drag.price;
   sfx.playBuy();
-  hotbar[to] = { ...it };
+  inventory.set(to, { ...it });
   removeFromShopInventory(it.item);
   shopBuySlots[from] = null;
   syncShopBuyArea();
@@ -5760,7 +5787,7 @@ function tryHandleSellDrag(drag, targetSlotEl, slotKinds) {
   if (slotKinds.isHotbar) {
     const to = parseInt(targetSlotEl.dataset.slot, 10);
     if (to >= 0 && !hotbar[to]) {
-      hotbar[to] = { ...it };
+      inventory.set(to, { ...it });
       shopSellSlots[from] = null;
       updateHUD();
       syncShopSellArea();
@@ -5852,14 +5879,15 @@ function tryHandleRefineryInputDrag(drag, targetSlotEl, slotKinds) {
   return false;
 }
 
-function tryHandleRefineryOutputDrag(targetSlotEl, slotKinds) {
-  const it = refineryOutputSlot;
+function tryHandleRefineryOutputDrag(drag, targetSlotEl, slotKinds) {
+  const idx = drag.fromRefineryOutput ?? 0;
+  const it = refineryOutputSlots[idx];
   if (!it || !it.real || !slotKinds.isHotbar) return false;
 
   const to = parseInt(targetSlotEl.dataset.slot, 10);
   if (to >= 0 && !hotbar[to]) {
     hotbar[to] = { ...it };
-    refineryOutputSlot = null;
+    refineryOutputSlots[idx] = null;
     updateHUD();
     syncRefineryUI();
     return true;
@@ -5894,7 +5922,7 @@ function endDrag(clientX, clientY) {
   } else if (drag.kind === 'refineryInput') {
     tryHandleRefineryInputDrag(drag, dropTarget.targetSlotEl, slotKinds);
   } else if (drag.kind === 'refineryOutput') {
-    tryHandleRefineryOutputDrag(dropTarget.targetSlotEl, slotKinds);
+    tryHandleRefineryOutputDrag(drag, dropTarget.targetSlotEl, slotKinds);
   }
 }
 
@@ -5909,7 +5937,7 @@ window.addEventListener('mousedown', (e) => {
   const craftInputEl = t.closest && t.closest('.crafting-slot.input-slot:not(.refinery-input-slot)');
   const craftOutputEl = t.closest && t.closest('#crafting-work-area .crafting-slot.output-slot');
   const refineryInputEl = t.closest && t.closest('.refinery-input-slot');
-  const refineryOutputEl = t.closest && t.closest('#refinery-output-area .crafting-slot.output-slot');
+  const refineryOutputEl = t.closest && t.closest('#refinery-output-area .refinery-output-slot');
   
   if (hotbarSlotEl) {
     const slotIndex = parseInt(hotbarSlotEl.dataset.slot, 10);
@@ -6055,11 +6083,13 @@ window.addEventListener('mousedown', (e) => {
       return;
     }
     if (refineryOutputEl) {
-      if (refineryOutputSlot && refineryOutputSlot.real) {
+      const outIdx = parseInt(refineryOutputEl.dataset.refineryOutput, 10);
+      const it = outIdx >= 0 ? refineryOutputSlots[outIdx] : null;
+      if (it && it.real) {
         e.preventDefault();
         if (e.shiftKey) {
-          if (inventory.add(refineryOutputSlot.item, refineryOutputSlot.quantity)) {
-            refineryOutputSlot = null;
+          if (inventory.add(it.item, it.quantity)) {
+            refineryOutputSlots[outIdx] = null;
             syncRefineryUI();
             updateHUD();
           }
@@ -6067,8 +6097,7 @@ window.addEventListener('mousedown', (e) => {
         }
         // Drag
         hideShopTooltip();
-        const it = refineryOutputSlot;
-        inventoryDrag = { kind: 'refineryOutput' };
+        inventoryDrag = { kind: 'refineryOutput', fromRefineryOutput: outIdx };
         const qty = it.quantity != null ? String(it.quantity) : '';
         setDragGhostContent(it, getItemLabel(it), qty);
         setDragGhostPos(e.clientX, e.clientY);
@@ -6099,7 +6128,8 @@ window.addEventListener('mousemove', (e) => {
     } else if (inventoryDrag.kind === 'refineryInput') {
       it = refineryInputSlots[inventoryDrag.fromRefineryInput];
     } else if (inventoryDrag.kind === 'refineryOutput') {
-      it = refineryOutputSlot;
+      const outIdx = inventoryDrag.fromRefineryOutput ?? 0;
+      it = refineryOutputSlots[outIdx];
     }
     
     const isOverFuel = under && under.closest('#fuel-bar-drop-zone');
