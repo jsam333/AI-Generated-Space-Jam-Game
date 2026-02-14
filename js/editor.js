@@ -9,6 +9,12 @@ import {
   ensureSpawnSettingsDefaults,
   ensurePirateBaseSpawnDefaults
 } from './pirateShared.js';
+import {
+  MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT,
+  MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN,
+  MOTHERSHIP_EJECT_COUNT_DEFAULT,
+  MOTHERSHIP_EJECT_COUNT_MIN
+} from './constants.js';
 
 const canvas = document.getElementById('editor-canvas');
 const ctx = canvas.getContext('2d');
@@ -59,7 +65,8 @@ const STRUCTURE_STYLES = {
   fueling: { fill: '#446644', stroke: '#668866' },
   crafting: { fill: '#886644', stroke: '#aa8866' },
   warpgate: { fill: '#6644aa', stroke: '#8866cc' },
-  piratebase: { fill: '#884422', stroke: '#aa6644' }
+  piratebase: { fill: '#884422', stroke: '#aa6644' },
+  mothership: { fill: '#551111', stroke: '#aa3333' }
 };
 
 // Interact radius matches game: STRUCTURE_SIZE_COLL (54) + SHOP_DASHED_EXTRA_3D (108) = 162
@@ -133,6 +140,18 @@ function normalizeStructure(st) {
   if (out.type === 'piratebase') {
     out.tier = normalizePirateBaseTier(out.tier);
     ensurePirateBaseSpawnDefaults(out);
+  } else if (out.type === 'mothership') {
+    out.health = Math.max(1, Number(out.health) || 1000);
+    out.size = Math.max(10, Number(out.size) || 80);
+    out.specialAttackEnabled = out.specialAttackEnabled !== false;
+    out.specialAttackInterval = Math.max(
+      MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN,
+      Number(out.specialAttackInterval) || MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT
+    );
+    out.ejectCount = Math.max(
+      MOTHERSHIP_EJECT_COUNT_MIN,
+      Math.round(Number(out.ejectCount) || MOTHERSHIP_EJECT_COUNT_DEFAULT)
+    );
   }
   return out;
 }
@@ -691,6 +710,8 @@ function updatePropertiesPanel() {
       renderWarpGateProperties(content, obj);
     } else if (obj.type === 'refinery') {
       renderRefineryProperties(content, obj);
+    } else if (obj.type === 'mothership') {
+      renderMothershipProperties(content, obj);
     }
   }
 }
@@ -1180,6 +1201,50 @@ function renderPirateBaseProperties(parent, obj) {
   parent.appendChild(dropsDiv);
 }
 
+function renderMothershipProperties(parent, obj) {
+  obj.health = Math.max(1, Number(obj.health) || 1000);
+  obj.size = Math.max(10, Number(obj.size) || 80);
+  obj.specialAttackEnabled = obj.specialAttackEnabled !== false;
+  obj.specialAttackInterval = Math.max(
+    MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN,
+    Number(obj.specialAttackInterval) || MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT
+  );
+  obj.ejectCount = Math.max(
+    MOTHERSHIP_EJECT_COUNT_MIN,
+    Math.round(Number(obj.ejectCount) || MOTHERSHIP_EJECT_COUNT_DEFAULT)
+  );
+
+  addPropInput(parent, 'Health', obj.health, (v) => {
+    obj.health = Math.max(1, parseInt(v, 10) || 1);
+    saveLevel();
+  });
+  addPropInput(parent, 'Size', obj.size, (v) => {
+    obj.size = Math.max(10, parseInt(v, 10) || 10);
+    saveLevel();
+  });
+  addPropInput(parent, 'Special Attack Interval (s)', obj.specialAttackInterval, (v) => {
+    obj.specialAttackInterval = Math.max(MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN, Number(v) || MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT);
+    saveLevel();
+  });
+  addPropInput(parent, 'Pirate Ejection Count', obj.ejectCount, (v) => {
+    obj.ejectCount = Math.max(MOTHERSHIP_EJECT_COUNT_MIN, Math.round(Number(v) || MOTHERSHIP_EJECT_COUNT_DEFAULT));
+    saveLevel();
+  });
+
+  const enabledDiv = document.createElement('div');
+  enabledDiv.className = 'prop-group';
+  enabledDiv.innerHTML = '<label>Special Attacks Enabled</label>';
+  const enabledCheckbox = document.createElement('input');
+  enabledCheckbox.type = 'checkbox';
+  enabledCheckbox.checked = obj.specialAttackEnabled !== false;
+  enabledCheckbox.onchange = () => {
+    obj.specialAttackEnabled = enabledCheckbox.checked;
+    saveLevel();
+  };
+  enabledDiv.appendChild(enabledCheckbox);
+  parent.appendChild(enabledDiv);
+}
+
 function renderWarpGateProperties(parent, obj) {
   addPropInput(parent, 'Warp Cost', obj.warpCost || 3000, (v) => { obj.warpCost = parseInt(v); saveLevel(); });
   
@@ -1275,6 +1340,13 @@ function handlePlaceObject(world) {
       st.tier = normalizePirateBaseTier(state.tool.piratebaseTier);
       st.pirateArchetype = 'standard';
       ensurePirateBaseSpawnDefaults(st);
+    }
+    if (type === 'mothership') {
+      st.health = 1000;
+      st.size = 80;
+      st.specialAttackEnabled = true;
+      st.specialAttackInterval = MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT;
+      st.ejectCount = MOTHERSHIP_EJECT_COUNT_DEFAULT;
     }
     state.level.structures.push(st);
   }

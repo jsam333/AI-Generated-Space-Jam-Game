@@ -83,7 +83,7 @@ export const SHIP_STATS = {
   'scout':     { name: 'Scout',     price: 0,     health: 50, fuel: 25, oxygen: 30, speed: 175, slots: 11, collisionRadius: 8,  shipScale: 1.0, damageMult: 1.0, damageReduction: 0,    droneSlots: 0,  desc: 'Standard issue scout ship.' },
   'cutter':    { name: 'Cutter',    price: 5000,  health: 80, fuel: 40, oxygen: 35, speed: 175, slots: 15, collisionRadius: 10.4, shipScale: 1.3, damageMult: 1.25, damageReduction: 0,    droneSlots: 0,  desc: 'Sturdy attack vessel. 25% bonus weapon damage vs pirates and bases.' },
   'transport': { name: 'Transport', price: 5000,  health: 60, fuel: 50, oxygen: 50, speed: 175, slots: 18, collisionRadius: 11.2, shipScale: 1.4, damageMult: 1.0, damageReduction: 0,    droneSlots: 0,  desc: 'Heavy transport with 18 inventory slots.' },
-  'frigate':   { name: 'Frigate',   price: 8000,  health: 80, fuel: 60, oxygen: 60, speed: 175, slots: 25, collisionRadius: 12,   shipScale: 1.5, damageMult: 1.0, damageReduction: 0.10, droneSlots: 5,  desc: 'Defensive combat hull. Takes 10% less damage from all sources.' },
+  'frigate':   { name: 'Frigate',   price: 8000,  health: 80, fuel: 60, oxygen: 60, speed: 175, slots: 25, collisionRadius: 12,   shipScale: 1.8, damageMult: 1.0, damageReduction: 0.10, droneSlots: 5,  desc: 'Defensive combat hull. Takes 10% less damage from all sources.' },
   'carrier':   { name: 'Carrier',   price: 10000, health: 120, fuel: 90, oxygen: 60, speed: 175, slots: 27, collisionRadius: 13.6, shipScale: 1.7, damageMult: 1.0, damageReduction: 0,    droneSlots: 20, desc: 'Heavy capital ship with expanded storage and drone bays.' }
 };
 
@@ -176,6 +176,19 @@ export const PIRATE_FIRE_RANGE = 700;
 export const PIRATE_AIM_SPREAD = 60;
 export const PIRATE_TILT_SENSITIVITY = 8;
 export const PIRATE_TILT_DECAY = 4;
+
+// --- Mothership special attacks ---
+export const MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT = 12;
+export const MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN = 1;
+export const MOTHERSHIP_EJECT_COUNT_DEFAULT = 2;
+export const MOTHERSHIP_EJECT_COUNT_MIN = 1;
+export const MOTHERSHIP_EJECT_DURATION = 3;
+export const MOTHERSHIP_SHOTGUN_VOLLEY_DURATION = 3;
+export const MOTHERSHIP_SHOTGUN_VOLLEY_COUNT = 5;
+export const MOTHERSHIP_SHOTGUN_PELLETS_PER_VOLLEY = 7;
+export const MOTHERSHIP_SHOTGUN_PELLET_SPREAD = 0.18;
+export const MOTHERSHIP_SHOTGUN_AIM_JITTER = 35;
+export const MOTHERSHIP_SHOTGUN_PELLET_DAMAGE = 3;
 
 // --- Interaction radius (structure radius + dashed ring) ---
 export const INTERACT_RADIUS = STRUCTURE_SIZE_COLL + SHOP_DASHED_EXTRA_3D; // 54 + 108
@@ -288,7 +301,7 @@ export const ITEM_SELL_PRICE = {
 };
 
 // --- Collidable structure types ---
-const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'crafting', 'shipyard', 'refinery']);
+const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'crafting', 'shipyard', 'refinery', 'mothership']);
 
 /** Returns true if a structure should participate in physics collision checks. */
 export function isCollidableStructure(st) {

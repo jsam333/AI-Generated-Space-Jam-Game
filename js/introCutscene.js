@@ -181,13 +181,13 @@ function generateMap() {
 function runTypewriter(el, script, onDone, onCharTyped = null) {
   let lineIdx = 0;
   let charIdx = 0;
-  let waitTimer = 0;
   let phase = 'wait'; // 'wait' | 'type' | 'done'
   const lines = []; // accumulated finished lines (as plain strings)
   let cancelled = false;
+  let waitUntil = 0;  // elapsed seconds when wait phase ends
+  let nextCharAt = 0; // elapsed seconds when next char may be typed
 
-  // Start with pre-delay of first line
-  waitTimer = script[0].preDelay;
+  waitUntil = script[0].preDelay;
 
   function buildHTML() {
     // Finished lines as dim text, current line being typed, plus cursor
@@ -203,36 +203,34 @@ function runTypewriter(el, script, onDone, onCharTyped = null) {
     return html;
   }
 
-  function tick(dt) {
+  function tick(dt, elapsedSeconds) {
     if (cancelled) return true;
+    if (elapsedSeconds == null) elapsedSeconds = (tick._elapsed = (tick._elapsed || 0) + dt);
 
     if (phase === 'wait') {
-      waitTimer -= dt;
-      if (waitTimer <= 0) {
+      if (elapsedSeconds >= waitUntil) {
         phase = 'type';
         charIdx = 0;
-        waitTimer = 0;
+        nextCharAt = elapsedSeconds; // first char appears immediately
       }
     }
 
     if (phase === 'type') {
-      waitTimer -= dt;
-      if (waitTimer <= 0) {
+      if (elapsedSeconds >= nextCharAt) {
         charIdx++;
         if (onCharTyped) onCharTyped();
         if (charIdx >= script[lineIdx].text.length) {
-          // Finished this line
           lines.push(script[lineIdx].text);
           lineIdx++;
           if (lineIdx >= script.length) {
             phase = 'done';
           } else {
             phase = 'wait';
-            waitTimer = script[lineIdx].preDelay;
+            waitUntil = elapsedSeconds + script[lineIdx].preDelay;
             charIdx = 0;
           }
         } else {
-          waitTimer = script[lineIdx].charDelay;
+          nextCharAt = elapsedSeconds + script[lineIdx].charDelay;
         }
       }
     }
@@ -636,8 +634,8 @@ export function playIntroCutscene(mapCanvas, dialogueEl, overlayEl, onComplete, 
     lastNow = now;
     elapsed += dt;
 
-    // Update typewriter
-    typewriter.tick(dt);
+    // Update typewriter (elapsed ensures waits are frame-independent)
+    typewriter.tick(dt, elapsed);
 
     // Draw map
     drawMapFrame(elapsed);

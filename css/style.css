@@ -375,6 +375,51 @@ textarea {
   letter-spacing: 0.5px;
 }
 
+#mothership-intro-overlay {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--game-width);
+  height: var(--game-height);
+  z-index: 26;
+  pointer-events: none;
+}
+
+#mothership-intro-dialogue-box {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 115px;
+  padding: 8px 20px 8px;
+  box-sizing: border-box;
+  background: rgba(5, 10, 18, 0.92);
+  border-bottom: 1px solid rgba(0, 255, 140, 0.25);
+  box-shadow: 0 2px 20px rgba(0, 255, 140, 0.06);
+  font-family: 'Oxanium', Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#mothership-intro-dialogue-header {
+  font-size: 10px;
+  color: rgba(0, 255, 140, 0.35);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+#mothership-intro-dialogue-text {
+  font-size: 15px;
+  color: #00ff8c;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  text-shadow: 0 0 6px rgba(0, 255, 140, 0.4);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 #pause-menu-overlay {
   position: absolute;
   left: 0;
