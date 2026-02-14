@@ -16,14 +16,14 @@
       "oreType": "aurite"
     },
     {
-      "x": -980.2383001778235,
-      "y": -894.4911885139588,
+      "x": -880.2383001778235,
+      "y": -881.1578551806255,
       "radius": 450,
       "oreType": "diamite"
     },
     {
-      "x": 1122.9246949248572,
-      "y": 521.0797676837332,
+      "x": 1089.591361591524,
+      "y": 267.74643435039985,
       "radius": 480,
       "oreType": "platinite"
     }
@@ -38,6 +38,63 @@
       "specialAttackEnabled": true,
       "specialAttackInterval": 10,
       "ejectCount": 8
+    },
+    {
+      "x": 1123.3333333333335,
+      "y": 1100,
+      "type": "healingbase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
+    },
+    {
+      "x": 1183.3333333333335,
+      "y": -1213.3333333333335,
+      "type": "healingbase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4
+    },
+    {
+      "x": -1216.6666666666667,
+      "y": -246.66666666666669,
+      "type": "healingbase",
+      "tier": 1,
+      "pirateArchetype": "standard",
+      "defenseTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnTypePercentages": {
+        "normal": 100,
+        "sturdy": 0,
+        "fast": 0
+      },
+      "waveSpawnCount": 4,
+      "drops": [],
+      "defenseCount": 6,
+      "spawnRate": 35
     }
   ],
   "spawnSettings": {

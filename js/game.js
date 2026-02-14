@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PLAYER_BULLET_HIT_RADIUS, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, BLASTER_STATS, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT, MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN, MOTHERSHIP_EJECT_COUNT_DEFAULT, MOTHERSHIP_EJECT_COUNT_MIN, MOTHERSHIP_EJECT_DURATION, MOTHERSHIP_SHOTGUN_VOLLEY_DURATION, MOTHERSHIP_SHOTGUN_VOLLEY_COUNT, MOTHERSHIP_SHOTGUN_PELLETS_PER_VOLLEY, MOTHERSHIP_SHOTGUN_PELLET_SPREAD, MOTHERSHIP_SHOTGUN_AIM_JITTER, MOTHERSHIP_SHOTGUN_PELLET_DAMAGE, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED } from './constants.js';
+import { WIDTH, HEIGHT, ACCEL, FRICTION, BRAKE_FRICTION, MAX_SPEED_DEFAULT, BULLET_SPEED, FIRE_COOLDOWN, PLAYER_BULLET_HIT_RADIUS, PIRATE_ACCEL, PIRATE_FRICTION, PIRATE_MAX_SPEED, PIRATE_HEALTH, PIRATE_BULLET_SPEED, PIRATE_BASE_AGGRO_RADIUS, BASE_DEFENSE_ORBIT_RADIUS, BASE_DEFENSE_ORBIT_SPEED, SHIP_SIZE, SHIP_COLLISION_RADIUS, SHIP_COLLECTION_RADIUS, LASER_HEAT_RATE, LASER_COOL_RATE, WEAPON_ENERGY_DRAIN, MINING_LASER_STATS, BLASTER_ENERGY_PER_SHOT, BLASTER_HEAT_PER_SHOT, BLASTER_COOL_RATE, BLASTER_FIRE_RATE, BLASTER_STATS, OXYGEN_DEPLETION_RATE, FUEL_DEPLETION_RATE, MAX_ORE_STACK, ORE_ITEMS, STRUCTURE_SIZE, STRUCTURE_RADIUS_3D, WARP_GATE_DASHED_EXTRA, SHOP_DASHED_EXTRA, WARP_GATE_DASHED_EXTRA_3D, SHOP_DASHED_EXTRA_3D, STRUCTURE_SIZE_COLL, PIRATE_BASE_HIT_RADIUS, STRUCTURE_STYLES, SHIP_STATS, ITEM_USAGE, ITEM_DISPLAY_NAMES, BOUNCE_RESTITUTION, MAX_COLLISION_DAMAGE, DAMAGE_PER_SPEED, MAGNET_RADIUS, MAGNET_STRENGTH, FLOAT_DRAG, FLOAT_STOP_SPEED, FLOAT_ITEM_RADIUS, FLOATING_ORE_SCALE, PARTICLE_DRAG, INTERACT_RADIUS, ITEM_BUY_PRICE, ITEM_SELL_PRICE, PIRATE_FIRE_RANGE, PIRATE_AIM_SPREAD, PIRATE_TILT_SENSITIVITY, PIRATE_TILT_DECAY, MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT, MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN, MOTHERSHIP_EJECT_COUNT_DEFAULT, MOTHERSHIP_EJECT_COUNT_MIN, MOTHERSHIP_EJECT_DURATION, MOTHERSHIP_SHOTGUN_VOLLEY_DURATION, MOTHERSHIP_SHOTGUN_VOLLEY_COUNT, MOTHERSHIP_SHOTGUN_PELLETS_PER_VOLLEY, MOTHERSHIP_SHOTGUN_PELLET_SPREAD, MOTHERSHIP_SHOTGUN_AIM_JITTER, MOTHERSHIP_SHOTGUN_PELLET_DAMAGE, MOTHERSHIP_NAV_CELL_SIZE, MOTHERSHIP_NAV_REPLAN_INTERVAL, MOTHERSHIP_NAV_GOAL_INTERVAL, MOTHERSHIP_NAV_MAX_EXPANSIONS, MOTHERSHIP_NAV_MAX_PATH_POINTS, MOTHERSHIP_NAV_WAYPOINT_REACH_DIST, MOTHERSHIP_NAV_GOAL_RETRY_COUNT, MOTHERSHIP_NAV_PLAYER_BIAS_RADIUS, MOTHERSHIP_NAV_PLAYER_MIN_DIST, MOTHERSHIP_NAV_BOUNDS_MARGIN, MOTHERSHIP_NAV_BOUNDS_PUSH_FORCE, HEALING_BASE_HEAL_PER_SECOND, HEAT_WEAPONS, RESOURCE_BAR_CONFIG, isCollidableStructure, RAW_TO_REFINED } from './constants.js';
 import { normalize, createSeededRandom, getMaxStack, getItemImagePath, getItemLabel, getItemPayload, pushOutOverlap, bounceEntity, raycastCircle } from './utils.js';
 import { InputHandler } from './input.js';
 import { Inventory } from './inventory.js';
@@ -51,6 +51,8 @@ let structureModels = {
 const pirateModelFiles = { standard: 'pirate-standard.glb', shotgun: 'pirate-shotgun.glb', slowing: 'pirate-slowing.glb', breaching: 'pirate-breaching.glb', drone: 'pirate-drone.glb' };
 let pirateModels = { standard: null, shotgun: null, slowing: null, breaching: null, drone: null };
 let pirateContainer = null;
+let droneModel = null;
+let droneContainer = null;
 let structureContainer = null;
 let floatingOreContainer = null;
 let levelSeed = 0;
@@ -65,6 +67,7 @@ let pirateNextWaveTime = 120; // default; overwritten by loadLevel()
 let levelIsDebug = false;
 let nextDroneId = 1;
 let lastPlayerHitAsteroid = null;
+let lastPlayerTargetedMothership = null;
 const shipDroneCounts = { scout: 0, cutter: 0, transport: 0, frigate: 0, carrier: 0 };
 
 // Dynamic ship properties (updated when switching ships)
@@ -302,7 +305,7 @@ function itemEntryHasWarpKeyOpportunity(entry) {
 
 function structureHasWarpKeyOpportunity(st) {
   if (!st || typeof st !== 'object') return false;
-  if (st.type === 'piratebase') {
+  if (st.type === 'piratebase' || st.type === 'healingbase') {
     const drops = Array.isArray(st.drops) ? st.drops : [];
     return drops.some(itemEntryHasWarpKeyOpportunity);
   }
@@ -473,6 +476,10 @@ function isMothershipAlive(st) {
 
 function getAliveMotherships() {
   return structures.filter(isMothershipAlive);
+}
+
+function isPirateBaseStructure(st) {
+  return st?.type === 'piratebase' || st?.type === 'healingbase';
 }
 
 function getActiveMothershipTarget() {
@@ -1322,11 +1329,11 @@ function laserHitAsteroid(ox, oy, dx, dy, maxLen) {
 
 function isHostileStructure(st) {
   if (!st || (st.dead || st.health <= 0)) return false;
-  return st.type === 'piratebase' || st.type === 'mothership';
+  return isPirateBaseStructure(st) || st.type === 'mothership';
 }
 
 function getHostileStructureHitRadius(st) {
-  if (st?.type === 'piratebase') return getPirateBaseHitRadius(st);
+  if (isPirateBaseStructure(st)) return getPirateBaseHitRadius(st);
   if (st?.type === 'mothership') return getMothershipRadius(st);
   return STRUCTURE_SIZE_COLL;
 }
@@ -1708,6 +1715,8 @@ function initShip3D() {
   shipScene.add(structureContainer);
   pirateContainer = new THREE.Group();
   shipScene.add(pirateContainer);
+  droneContainer = new THREE.Group();
+  shipScene.add(droneContainer);
   floatingOreContainer = new THREE.Group();
   shipScene.add(floatingOreContainer);
   const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -1920,6 +1929,31 @@ function initShip3D() {
       }
     });
   };
+  const setupDroneModel = (model) => {
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const targetDiameter = DRONE_COLLISION_RADIUS * 2;
+    const scale = (targetDiameter / maxDim) * 1.35;
+    model.scale.setScalar(scale);
+    model.position.sub(center.multiplyScalar(scale));
+    model.rotation.x = -Math.PI / 2;
+    model.rotation.y = Math.PI;
+    model.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      const oldMat = child.material;
+      child.material = new THREE.MeshStandardMaterial({
+        color: oldMat.color ? oldMat.color.clone() : 0x8ec8ff,
+        map: oldMat.map || null,
+        roughness: oldMat.roughness ?? 0.65,
+        metalness: oldMat.metalness ?? 0.35,
+        emissive: 0xffffff,
+        emissiveMap: oldMat.emissiveMap || oldMat.map || null,
+        emissiveIntensity: 15.0
+      });
+    });
+  };
   for (const archetype of PIRATE_ARCHETYPE_KEYS) {
     const file = pirateModelFiles[archetype];
     if (!file) continue;
@@ -1930,6 +1964,12 @@ function initShip3D() {
       console.log('[ship3d] Loaded ' + file);
     }, undefined, (err) => console.error('[ship3d] Failed to load ' + file, err));
   }
+  loader.load(new URL('assets/drone.glb', window.location.href).toString(), (gltf) => {
+    const model = gltf.scene;
+    setupDroneModel(model);
+    droneModel = model;
+    console.log('[ship3d] Loaded drone.glb');
+  }, undefined, (err) => console.error('[ship3d] Failed to load drone.glb', err));
 }
 
 function buildOreIconDataUrls() {
@@ -2110,7 +2150,7 @@ function getPirateBaseDefenseOrbitRadius(st) {
 }
 
 function getStructureCollisionRadius(st) {
-  if (st?.type === 'piratebase') return STRUCTURE_SIZE_COLL * getPirateBaseTierScale(st.tier);
+  if (isPirateBaseStructure(st)) return STRUCTURE_SIZE_COLL * getPirateBaseTierScale(st.tier);
   if (st?.type === 'mothership') return getMothershipRadius(st);
   return STRUCTURE_SIZE_COLL;
 }
@@ -2134,6 +2174,8 @@ const DRONE_PLAYER_PROXIMITY_BIAS = 120;
 const DRONE_LASER_OUTER_COLOR = 'rgba(255,180,120,0.9)';
 const DRONE_LASER_INNER_COLOR = 'rgba(255,220,170,0.95)';
 const DRONE_LASER_SPARKS_PER_SECOND = 12.6; // time-based, ~20% of original rate
+const HEALING_BEAM_OUTER_COLOR = 'rgba(70, 255, 175, 0.75)';
+const HEALING_BEAM_INNER_COLOR = 'rgba(190, 255, 230, 0.95)';
 
 function isWorldOnScreen(x, y, padding = 0) {
   return x >= ship.x - WIDTH / 2 - padding &&
@@ -2178,6 +2220,7 @@ function createDrone(index = 0, total = 1) {
     vx: 0,
     vy: 0,
     facingAngle: angle,
+    prevFacingAngle: angle,
     tilt: 0,
     orbitAngle: angle,
     state: 'chase',
@@ -2193,7 +2236,11 @@ function createDrone(index = 0, total = 1) {
 
 function syncActiveDronesForCurrentShip() {
   const desired = Math.min(getPurchasedDroneCount(currentShipType), getShipDroneCapacity(currentShipType));
-  for (let i = drones.length - 1; i >= desired; i--) drones.pop();
+  for (let i = drones.length - 1; i >= desired; i--) {
+    const drone = drones[i];
+    if (drone && drone._mesh && droneContainer) droneContainer.remove(drone._mesh);
+    drones.pop();
+  }
   const startCount = drones.length;
   for (let i = startCount; i < desired; i++) drones.push(createDrone(i, desired));
 }
@@ -2238,7 +2285,7 @@ function getNearestEligibleAggroBaseForDrone(drone) {
   let best = null;
   let bestDistSq = Infinity;
   for (const st of structures) {
-    if (st.type !== 'piratebase' || st.dead || st.health <= 0 || !st.aggroed) continue;
+    if (!isPirateBaseStructure(st) || st.dead || st.health <= 0 || !st.aggroed) continue;
     if (!isWorldOnScreen(st.x, st.y, getPirateBaseHitRadius(st))) continue;
     const dx = st.x - drone.x;
     const dy = st.y - drone.y;
@@ -2265,6 +2312,15 @@ function pickDroneTarget(drone) {
     }
     return pirateTarget;
   }
+  if (lastPlayerTargetedMothership) {
+    const mothershipAlive = !lastPlayerTargetedMothership.dead && lastPlayerTargetedMothership.health > 0;
+    const mothershipPresent = structures.includes(lastPlayerTargetedMothership);
+    if (mothershipAlive && mothershipPresent &&
+        isWorldOnScreen(lastPlayerTargetedMothership.x, lastPlayerTargetedMothership.y, getMothershipRadius(lastPlayerTargetedMothership))) {
+      return lastPlayerTargetedMothership;
+    }
+    if (!mothershipAlive || !mothershipPresent) lastPlayerTargetedMothership = null;
+  }
   const baseTarget = getNearestEligibleAggroBaseForDrone(drone);
   if (baseTarget) return baseTarget;
   if (!lastPlayerHitAsteroid) return null;
@@ -2277,7 +2333,7 @@ function pickDroneTarget(drone) {
 }
 
 function getDroneTargetRadius(target) {
-  return target?.type === 'piratebase'
+  return isPirateBaseStructure(target)
     ? getPirateBaseHitRadius(target)
     : (target?.radius ?? target?.collisionRadius ?? PIRATE_BASE_COLLISION_RADIUS);
 }
@@ -2507,9 +2563,9 @@ function refreshStructureMeshes() {
   const STRUCTURE_SIZE = 40;
   const STRUCTURE_DIAMETER = STRUCTURE_SIZE * 2;
   const STRUCTURE_SCALE_MULT = 2.7; // base
-  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0, crafting: 0.75, shipyard: 0.96, refinery: 1.0, mothership: 1.875 };
+  const scaleMultByType = { warpgate: 1.15, shop: 1.10, piratebase: 1.0, healingbase: 1.0, crafting: 0.75, shipyard: 0.96, refinery: 1.0, mothership: 1.875 };
   const getSourceModel = (st) => {
-    if (st.type === 'piratebase') {
+    if (isPirateBaseStructure(st)) {
       const tier = normalizePirateBaseTier(st.tier);
       return structureModels.piratebase?.[tier] || structureModels.piratebase?.[2] || structureModels['shop'];
     }
@@ -2526,7 +2582,7 @@ function refreshStructureMeshes() {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
     const typeMult = scaleMultByType[st.type] ?? 1.0;
-    const tierMult = st.type === 'piratebase' ? getPirateBaseTierScale(st.tier) : 1.0;
+    const tierMult = isPirateBaseStructure(st) ? getPirateBaseTierScale(st.tier) : 1.0;
     const scale = (STRUCTURE_DIAMETER / maxDim) * STRUCTURE_SCALE_MULT * typeMult * tierMult;
     clone.scale.setScalar(scale);
     if (st.type === 'mothership') {
@@ -2625,6 +2681,7 @@ function onMothershipDeath(st) {
   if (mothershipEncounter.activeMothershipId === st.id) {
     mothershipEncounter.activeMothershipId = null;
   }
+  if (lastPlayerTargetedMothership === st) lastPlayerTargetedMothership = null;
   if (getAliveMotherships().length <= 0) {
     resetMothershipEncounterState();
   }
@@ -2654,6 +2711,297 @@ function recordMothershipSpecialAttackType(st, attackType) {
   }
   st.lastSpecialAttackType = attackType;
   st.sameSpecialAttackStreak = 1;
+}
+
+function clampValue(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getMothershipNavBounds(st) {
+  const halfW = levelWidth * 0.5;
+  const halfH = levelHeight * 0.5;
+  const radius = getMothershipRadius(st);
+  const minX = -halfW + radius;
+  const maxX = halfW - radius;
+  const minY = -halfH + radius;
+  const maxY = halfH - radius;
+  return {
+    minX, maxX, minY, maxY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY)
+  };
+}
+
+function getMothershipNavGrid(st) {
+  const bounds = getMothershipNavBounds(st);
+  const cellSize = MOTHERSHIP_NAV_CELL_SIZE;
+  const cols = Math.max(4, Math.ceil(bounds.width / cellSize));
+  const rows = Math.max(4, Math.ceil(bounds.height / cellSize));
+  const blocked = new Uint8Array(cols * rows);
+  const inflateBy = getMothershipRadius(st) + MOTHERSHIP_AVOID_CLEARANCE;
+  const nav = {
+    bounds,
+    cellSize,
+    cols,
+    rows,
+    blocked,
+    minX: bounds.minX,
+    minY: bounds.minY
+  };
+  const toIndex = (cx, cy) => cy * cols + cx;
+  const cellCenterX = (cx) => nav.minX + (cx + 0.5) * cellSize;
+  const cellCenterY = (cy) => nav.minY + (cy + 0.5) * cellSize;
+  const markBlockedCircle = (cx, cy, radius) => {
+    const minCx = clampValue(Math.floor((cx - radius - nav.minX) / cellSize), 0, cols - 1);
+    const maxCx = clampValue(Math.floor((cx + radius - nav.minX) / cellSize), 0, cols - 1);
+    const minCy = clampValue(Math.floor((cy - radius - nav.minY) / cellSize), 0, rows - 1);
+    const maxCy = clampValue(Math.floor((cy + radius - nav.minY) / cellSize), 0, rows - 1);
+    const radiusSq = radius * radius;
+    for (let gridY = minCy; gridY <= maxCy; gridY++) {
+      const centerY = cellCenterY(gridY);
+      const dy = centerY - cy;
+      for (let gridX = minCx; gridX <= maxCx; gridX++) {
+        const centerX = cellCenterX(gridX);
+        const dx = centerX - cx;
+        if ((dx * dx + dy * dy) <= radiusSq) blocked[toIndex(gridX, gridY)] = 1;
+      }
+    }
+  };
+  for (const ast of asteroids) {
+    markBlockedCircle(ast.x, ast.y, ast.radius + inflateBy);
+  }
+  for (const other of structures) {
+    if (other === st || !isCollidableStructure(other)) continue;
+    markBlockedCircle(other.x, other.y, getStructureCollisionRadius(other) + inflateBy);
+  }
+  nav.toIndex = toIndex;
+  nav.isInBounds = (cx, cy) => cx >= 0 && cy >= 0 && cx < cols && cy < rows;
+  nav.worldToCell = (x, y) => ({
+    cx: clampValue(Math.floor((x - nav.minX) / cellSize), 0, cols - 1),
+    cy: clampValue(Math.floor((y - nav.minY) / cellSize), 0, rows - 1)
+  });
+  nav.cellToWorld = (cx, cy) => ({ x: cellCenterX(cx), y: cellCenterY(cy) });
+  nav.isBlocked = (cx, cy) => !nav.isInBounds(cx, cy) || blocked[toIndex(cx, cy)] !== 0;
+  return nav;
+}
+
+function findNearestOpenMothershipCell(nav, cx, cy, maxRadius = 8) {
+  if (!nav.isBlocked(cx, cy)) return { cx, cy };
+  for (let r = 1; r <= maxRadius; r++) {
+    for (let y = cy - r; y <= cy + r; y++) {
+      for (let x = cx - r; x <= cx + r; x++) {
+        if (Math.abs(x - cx) !== r && Math.abs(y - cy) !== r) continue;
+        if (!nav.isInBounds(x, y)) continue;
+        if (!nav.isBlocked(x, y)) return { cx: x, cy: y };
+      }
+    }
+  }
+  return null;
+}
+
+function findMothershipPath(nav, startX, startY, goalX, goalY) {
+  const startCellRaw = nav.worldToCell(startX, startY);
+  const goalCellRaw = nav.worldToCell(goalX, goalY);
+  const startCell = findNearestOpenMothershipCell(nav, startCellRaw.cx, startCellRaw.cy);
+  const goalCell = findNearestOpenMothershipCell(nav, goalCellRaw.cx, goalCellRaw.cy);
+  if (!startCell || !goalCell) return [];
+  const cols = nav.cols;
+  const rows = nav.rows;
+  const total = cols * rows;
+  const startIdx = nav.toIndex(startCell.cx, startCell.cy);
+  const goalIdx = nav.toIndex(goalCell.cx, goalCell.cy);
+  if (startIdx === goalIdx) return [nav.cellToWorld(startCell.cx, startCell.cy)];
+  const cameFrom = new Int32Array(total);
+  const gScore = new Float64Array(total);
+  const fScore = new Float64Array(total);
+  const opened = new Uint8Array(total);
+  const closed = new Uint8Array(total);
+  cameFrom.fill(-1);
+  gScore.fill(Infinity);
+  fScore.fill(Infinity);
+  const heuristic = (idx) => {
+    const cx = idx % cols;
+    const cy = Math.floor(idx / cols);
+    const dx = Math.abs(cx - goalCell.cx);
+    const dy = Math.abs(cy - goalCell.cy);
+    const diagonal = Math.min(dx, dy);
+    const straight = Math.max(dx, dy) - diagonal;
+    return diagonal * Math.SQRT2 + straight;
+  };
+  const openSet = [startIdx];
+  opened[startIdx] = 1;
+  gScore[startIdx] = 0;
+  fScore[startIdx] = heuristic(startIdx);
+  let expansions = 0;
+  while (openSet.length > 0 && expansions < MOTHERSHIP_NAV_MAX_EXPANSIONS) {
+    let bestSetIdx = 0;
+    let current = openSet[0];
+    let bestF = fScore[current];
+    for (let i = 1; i < openSet.length; i++) {
+      const candidate = openSet[i];
+      if (fScore[candidate] < bestF) {
+        bestF = fScore[candidate];
+        current = candidate;
+        bestSetIdx = i;
+      }
+    }
+    openSet.splice(bestSetIdx, 1);
+    opened[current] = 0;
+    if (current === goalIdx) {
+      const path = [];
+      let walk = current;
+      while (walk >= 0) {
+        const wx = walk % cols;
+        const wy = Math.floor(walk / cols);
+        path.push(nav.cellToWorld(wx, wy));
+        walk = cameFrom[walk];
+      }
+      path.reverse();
+      if (path.length > MOTHERSHIP_NAV_MAX_PATH_POINTS) {
+        path.splice(MOTHERSHIP_NAV_MAX_PATH_POINTS);
+      }
+      return path;
+    }
+    closed[current] = 1;
+    expansions++;
+    const cx = current % cols;
+    const cy = Math.floor(current / cols);
+    for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        if (ox === 0 && oy === 0) continue;
+        const nx = cx + ox;
+        const ny = cy + oy;
+        if (!nav.isInBounds(nx, ny) || nav.isBlocked(nx, ny)) continue;
+        if (ox !== 0 && oy !== 0) {
+          if (nav.isBlocked(cx + ox, cy) || nav.isBlocked(cx, cy + oy)) continue;
+        }
+        const neighbor = nav.toIndex(nx, ny);
+        if (closed[neighbor]) continue;
+        const moveCost = (ox !== 0 && oy !== 0) ? Math.SQRT2 : 1;
+        const tentative = gScore[current] + moveCost;
+        if (tentative >= gScore[neighbor]) continue;
+        cameFrom[neighbor] = current;
+        gScore[neighbor] = tentative;
+        fScore[neighbor] = tentative + heuristic(neighbor);
+        if (!opened[neighbor]) {
+          opened[neighbor] = 1;
+          openSet.push(neighbor);
+        }
+      }
+    }
+  }
+  return [];
+}
+
+function pickMothershipNavGoal(st, nav) {
+  const bounds = nav.bounds;
+  for (let i = 0; i < MOTHERSHIP_NAV_GOAL_RETRY_COUNT; i++) {
+    let x;
+    let y;
+    if (Math.random() < 0.7) {
+      const angle = Math.random() * Math.PI * 2;
+      const radialDist = MOTHERSHIP_NAV_PLAYER_MIN_DIST + Math.random() * (MOTHERSHIP_NAV_PLAYER_BIAS_RADIUS - MOTHERSHIP_NAV_PLAYER_MIN_DIST);
+      x = ship.x + Math.cos(angle) * radialDist;
+      y = ship.y + Math.sin(angle) * radialDist;
+    } else {
+      x = bounds.minX + Math.random() * bounds.width;
+      y = bounds.minY + Math.random() * bounds.height;
+    }
+    x = clampValue(x, bounds.minX, bounds.maxX);
+    y = clampValue(y, bounds.minY, bounds.maxY);
+    const cell = nav.worldToCell(x, y);
+    if (nav.isBlocked(cell.cx, cell.cy)) continue;
+    return { x, y };
+  }
+  const fallback = nav.worldToCell(st.x, st.y);
+  const nearest = findNearestOpenMothershipCell(nav, fallback.cx, fallback.cy);
+  return nearest ? nav.cellToWorld(nearest.cx, nearest.cy) : { x: st.x, y: st.y };
+}
+
+function ensureMothershipNavPath(st, dt) {
+  st.navReplanTimer = Number.isFinite(Number(st.navReplanTimer)) ? Number(st.navReplanTimer) : 0;
+  st.navGoalTimer = Number.isFinite(Number(st.navGoalTimer)) ? Number(st.navGoalTimer) : 0;
+  st.navReplanTimer -= dt;
+  st.navGoalTimer -= dt;
+  const path = Array.isArray(st.navPath) ? st.navPath : [];
+  st.navPath = path;
+  st.navWaypointIndex = Math.max(0, Math.floor(Number(st.navWaypointIndex) || 0));
+  if (st.navWaypointIndex >= path.length) st.navWaypointIndex = Math.max(0, path.length - 1);
+  const goalDefined = Number.isFinite(Number(st.navGoalX)) && Number.isFinite(Number(st.navGoalY));
+  const dxGoal = goalDefined ? (Number(st.navGoalX) - st.x) : 0;
+  const dyGoal = goalDefined ? (Number(st.navGoalY) - st.y) : 0;
+  const goalDist = Math.sqrt(dxGoal * dxGoal + dyGoal * dyGoal);
+  const goalReached = goalDefined && goalDist <= MOTHERSHIP_NAV_WAYPOINT_REACH_DIST;
+  const pathDone = path.length === 0 || st.navWaypointIndex >= path.length;
+  const needGoal = !goalDefined || goalReached || st.navGoalTimer <= 0;
+  const needPath = pathDone || st.navReplanTimer <= 0;
+  if (!needGoal && !needPath) return;
+  const nav = getMothershipNavGrid(st);
+  if (needGoal) {
+    const goal = pickMothershipNavGoal(st, nav);
+    st.navGoalX = goal.x;
+    st.navGoalY = goal.y;
+    st.navGoalTimer = MOTHERSHIP_NAV_GOAL_INTERVAL;
+  }
+  const newPath = findMothershipPath(nav, st.x, st.y, Number(st.navGoalX), Number(st.navGoalY));
+  st.navPath = newPath;
+  st.navWaypointIndex = newPath.length > 1 ? 1 : 0;
+  st.navReplanTimer = MOTHERSHIP_NAV_REPLAN_INTERVAL;
+}
+
+function getMothershipPathDirection(st) {
+  if (!Array.isArray(st.navPath) || st.navPath.length <= 0) return { x: 0, y: 0 };
+  while (st.navWaypointIndex < st.navPath.length) {
+    const target = st.navPath[st.navWaypointIndex];
+    const dx = target.x - st.x;
+    const dy = target.y - st.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist <= MOTHERSHIP_NAV_WAYPOINT_REACH_DIST) {
+      st.navWaypointIndex += 1;
+      continue;
+    }
+    return dist > 0 ? { x: dx / dist, y: dy / dist } : { x: 0, y: 0 };
+  }
+  return { x: 0, y: 0 };
+}
+
+function addMothershipBoundsSteering(st, ax, ay) {
+  const halfW = levelWidth * 0.5;
+  const halfH = levelHeight * 0.5;
+  const radius = getMothershipRadius(st);
+  const minX = -halfW + radius + MOTHERSHIP_NAV_BOUNDS_MARGIN;
+  const maxX = halfW - radius - MOTHERSHIP_NAV_BOUNDS_MARGIN;
+  const minY = -halfH + radius + MOTHERSHIP_NAV_BOUNDS_MARGIN;
+  const maxY = halfH - radius - MOTHERSHIP_NAV_BOUNDS_MARGIN;
+  let outAx = ax;
+  let outAy = ay;
+  if (st.x < minX) outAx += MOTHERSHIP_NAV_BOUNDS_PUSH_FORCE * ((minX - st.x) / Math.max(1, MOTHERSHIP_NAV_BOUNDS_MARGIN));
+  if (st.x > maxX) outAx -= MOTHERSHIP_NAV_BOUNDS_PUSH_FORCE * ((st.x - maxX) / Math.max(1, MOTHERSHIP_NAV_BOUNDS_MARGIN));
+  if (st.y < minY) outAy += MOTHERSHIP_NAV_BOUNDS_PUSH_FORCE * ((minY - st.y) / Math.max(1, MOTHERSHIP_NAV_BOUNDS_MARGIN));
+  if (st.y > maxY) outAy -= MOTHERSHIP_NAV_BOUNDS_PUSH_FORCE * ((st.y - maxY) / Math.max(1, MOTHERSHIP_NAV_BOUNDS_MARGIN));
+  return { ax: outAx, ay: outAy };
+}
+
+function clampMothershipInsideLevel(st) {
+  const halfW = levelWidth * 0.5;
+  const halfH = levelHeight * 0.5;
+  const radius = getMothershipRadius(st);
+  const minX = -halfW + radius;
+  const maxX = halfW - radius;
+  const minY = -halfH + radius;
+  const maxY = halfH - radius;
+  const clampedX = clampValue(st.x, minX, maxX);
+  const clampedY = clampValue(st.y, minY, maxY);
+  if (clampedX !== st.x) {
+    st.x = clampedX;
+    if (st.vx < 0 && clampedX === minX) st.vx = 0;
+    if (st.vx > 0 && clampedX === maxX) st.vx = 0;
+  }
+  if (clampedY !== st.y) {
+    st.y = clampedY;
+    if (st.vy < 0 && clampedY === minY) st.vy = 0;
+    if (st.vy > 0 && clampedY === maxY) st.vy = 0;
+  }
 }
 
 function setMothershipSpecialPhase(st, phase) {
@@ -2801,38 +3149,23 @@ function updateMotherships(dt) {
     st.specialAttackTimer = Number.isFinite(Number(st.specialAttackTimer)) ? Number(st.specialAttackTimer) : Math.max(MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_MIN, Number(st.specialAttackInterval) || MOTHERSHIP_SPECIAL_ATTACK_INTERVAL_DEFAULT);
     st.lastSpecialAttackType = typeof st.lastSpecialAttackType === 'string' ? st.lastSpecialAttackType : null;
     st.sameSpecialAttackStreak = Math.max(0, Math.floor(Number(st.sameSpecialAttackStreak) || 0));
+    st.navPath = Array.isArray(st.navPath) ? st.navPath : [];
+    st.navWaypointIndex = Math.max(0, Math.floor(Number(st.navWaypointIndex) || 0));
+    st.navReplanTimer = Number.isFinite(Number(st.navReplanTimer)) ? Number(st.navReplanTimer) : 0;
+    st.navGoalTimer = Number.isFinite(Number(st.navGoalTimer)) ? Number(st.navGoalTimer) : 0;
+    st.navGoalX = Number.isFinite(Number(st.navGoalX)) ? Number(st.navGoalX) : null;
+    st.navGoalY = Number.isFinite(Number(st.navGoalY)) ? Number(st.navGoalY) : null;
     tryStartMothershipSpecialAttack(st, dt);
     const movementMode = updateMothershipSpecialAttack(st, dt);
     const specialActive = movementMode !== 'normal';
 
-    if (!specialActive) {
-      if (st.state !== 'chase' && st.state !== 'circle') {
-        st.state = Math.random() < 0.9 ? 'circle' : 'chase';
-      }
-      st.stateTimer -= dt;
-      if (st.stateTimer <= 0) {
-        st.state = Math.random() < 0.9 ? 'circle' : 'chase';
-        st.stateTimer = 2 + Math.random() * 4;
-      }
-    }
-
-    const dx = ship.x - st.x;
-    const dy = ship.y - st.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const dirX = dist > 0 ? dx / dist : 0;
-    const dirY = dist > 0 ? dy / dist : 0;
-
     let ax = 0;
     let ay = 0;
     if (!specialActive) {
-      if (st.state === 'chase') {
-        ax += dirX * MOTHERSHIP_ACCEL;
-        ay += dirY * MOTHERSHIP_ACCEL;
-      } else {
-        const cw = (Number(st.id) || 0) > 0.5 ? 1 : -1;
-        ax += -dirY * cw * MOTHERSHIP_ACCEL;
-        ay += dirX * cw * MOTHERSHIP_ACCEL;
-      }
+      ensureMothershipNavPath(st, dt);
+      const navDir = getMothershipPathDirection(st);
+      ax += navDir.x * MOTHERSHIP_ACCEL;
+      ay += navDir.y * MOTHERSHIP_ACCEL;
     }
     const mothershipRadius = getMothershipRadius(st);
 
@@ -2859,6 +3192,9 @@ function updateMotherships(dt) {
           ay -= (ody / odist) * MOTHERSHIP_AVOID_FORCE;
         }
       }
+      const boundsSteer = addMothershipBoundsSteering(st, ax, ay);
+      ax = boundsSteer.ax;
+      ay = boundsSteer.ay;
     }
 
     if (!specialActive) {
@@ -2905,6 +3241,7 @@ function updateMotherships(dt) {
       const hit = pushOutOverlap(st, other, getMothershipRadius(st), getStructureCollisionRadius(other));
       if (hit) bounceEntity(st, hit.nx, hit.ny, BOUNCE_RESTITUTION);
     }
+    clampMothershipInsideLevel(st);
     // Mothership behaves as extremely heavy against the player ship:
     // resolve the ship side elsewhere, but do not displace/bounce mothership here.
     const shipHit = getCircleVsMothershipPenetration(ship.x, ship.y, shipCollisionRadius, st);
@@ -2923,7 +3260,7 @@ function updateMotherships(dt) {
 function updatePirates(dt) {
   // Aggro: player entering radius 300 around any living pirate base
   for (const st of structures) {
-    if (st.type !== 'piratebase' || st.dead || st.health <= 0) continue;
+    if (!isPirateBaseStructure(st) || st.dead || st.health <= 0) continue;
     const d = Math.sqrt((ship.x - st.x) ** 2 + (ship.y - st.y) ** 2);
     if (d < getPirateBaseAggroRadius(st)) st.aggroed = true;
   }
@@ -3295,6 +3632,12 @@ function updateDrones(dt) {
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
       drone.facingAngle += angleDiff * Math.min(1, 5 * dt);
     }
+    let droneDeltaAngle = drone.facingAngle - (drone.prevFacingAngle !== undefined ? drone.prevFacingAngle : drone.facingAngle);
+    while (droneDeltaAngle > Math.PI) droneDeltaAngle -= 2 * Math.PI;
+    while (droneDeltaAngle < -Math.PI) droneDeltaAngle += 2 * Math.PI;
+    drone.prevFacingAngle = drone.facingAngle;
+    drone.tilt = (drone.tilt || 0) + droneDeltaAngle * PIRATE_TILT_SENSITIVITY - (drone.tilt || 0) * PIRATE_TILT_DECAY * dt;
+    drone.tilt = Math.max(-0.5, Math.min(0.5, drone.tilt));
 
     drone.fireTimer = (drone.fireTimer + dt) % DRONE_FIRE_PERIOD;
     const fireActive = drone.fireTimer <= DRONE_FIRE_ACTIVE_TIME;
@@ -3314,7 +3657,7 @@ function updateDrones(dt) {
           const hit = getDroneLaserHit(drone, target, dirX, dirY, maxDist);
           if (hit) {
             hit.target.health -= DRONE_LASER_DPS * dt * shipDamageMult;
-            if (hit.target.type === 'piratebase' && hit.target.health <= 0) onPirateBaseDeath(hit.target);
+            if (isPirateBaseStructure(hit.target) && hit.target.health <= 0) onPirateBaseDeath(hit.target);
             const laserLength = Math.max(0, hit.distance - 2);
             const hitX = drone.x + dirX * laserLength;
             const hitY = drone.y + dirY * laserLength;
@@ -3423,12 +3766,12 @@ function update(dt) {
         const sparkX = ship.x - hit.nx * sparkOffset;
         const sparkY = ship.y - hit.ny * sparkOffset;
         spawnSparks(sparkX, sparkY, Math.max(2, Math.round(appliedDamage)));
-        if (st.type === 'piratebase' || st.type === 'mothership') {
-          if (st.type === 'piratebase') st.aggroed = true;
+        if (isPirateBaseStructure(st) || st.type === 'mothership') {
+          if (isPirateBaseStructure(st)) st.aggroed = true;
           const currentHealth = st.health ?? 100;
           st.health = Math.max(0, currentHealth - appliedDamage / 2);
           if (st.health <= 0) {
-            if (st.type === 'piratebase') onPirateBaseDeath(st);
+            if (isPirateBaseStructure(st)) onPirateBaseDeath(st);
             if (st.type === 'mothership') onMothershipDeath(st);
           }
         }
@@ -3559,14 +3902,16 @@ function update(dt) {
           if (target.radius != null) {
             lastPlayerHitAsteroid = target;
             target._vibrateUntil = levelElapsedTime + ASTEROID_VIBRATE_DURATION;
+          } else if (target.type === 'mothership') {
+            lastPlayerTargetedMothership = target;
           }
           // Apply damage multiplier only to pirates/pirate bases, not asteroids
-          const isEnemy = target.defendingBase !== undefined || target.type === 'piratebase' || target.type === 'mothership';
+          const isEnemy = target.defendingBase !== undefined || isPirateBaseStructure(target) || target.type === 'mothership';
           // Mining lasers deal 30% less damage to pirates than to asteroids
           const pirateDmgMult = 0.7;
           target.health -= laserStats.dps * dt * (isEnemy ? shipDamageMult * pirateDmgMult : 1);
           if (target.defendingBase) target.defendingBase.aggroed = true;
-          if (target.type === 'piratebase') {
+          if (isPirateBaseStructure(target)) {
             target.aggroed = true;
             if (target.health <= 0) onPirateBaseDeath(target);
           } else if (target.type === 'mothership' && target.health <= 0) {
@@ -3642,7 +3987,7 @@ function update(dt) {
   // Pirate base wave spawning while aggroed
   const BASE_SPAWN_OFFSET = 80;
   for (const st of structures) {
-    if (st.type !== 'piratebase' || st.dead || st.health <= 0 || !st.aggroed) continue;
+    if (!isPirateBaseStructure(st) || st.dead || st.health <= 0 || !st.aggroed) continue;
     st.spawnTimer -= dt;
     if (st.spawnTimer <= 0) {
       st.spawnTimer = st.spawnRate || 30; // Use instance spawn rate
@@ -3661,6 +4006,18 @@ function update(dt) {
           fromBaseSpawn: true
         }));
       }
+    }
+  }
+
+  // Healing bases continuously repair damaged motherships while alive.
+  for (const st of structures) {
+    if (st.type !== 'healingbase' || st.dead || st.health <= 0) continue;
+    for (const mothership of getAliveMotherships()) {
+      if (mothership.health >= mothership.maxHealth) continue;
+      mothership.health = Math.min(
+        mothership.maxHealth,
+        mothership.health + HEALING_BASE_HEAL_PER_SECOND * dt
+      );
     }
   }
 
@@ -3721,7 +4078,8 @@ function update(dt) {
               })();
           if (isHit) {
             st.health -= (b.pirateDmg ?? BULLET_DAMAGE_PIRATE) * shipDamageMult;
-            if (st.type === 'piratebase') st.aggroed = true;
+            if (isPirateBaseStructure(st)) st.aggroed = true;
+            if (st.type === 'mothership') lastPlayerTargetedMothership = st;
             remove = true;
             const impactPoint = st.type === 'mothership'
               ? getMothershipImpactPoint(st, b.x, b.y)
@@ -3729,7 +4087,7 @@ function update(dt) {
             spawnSparks(impactPoint.x, impactPoint.y, 4);
             sfx.playImpact('bullet');
             if (st.health <= 0) {
-              if (st.type === 'piratebase') onPirateBaseDeath(st);
+              if (isPirateBaseStructure(st)) onPirateBaseDeath(st);
               if (st.type === 'mothership') onMothershipDeath(st);
             }
             break;
@@ -4094,7 +4452,31 @@ function render(dt = 1 / 60) {
     ctx.lineTo(ex, ey);
     ctx.stroke();
   }
+  const aliveMotherships = getAliveMotherships();
+  if (aliveMotherships.length > 0) {
+    for (const st of structures) {
+      if (st.type !== 'healingbase' || st.dead || st.health <= 0) continue;
+      const from = worldToScreen(st.x, st.y);
+      for (const mothership of aliveMotherships) {
+        if (mothership.health >= mothership.maxHealth) continue;
+        const to = worldToScreen(mothership.x, mothership.y);
+        ctx.strokeStyle = HEALING_BEAM_OUTER_COLOR;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+        ctx.strokeStyle = HEALING_BEAM_INNER_COLOR;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+      }
+    }
+  }
   for (const d of drones) {
+    if (d._mesh) continue;
     const { x, y } = worldToScreen(d.x, d.y);
     if (x < -20 || x > WIDTH + 20 || y < -20 || y > HEIGHT + 20) continue;
     const size = 7;
@@ -4177,13 +4559,13 @@ function render(dt = 1 / 60) {
   // Structures (circles underneath 3D models; 2D circles for other types)
   const STRUCTURE_RADIUS_3D = 54;
   const STRUCTURE_SIZE = 40;
-  const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', crafting: '#886644', warpgate: '#6644aa', piratebase: '#884422', mothership: '#551111' };
+  const STRUCTURE_STYLES = { shop: '#446688', shipyard: '#664466', refinery: '#666644', fueling: '#446644', crafting: '#886644', warpgate: '#6644aa', piratebase: '#884422', healingbase: '#1f6b43', mothership: '#551111' };
   const INTERACTABLE_TYPES_SET = new Set(['shop', 'warpgate', 'crafting', 'refinery', 'shipyard']);
   for (const st of structures) {
-    if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
-    const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'shipyard' || st.type === 'refinery' || st.type === 'crafting' || st.type === 'piratebase';
+    if (isPirateBaseStructure(st) && (st.dead || st.health <= 0)) continue;
+    const is3D = st.type === 'warpgate' || st.type === 'shop' || st.type === 'shipyard' || st.type === 'refinery' || st.type === 'crafting' || isPirateBaseStructure(st);
     const r = is3D
-      ? (st.type === 'piratebase' ? getPirateBaseVisualRadius(st) : STRUCTURE_RADIUS_3D)
+      ? (isPirateBaseStructure(st) ? getPirateBaseVisualRadius(st) : STRUCTURE_RADIUS_3D)
       : (st.type === 'mothership'
           ? Math.max(getMothershipRadius(st), getMothershipHitbox(st).halfLength, getMothershipHitbox(st).halfWidth)
           : STRUCTURE_SIZE);
@@ -4191,7 +4573,7 @@ function render(dt = 1 / 60) {
     const glowPulse = hasKeyOpportunity ? (0.95 + Math.sin(levelElapsedTime * 2.4) * 0.08) : 1;
     const glowRadius = hasKeyOpportunity ? (r + 32) * glowPulse : 0;
     const isInteractable = INTERACTABLE_TYPES_SET.has(st.type);
-    const cullR = st.type === 'piratebase' ? getPirateBaseAggroRadius(st) : (isInteractable ? INTERACT_RADIUS : r);
+    const cullR = isPirateBaseStructure(st) ? getPirateBaseAggroRadius(st) : (isInteractable ? INTERACT_RADIUS : r);
     const cullMargin = hasKeyOpportunity ? Math.max(cullR, glowRadius) : cullR;
     const { x, y } = worldToScreen(st.x, st.y);
     if (x + cullMargin < 0 || x - cullMargin > WIDTH || y + cullMargin < 0 || y - cullMargin > HEIGHT) continue;
@@ -4208,8 +4590,12 @@ function render(dt = 1 / 60) {
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 2;
     if (is3D) {
-      if (st.type === 'piratebase') {
-        ctx.strokeStyle = normalizePirateBaseTier(st.tier) === 5 ? '#552200' : STRUCTURE_STYLES.piratebase;
+      if (isPirateBaseStructure(st)) {
+        if (st.type === 'healingbase') {
+          ctx.strokeStyle = normalizePirateBaseTier(st.tier) === 5 ? '#195336' : STRUCTURE_STYLES.healingbase;
+        } else {
+          ctx.strokeStyle = normalizePirateBaseTier(st.tier) === 5 ? '#552200' : STRUCTURE_STYLES.piratebase;
+        }
         ctx.setLineDash([10, 10]);
         ctx.beginPath();
         ctx.arc(x, y, getPirateBaseAggroRadius(st), 0, Math.PI * 2);
@@ -4247,7 +4633,7 @@ function render(dt = 1 / 60) {
     ctx.font = '14px Oxanium';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const label = st.type === 'warpgate' ? 'W' : (st.type === 'piratebase' ? 'P' : (st.type === 'mothership' ? 'M' : (st.type ? st.type.charAt(0).toUpperCase() : '?')));
+    const label = st.type === 'warpgate' ? 'W' : (st.type === 'piratebase' ? 'P' : (st.type === 'healingbase' ? 'H' : (st.type === 'mothership' ? 'M' : (st.type ? st.type.charAt(0).toUpperCase() : '?'))));
     ctx.fillText(label, x, y);
   }
 
@@ -4326,6 +4712,21 @@ function render(dt = 1 / 60) {
         p._mesh.rotation.z = p.tilt || 0;
         p._mesh.visible = true;
     }
+  }
+  for (const d of drones) {
+    if (!d._mesh && droneContainer && droneModel) {
+      const clone = droneModel.clone(true);
+      droneContainer.add(clone);
+      d._mesh = clone;
+    }
+    if (!d._mesh) continue;
+    const onScreen = d.x > cullLeft && d.x < cullRight && d.y > cullTop && d.y < cullBottom;
+    d._mesh.visible = onScreen;
+    if (!onScreen) continue;
+    d._mesh.position.set(d.x - ship.x, -(d.y - ship.y), 0);
+    d._mesh.rotation.x = -Math.PI / 2;
+    d._mesh.rotation.y = d.facingAngle + Math.PI / 2;
+    d._mesh.rotation.z = d.tilt || 0;
   }
 
   // Ship: 3D model if loaded, else 2D triangle
@@ -4463,7 +4864,7 @@ function render(dt = 1 / 60) {
     if (!shopMenuOpen && !craftingMenuOpen && !refineryMenuOpen && !shipyardMenuOpen) {
       for (const st of structures) {
         if (!INTERACTABLE_TYPES.has(st.type)) continue;
-        if (st.type === 'piratebase' && (st.dead || st.health <= 0)) continue;
+        if (isPirateBaseStructure(st) && (st.dead || st.health <= 0)) continue;
         const dx = ship.x - st.x;
         const dy = ship.y - st.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -4573,7 +4974,7 @@ function render(dt = 1 / 60) {
     const barW = 90;
     const barH = 6;
     for (const st of structures) {
-      if (st.type !== 'piratebase' || st.dead || st.health <= 0 || st.health >= st.maxHealth) continue;
+      if (!isPirateBaseStructure(st) || st.dead || st.health <= 0 || st.health >= st.maxHealth) continue;
       const r = getPirateBaseVisualRadius(st);
       const { x, y } = worldToScreen(st.x, st.y);
       if (x + barW / 2 < 0 || x - barW / 2 > WIDTH || y - r - 30 < 0 || y + 30 > HEIGHT) continue;
@@ -4581,7 +4982,7 @@ function render(dt = 1 / 60) {
       const barUpOffset = st.tier === 1 ? 28 : 20;
       pbCtx.fillStyle = 'rgba(0,0,0,0.5)';
       pbCtx.fillRect(x - barW / 2, y - r - barUpOffset, barW, barH);
-      pbCtx.fillStyle = '#ff3333';
+      pbCtx.fillStyle = st.type === 'healingbase' ? '#49d29d' : '#ff3333';
       pbCtx.fillRect(x - barW / 2, y - r - barUpOffset, barW * pct, barH);
     }
   }
@@ -5347,7 +5748,7 @@ function loadLevel(levelData, levelIdx, options = {}) {
       if (!st.prices) st.prices = {};
     }
     
-    if (st.type === 'piratebase') {
+    if (isPirateBaseStructure(st)) {
       st.tier = normalizePirateBaseTier(st.tier);
       // Use config health or default 150
       const hp = st.health || 150;
@@ -5418,6 +5819,12 @@ function loadLevel(levelData, levelIdx, options = {}) {
       st.shotgunVolleyIndex = 0;
       st.lastSpecialAttackType = null;
       st.sameSpecialAttackStreak = 0;
+      st.navPath = [];
+      st.navWaypointIndex = 0;
+      st.navReplanTimer = 0;
+      st.navGoalTimer = 0;
+      st.navGoalX = null;
+      st.navGoalY = null;
       st.dead = false;
     }
 
@@ -5425,12 +5832,13 @@ function loadLevel(levelData, levelIdx, options = {}) {
   });
   if (floatingOreContainer) while (floatingOreContainer.children.length) floatingOreContainer.remove(floatingOreContainer.children[0]);
   if (pirateContainer) while (pirateContainer.children.length) pirateContainer.remove(pirateContainer.children[0]);
+  if (droneContainer) while (droneContainer.children.length) droneContainer.remove(droneContainer.children[0]);
   floatingItems.length = 0; // Clear floating items on level load
   pirates.length = 0; // Clear pirates on level load
   drones.length = 0; // Rebuild drones for the active ship
   bullets.length = 0; // Clear bullets on level load
   for (const st of structures) {
-    if (st.type === 'piratebase') spawnBaseDefensePirates(st);
+    if (isPirateBaseStructure(st)) spawnBaseDefensePirates(st);
   }
   levelElapsedTime = 0;
   levelIsDebug = levelData.debug === true;
@@ -5481,6 +5889,7 @@ function loadLevel(levelData, levelIdx, options = {}) {
     if (currentLevelIdx === 3) {
       ownedShips.add('frigate');
       currentShipType = 'frigate';
+      setPurchasedDroneCount('frigate', 5);
     }
   }
 

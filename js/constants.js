@@ -76,7 +76,8 @@ export const STRUCTURE_STYLES = {
   refinery: '#666644', 
   fueling: '#446644', 
   warpgate: '#6644aa', 
-  piratebase: '#884422' 
+  piratebase: '#884422',
+  healingbase: '#1f6b43'
 };
 
 export const SHIP_STATS = {
@@ -189,6 +190,18 @@ export const MOTHERSHIP_SHOTGUN_PELLETS_PER_VOLLEY = 7;
 export const MOTHERSHIP_SHOTGUN_PELLET_SPREAD = 0.18;
 export const MOTHERSHIP_SHOTGUN_AIM_JITTER = 35;
 export const MOTHERSHIP_SHOTGUN_PELLET_DAMAGE = 3;
+export const MOTHERSHIP_NAV_CELL_SIZE = 180;
+export const MOTHERSHIP_NAV_REPLAN_INTERVAL = 1.2;
+export const MOTHERSHIP_NAV_GOAL_INTERVAL = 5;
+export const MOTHERSHIP_NAV_MAX_EXPANSIONS = 1600;
+export const MOTHERSHIP_NAV_MAX_PATH_POINTS = 48;
+export const MOTHERSHIP_NAV_WAYPOINT_REACH_DIST = 90;
+export const MOTHERSHIP_NAV_GOAL_RETRY_COUNT = 10;
+export const MOTHERSHIP_NAV_PLAYER_BIAS_RADIUS = 900;
+export const MOTHERSHIP_NAV_PLAYER_MIN_DIST = 280;
+export const MOTHERSHIP_NAV_BOUNDS_MARGIN = 80;
+export const MOTHERSHIP_NAV_BOUNDS_PUSH_FORCE = 340;
+export const HEALING_BASE_HEAL_PER_SECOND = 10;
 
 // --- Interaction radius (structure radius + dashed ring) ---
 export const INTERACT_RADIUS = STRUCTURE_SIZE_COLL + SHOP_DASHED_EXTRA_3D; // 54 + 108
@@ -301,12 +314,12 @@ export const ITEM_SELL_PRICE = {
 };
 
 // --- Collidable structure types ---
-const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'crafting', 'shipyard', 'refinery', 'mothership']);
+const COLLIDABLE_TYPES = new Set(['warpgate', 'shop', 'piratebase', 'healingbase', 'crafting', 'shipyard', 'refinery', 'mothership']);
 
 /** Returns true if a structure should participate in physics collision checks. */
 export function isCollidableStructure(st) {
   if (!COLLIDABLE_TYPES.has(st.type)) return false;
-  if (st.type === 'piratebase' && (st.dead || st.health <= 0)) return false;
+  if ((st.type === 'piratebase' || st.type === 'healingbase') && (st.dead || st.health <= 0)) return false;
   return true;
 }
 

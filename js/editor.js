@@ -66,6 +66,7 @@ const STRUCTURE_STYLES = {
   crafting: { fill: '#886644', stroke: '#aa8866' },
   warpgate: { fill: '#6644aa', stroke: '#8866cc' },
   piratebase: { fill: '#884422', stroke: '#aa6644' },
+  healingbase: { fill: '#1f6b43', stroke: '#4fbf87' },
   mothership: { fill: '#551111', stroke: '#aa3333' }
 };
 
@@ -91,12 +92,12 @@ const PIRATE_ARCHETYPE_OUTLINE_COLORS = Object.freeze({
 });
 
 function getStructureDrawScale(type, tier) {
-  return type === 'piratebase' ? getPirateBaseTierScale(tier) : 1;
+  return type === 'piratebase' || type === 'healingbase' ? getPirateBaseTierScale(tier) : 1;
 }
 
 function getStructureStyle(type, pirateArchetype = 'standard') {
   const baseStyle = STRUCTURE_STYLES[type] || STRUCTURE_STYLES.shop;
-  if (type !== 'piratebase') return baseStyle;
+  if (type !== 'piratebase' && type !== 'healingbase') return baseStyle;
   const resolvedArchetype = normalizePirateArchetype(pirateArchetype);
   return {
     ...baseStyle,
@@ -137,7 +138,7 @@ function renderPirateTypePercentagesEditor(parent, labelText, mixObj, onChange) 
 
 function normalizeStructure(st) {
   const out = { ...st };
-  if (out.type === 'piratebase') {
+  if (out.type === 'piratebase' || out.type === 'healingbase') {
     out.tier = normalizePirateBaseTier(out.tier);
     ensurePirateBaseSpawnDefaults(out);
   } else if (out.type === 'mothership') {
@@ -307,9 +308,13 @@ function drawStructure(ctx, x, y, type, isPreview = false, tier = 2, pirateArche
       ctx.globalAlpha = 1;
     }
 
-    if (type === 'piratebase') {
+    if (type === 'piratebase' || type === 'healingbase') {
       const ar = PIRATE_BASE_AGGRO_RADIUS * getPirateBaseTierScale(tier) * z;
-      ctx.strokeStyle = normalizePirateBaseTier(tier) === 5 ? '#bb2222' : '#ff3333';
+      if (type === 'healingbase') {
+        ctx.strokeStyle = normalizePirateBaseTier(tier) === 5 ? '#3cab7a' : '#4fd39a';
+      } else {
+        ctx.strokeStyle = normalizePirateBaseTier(tier) === 5 ? '#bb2222' : '#ff3333';
+      }
       ctx.lineWidth = 2;
       ctx.globalAlpha = isPreview ? 0.6 : 0.95;
       ctx.setLineDash([dashA, dashB]);
@@ -338,6 +343,7 @@ function drawStructure(ctx, x, y, type, isPreview = false, tier = 2, pirateArche
   let label = type.charAt(0).toUpperCase();
   if (type === 'warpgate') label = 'W';
   if (type === 'piratebase') label = `P${normalizePirateBaseTier(tier)}`;
+  if (type === 'healingbase') label = `H${normalizePirateBaseTier(tier)}`;
   
   ctx.fillText(label, s.x, s.y);
 }
@@ -704,7 +710,7 @@ function updatePropertiesPanel() {
       renderCraftingProperties(content, obj);
     } else if (obj.type === 'shipyard') {
       renderShipyardProperties(content, obj);
-    } else if (obj.type === 'piratebase') {
+    } else if (obj.type === 'piratebase' || obj.type === 'healingbase') {
       renderPirateBaseProperties(content, obj);
     } else if (obj.type === 'warpgate') {
       renderWarpGateProperties(content, obj);
@@ -1336,7 +1342,7 @@ function handlePlaceObject(world) {
     if (type === 'refinery') {
       st.acceptedOres = ['cuprite'];
     }
-    if (type === 'piratebase') {
+    if (type === 'piratebase' || type === 'healingbase') {
       st.tier = normalizePirateBaseTier(state.tool.piratebaseTier);
       st.pirateArchetype = 'standard';
       ensurePirateBaseSpawnDefaults(st);
@@ -1667,7 +1673,7 @@ if (pirateTierSelect) {
 document.querySelectorAll('.palette-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     state.tool.selected = btn.dataset.tool;
-    if (state.tool.selected === 'piratebase' && pirateTierSelect) {
+    if ((state.tool.selected === 'piratebase' || state.tool.selected === 'healingbase') && pirateTierSelect) {
       state.tool.piratebaseTier = normalizePirateBaseTier(pirateTierSelect.value);
     }
     document.querySelectorAll('.palette-btn').forEach(b => b.classList.remove('selected'));
