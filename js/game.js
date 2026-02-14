@@ -4313,29 +4313,84 @@ function syncShopSellArea() {
 
 // syncShopCredits merged into updateHUD
 
+function dropReturnedMenuItem(it, scatterRadius = 30) {
+  if (!it || !it.item) return;
+  const angle = Math.random() * Math.PI * 2;
+  floatingItems.push({
+    ...it,
+    x: ship.x + Math.cos(angle) * scatterRadius,
+    y: ship.y + Math.sin(angle) * scatterRadius,
+    vx: Math.cos(angle) * 40,
+    vy: Math.sin(angle) * 40
+  });
+}
+
+function addStackableToInventorySlots(itemName, quantity) {
+  let remaining = Math.max(0, Math.round(Number(quantity) || 0));
+  if (remaining <= 0) return 0;
+  const maxStack = getMaxStack(itemName);
+  if (maxStack <= 1) return remaining;
+
+  // Fill existing stacks first
+  for (let i = 0; i < inventory.slots.length && remaining > 0; i++) {
+    const slot = inventory.slots[i];
+    if (!slot || slot.item !== itemName || slot.quantity == null) continue;
+    const current = Math.max(0, Math.round(Number(slot.quantity) || 0));
+    const space = Math.max(0, maxStack - current);
+    if (space <= 0) continue;
+    const add = Math.min(space, remaining);
+    slot.quantity = current + add;
+    remaining -= add;
+  }
+
+  // Then create new stacks in empty slots
+  for (let i = 0; i < inventory.slots.length && remaining > 0; i++) {
+    if (inventory.slots[i]) continue;
+    const add = Math.min(maxStack, remaining);
+    inventory.set(i, { item: itemName, quantity: add });
+    remaining -= add;
+  }
+
+  return remaining;
+}
+
+function returnMenuItemToInventoryOrDrop(item, scatterRadius = 30) {
+  if (!item || typeof item.item !== 'string') return;
+  const payload = cloneSaveItem(item);
+  if (!payload) return;
+
+  // Stackables (ore, fragments, etc.) use quantity stacks.
+  if (payload.quantity != null) {
+    const remaining = addStackableToInventorySlots(payload.item, payload.quantity);
+    if (remaining > 0) {
+      payload.quantity = remaining;
+      dropReturnedMenuItem(payload, scatterRadius);
+    }
+    return;
+  }
+
+  // Non-stackable items occupy one slot.
+  for (let i = 0; i < inventory.slots.length; i++) {
+    if (!inventory.slots[i]) {
+      inventory.set(i, payload);
+      return;
+    }
+  }
+
+  // No room: drop in world so the item is not lost.
+  dropReturnedMenuItem(payload, scatterRadius);
+}
+
 
 function returnSellAreaToHotbar() {
   for (let i = 0; i < shopSellSlots.length; i++) {
     const it = shopSellSlots[i];
     if (!it) continue;
-    const qty = it.quantity != null ? it.quantity : 1;
-    if (ORE_ITEMS.includes(it.item)) {
-      inventory.add(it.item, qty);
-    } else {
-      for (let k = 0; k < qty; k++) {
-        const payload = { ...it };
-        if (payload.quantity != null) delete payload.quantity;
-        for (let j = 0; j < hotbar.length; j++) {
-          if (!hotbar[j]) {
-            hotbar[j] = { ...payload };
-            break;
-          }
-        }
-      }
-    }
+    returnMenuItemToInventoryOrDrop(it, 40);
     shopSellSlots[i] = null;
   }
   syncShopSellArea();
+  markHUDDirty();
 }
 
 window.addEventListener('keydown', (e) => {
@@ -5008,25 +5063,15 @@ function closeCraftingMenu() {
   // Return items to inventory or drop them
   for(let i=0; i<craftingInputSlots.length; i++) {
     if (craftingInputSlots[i]) {
-        if (!inventory.add(craftingInputSlots[i].item, craftingInputSlots[i].quantity)) {
-             // Drop if full
-             const it = craftingInputSlots[i];
-             const angle = Math.random() * Math.PI * 2;
-             floatingItems.push({
-               x: ship.x + Math.cos(angle) * 40,
-               y: ship.y + Math.sin(angle) * 40,
-               vx: Math.cos(angle) * 20,
-               vy: Math.sin(angle) * 20,
-               item: it.item,
-               quantity: it.quantity,
-               energy: it.energy, maxEnergy: it.maxEnergy,
-               fuel: it.fuel, maxFuel: it.maxFuel,
-               oxygen: it.oxygen, maxOxygen: it.maxOxygen
-             });
-        }
-        craftingInputSlots[i] = null;
+      returnMenuItemToInventoryOrDrop(craftingInputSlots[i], 40);
+      craftingInputSlots[i] = null;
     }
   }
+  // Return crafted (real) output if still present.
+  if (craftingOutputSlot && craftingOutputSlot.real) {
+    returnMenuItemToInventoryOrDrop(craftingOutputSlot, 40);
+  }
+  craftingOutputSlot = null;
   
   craftingMenuOpen = false;
   updateExtInvVisibility();
@@ -5035,6 +5080,8 @@ function closeCraftingMenu() {
   const overlay = document.getElementById('crafting-menu-overlay');
   if (overlay) overlay.style.display = 'none';
   inventoryDrag = null;
+  markHUDDirty();
+  updateHUD();
 }
 
 function syncCraftingUI() {
@@ -5200,19 +5247,7 @@ function closeRefineryMenu() {
   // Return unprocessed items to inventory or drop them
   for (let i = 0; i < 4; i++) {
     if (refineryInputSlots[i]) {
-      if (!inventory.add(refineryInputSlots[i].item, refineryInputSlots[i].quantity)) {
-        // Drop if full
-        const it = refineryInputSlots[i];
-        const angle = Math.random() * Math.PI * 2;
-        floatingItems.push({
-          x: ship.x + Math.cos(angle) * 30,
-          y: ship.y + Math.sin(angle) * 30,
-          vx: Math.cos(angle) * 40,
-          vy: Math.sin(angle) * 40,
-          item: it.item,
-          quantity: it.quantity
-        });
-      }
+      returnMenuItemToInventoryOrDrop(refineryInputSlots[i], 30);
       refineryInputSlots[i] = null;
     }
   }
@@ -5220,17 +5255,7 @@ function closeRefineryMenu() {
   for (let i = 0; i < 4; i++) {
     const it = refineryOutputSlots[i];
     if (!it || !it.real) continue;
-    if (!inventory.add(it.item, it.quantity)) {
-      const angle = Math.random() * Math.PI * 2;
-      floatingItems.push({
-        x: ship.x + Math.cos(angle) * 30,
-        y: ship.y + Math.sin(angle) * 30,
-        vx: Math.cos(angle) * 40,
-        vy: Math.sin(angle) * 40,
-        item: it.item,
-        quantity: it.quantity
-      });
-    }
+    returnMenuItemToInventoryOrDrop(it, 30);
     refineryOutputSlots[i] = null;
   }
 
@@ -5241,7 +5266,8 @@ function closeRefineryMenu() {
   const overlay = document.getElementById('refinery-menu-overlay');
   if (overlay) overlay.style.display = 'none';
   inventoryDrag = null;
-  hudDirty = true;
+  markHUDDirty();
+  updateHUD();
 }
 
 function syncRefineryUI() {

@@ -7409,7 +7409,7 @@
         }
       },
       {
-        "startTime": 1200,
+        "startTime": 1800,
         "waveIntervalMin": 30,
         "waveIntervalMax": 50,
         "waveSizeMin": 3,
