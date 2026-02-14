@@ -303,12 +303,23 @@
           <div class="slot" data-slot="7"></div>
           <div class="slot" data-slot="8"></div>
         </div>
+        <button type="button" id="hotbar-inventory-toggle" aria-label="Toggle extended inventory">Inv</button>
         <div id="hotbar-item-tooltip" style="display: none;"></div>
         <div id="credits">
           <div class="credits-label">Credits</div>
           <div class="credits-value">0</div>
         </div>
       </div>
+    </div>
+    <div id="mobile-controls-root" aria-hidden="true">
+      <div id="mobile-joystick-zone">
+        <div id="mobile-joystick-base"></div>
+        <div id="mobile-joystick-knob"></div>
+      </div>
+      <button type="button" id="mobile-brake-btn" class="mobile-control-btn">Brake</button>
+      <button type="button" id="mobile-interact-btn" class="mobile-control-btn">Use</button>
+      <button type="button" id="mobile-pause-btn" class="mobile-control-btn">Pause</button>
+      <button type="button" id="mobile-inventory-btn" class="mobile-control-btn">Inv</button>
     </div>
   </div>
   <script type="module" src="js/main.js"></script>

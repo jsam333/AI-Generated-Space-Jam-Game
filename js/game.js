@@ -174,6 +174,67 @@ let droneLaserWasActive = false;
 const input = new InputHandler(canvas);
 // Aliases for compatibility where possible, but primitives must be replaced
 
+const touchProfile = {
+  enabled: false,
+  layout: null, // null | phone | tablet | square
+  isPhone: false,
+  isTablet: false,
+  isSquare: false
+};
+
+function detectTouchLayout() {
+  const hasTouchPoints = (navigator.maxTouchPoints || 0) > 0;
+  const coarsePointer = !!(window.matchMedia && window.matchMedia('(any-pointer: coarse)').matches);
+  const isTouch = hasTouchPoints || coarsePointer;
+  const w = window.innerWidth || WIDTH;
+  const h = window.innerHeight || HEIGHT;
+  const shortSide = Math.min(w, h);
+  const longSide = Math.max(w, h);
+  const ratio = longSide / Math.max(1, shortSide);
+  const isSquare = ratio <= 1.34 && longSide <= 1700;
+  const isPhone = shortSide <= 900 && longSide <= 1600 && ratio > 1.34;
+  const isTablet = !isPhone && !isSquare && shortSide <= 1300 && longSide <= 2100;
+  let layout = null;
+  if (isTouch) {
+    if (isSquare) layout = 'square';
+    else if (isPhone) layout = 'phone';
+    else if (isTablet) layout = 'tablet';
+  }
+  return { isTouch, isPhone, isTablet, isSquare, layout };
+}
+
+function isTouchLayoutActive() {
+  return !!touchProfile.layout;
+}
+
+function applyTouchLayoutProfile() {
+  const next = detectTouchLayout();
+  touchProfile.enabled = next.isTouch;
+  touchProfile.isPhone = next.isPhone;
+  touchProfile.isTablet = next.isTablet;
+  touchProfile.isSquare = next.isSquare;
+  touchProfile.layout = next.layout;
+  input.setTouchEnabled(isTouchLayoutActive());
+  if (touchProfile.layout) {
+    document.body.dataset.touchLayout = touchProfile.layout;
+  } else {
+    delete document.body.dataset.touchLayout;
+  }
+}
+
+function getAimDirectionFromInput() {
+  const dx = input.mouseX - WIDTH / 2;
+  const dy = input.mouseY - HEIGHT / 2;
+  return normalize(dx, dy);
+}
+
+function getThrustDirectionFromInput() {
+  if (isTouchLayoutActive() && input.touchThrustActive) {
+    return { x: input.touchMoveX, y: input.touchMoveY };
+  }
+  return getAimDirectionFromInput();
+}
+
 // Ship tilt (banks when turning, decays when resting)
 let prevAimAngle = 0;
 let shipTilt = 0;
@@ -269,13 +330,14 @@ const deathSequence = {
 let pauseConfirmAction = null;
 
 function computeMenuPauseState() {
-  return warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen || pauseMenuOpen || saveBrowserOpen;
+  const paused = warpMenuOpen || shopMenuOpen || craftingMenuOpen || shipyardMenuOpen || refineryMenuOpen || pauseMenuOpen || saveBrowserOpen;
+  syncMobileControlsMenuState();
+  return paused;
 }
 
 function clearLatchedGameplayInput() {
-  input.leftMouseDown = false;
-  input.rightMouseDown = false;
-  input.ctrlBrake = false;
+  input.resetInputs();
+  resetMobileControlVisuals();
   sfx.stopLaserLoop();
   sfx.stopDroneLaserLoop();
   laserWasFiring = false;
@@ -704,6 +766,264 @@ if (mainMenuOverlay && mainMenuStartBtn) {
   startScreenOpen = false;
   gamePaused = false;
 }
+
+const mobileControlsRoot = document.getElementById('mobile-controls-root');
+const mobileJoystickZone = document.getElementById('mobile-joystick-zone');
+const mobileJoystickBase = document.getElementById('mobile-joystick-base');
+const mobileJoystickKnob = document.getElementById('mobile-joystick-knob');
+const mobileBrakeBtn = document.getElementById('mobile-brake-btn');
+const mobileInteractBtn = document.getElementById('mobile-interact-btn');
+const mobilePauseBtn = document.getElementById('mobile-pause-btn');
+const mobileInventoryBtn = document.getElementById('mobile-inventory-btn');
+const hotbarInventoryToggleBtn = document.getElementById('hotbar-inventory-toggle');
+
+const mobileControlState = {
+  joystickPointerId: null,
+  brakePointerId: null,
+  firePointerId: null,
+  joystickCenterX: 0,
+  joystickCenterY: 0,
+  joystickRadius: 52
+};
+
+function resetMobileControlVisuals() {
+  if (mobileControlsRoot) mobileControlsRoot.classList.remove('joystick-active');
+  if (mobileJoystickBase) {
+    mobileJoystickBase.style.left = '0px';
+    mobileJoystickBase.style.top = '0px';
+  }
+  if (mobileJoystickKnob) {
+    mobileJoystickKnob.style.left = '0px';
+    mobileJoystickKnob.style.top = '0px';
+  }
+  if (mobileBrakeBtn) mobileBrakeBtn.classList.remove('is-active');
+  input.setTouchMoveVector(0, 0, false);
+  input.setTouchBrakeActive(false);
+  input.setTouchFireActive(false);
+  mobileControlState.joystickPointerId = null;
+  mobileControlState.brakePointerId = null;
+  mobileControlState.firePointerId = null;
+}
+
+function setJoystickVisuals(centerX, centerY, knobX, knobY) {
+  if (!mobileControlsRoot || !mobileJoystickBase || !mobileJoystickKnob) return;
+  mobileControlsRoot.classList.add('joystick-active');
+  mobileJoystickBase.style.left = `${centerX}px`;
+  mobileJoystickBase.style.top = `${centerY}px`;
+  mobileJoystickKnob.style.left = `${knobX}px`;
+  mobileJoystickKnob.style.top = `${knobY}px`;
+}
+
+function updateIntroSkipHintCopy() {
+  const hintEl = document.getElementById('intro-skip-hint');
+  if (!hintEl) return;
+  hintEl.textContent = isTouchLayoutActive() ? 'Tap to skip' : 'Press any key to skip';
+}
+
+function syncMobileControlsMenuState() {
+  if (!mobileControlsRoot || !isTouchLayoutActive()) return;
+  const anyOverlayActive = startScreenOpen || deathScreenOpen || pauseMenuOpen || saveBrowserOpen ||
+    warpMenuOpen || shopMenuOpen || craftingMenuOpen || refineryMenuOpen || shipyardMenuOpen;
+  mobileControlsRoot.classList.toggle('menus-active', anyOverlayActive);
+}
+
+function applyTouchLayoutRuntime() {
+  applyTouchLayoutProfile();
+  updateIntroSkipHintCopy();
+  updateStartMenuHintCopy();
+  if (mobileControlsRoot) {
+    mobileControlsRoot.setAttribute('aria-hidden', isTouchLayoutActive() ? 'false' : 'true');
+  }
+  if (!isTouchLayoutActive()) resetMobileControlVisuals();
+  syncMobileControlsMenuState();
+}
+
+function updateStartMenuHintCopy() {
+  const el = document.querySelector('#start-menu .start-title');
+  if (!el) return;
+  el.textContent = isTouchLayoutActive() ? 'Tap to start' : 'Click to start';
+}
+
+function isMenuInteractionTarget(target) {
+  if (!target || !(target instanceof Element)) return false;
+  return !!target.closest(
+    '#level-select-ui, #hud-overlay, #pause-menu-overlay, #warp-menu-overlay, #shop-menu-overlay,' +
+    ' #crafting-menu-overlay, #refinery-menu-overlay, #shipyard-menu-overlay, #death-menu-overlay,' +
+    ' #save-browser-overlay, #main-menu-overlay, #start-menu-overlay, #intro-cutscene-overlay,' +
+    ' #mobile-controls-root, #mothership-intro-overlay'
+  );
+}
+
+function shouldSuppressMobileGameplay() {
+  return startScreenOpen || deathScreenOpen || gamePaused;
+}
+
+function handleJoystickMove(e) {
+  if (!isTouchLayoutActive()) return;
+  if (e.pointerId !== mobileControlState.joystickPointerId) return;
+  e.preventDefault();
+  const rect = mobileJoystickZone.getBoundingClientRect();
+  const localX = e.clientX - rect.left;
+  const localY = e.clientY - rect.top;
+  const dx = localX - mobileControlState.joystickCenterX;
+  const dy = localY - mobileControlState.joystickCenterY;
+  const mag = Math.hypot(dx, dy);
+  const radius = mobileControlState.joystickRadius;
+  const scale = mag > radius ? radius / mag : 1;
+  const clampedDx = dx * scale;
+  const clampedDy = dy * scale;
+  const knobX = mobileControlState.joystickCenterX + clampedDx;
+  const knobY = mobileControlState.joystickCenterY + clampedDy;
+  setJoystickVisuals(mobileControlState.joystickCenterX, mobileControlState.joystickCenterY, knobX, knobY);
+  input.setTouchMoveVector(clampedDx, clampedDy, mag > 8);
+}
+
+if (mobileJoystickZone) {
+  mobileJoystickZone.addEventListener('pointerdown', (e) => {
+    if (!isTouchLayoutActive()) return;
+    if (e.pointerType === 'mouse') return;
+    if (mobileControlState.joystickPointerId != null) return;
+    e.preventDefault();
+    mobileControlState.joystickPointerId = e.pointerId;
+    // Capture pointer so moves outside the zone still track
+    mobileJoystickZone.setPointerCapture(e.pointerId);
+    const rect = mobileJoystickZone.getBoundingClientRect();
+    const centerX = e.clientX - rect.left;
+    const centerY = e.clientY - rect.top;
+    mobileControlState.joystickCenterX = centerX;
+    mobileControlState.joystickCenterY = centerY;
+    setJoystickVisuals(centerX, centerY, centerX, centerY);
+    input.setTouchMoveVector(0, 0, false);
+  });
+
+  // Use pointermove on the zone itself — pointer capture ensures it fires even outside bounds
+  mobileJoystickZone.addEventListener('pointermove', handleJoystickMove);
+}
+
+function endJoystickPointer(pointerId) {
+  if (pointerId !== mobileControlState.joystickPointerId) return;
+  mobileControlState.joystickPointerId = null;
+  if (mobileControlsRoot) mobileControlsRoot.classList.remove('joystick-active');
+  input.setTouchMoveVector(0, 0, false);
+}
+
+window.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') return;
+  endJoystickPointer(e.pointerId);
+});
+
+window.addEventListener('pointercancel', (e) => {
+  if (e.pointerType === 'mouse') return;
+  endJoystickPointer(e.pointerId);
+});
+
+if (mobileBrakeBtn) {
+  mobileBrakeBtn.addEventListener('pointerdown', (e) => {
+    if (!isTouchLayoutActive()) return;
+    if (e.pointerType === 'mouse') return;
+    if (mobileControlState.brakePointerId != null) return;
+    e.preventDefault();
+    mobileControlState.brakePointerId = e.pointerId;
+    mobileBrakeBtn.classList.add('is-active');
+    input.setTouchBrakeActive(true);
+  });
+}
+
+function endBrakePointer(pointerId) {
+  if (pointerId !== mobileControlState.brakePointerId) return;
+  mobileControlState.brakePointerId = null;
+  if (mobileBrakeBtn) mobileBrakeBtn.classList.remove('is-active');
+  input.setTouchBrakeActive(false);
+}
+
+window.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') return;
+  endBrakePointer(e.pointerId);
+});
+
+window.addEventListener('pointercancel', (e) => {
+  if (e.pointerType === 'mouse') return;
+  endBrakePointer(e.pointerId);
+});
+
+// Fire/aim: touch on canvas area (outside joystick/brake/menu controls)
+window.addEventListener('pointerdown', (e) => {
+  if (!isTouchLayoutActive()) return;
+  if (e.pointerType === 'mouse') return;
+  if (shouldSuppressMobileGameplay()) return;
+  if (isMenuInteractionTarget(e.target)) return;
+  // Don't fire if this pointer is already tracked by joystick/brake/drag
+  if (e.pointerId === mobileControlState.joystickPointerId) return;
+  if (e.pointerId === mobileControlState.brakePointerId) return;
+  if (e.pointerId === mobileDragPointerId) return;
+  // Allow one active firing pointer so joystick + fire can coexist.
+  if (mobileControlState.firePointerId != null && mobileControlState.firePointerId !== e.pointerId) return;
+  mobileControlState.firePointerId = e.pointerId;
+  input.setTouchAimFromClient(e.clientX, e.clientY);
+  input.setTouchFireActive(true);
+}, { passive: true });
+
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse') return;
+  if (e.pointerId !== mobileControlState.firePointerId) return;
+  input.setTouchAimFromClient(e.clientX, e.clientY);
+});
+
+function endFirePointer(pointerId) {
+  if (pointerId !== mobileControlState.firePointerId) return;
+  mobileControlState.firePointerId = null;
+  input.setTouchFireActive(false);
+}
+
+window.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') return;
+  endFirePointer(e.pointerId);
+});
+
+window.addEventListener('pointercancel', (e) => {
+  if (e.pointerType === 'mouse') return;
+  endFirePointer(e.pointerId);
+});
+
+if (mobilePauseBtn) {
+  mobilePauseBtn.addEventListener('click', (e) => {
+    if (!isTouchLayoutActive()) return;
+    e.preventDefault();
+    if (pauseMenuOpen) closePauseMenu();
+    else openPauseMenu();
+  });
+}
+
+if (mobileInteractBtn) {
+  mobileInteractBtn.addEventListener('click', (e) => {
+    if (!isTouchLayoutActive()) return;
+    e.preventDefault();
+    triggerInteractionAction();
+  });
+}
+
+if (mobileInventoryBtn) {
+  mobileInventoryBtn.addEventListener('click', (e) => {
+    if (!isTouchLayoutActive()) return;
+    e.preventDefault();
+    _extInvPinnedForTouch = !_extInvPinnedForTouch;
+    if (!_extInvPinnedForTouch) hideHotbarTooltip();
+    updateExtInvVisibility();
+  });
+}
+
+if (hotbarInventoryToggleBtn) {
+  hotbarInventoryToggleBtn.addEventListener('click', (e) => {
+    if (!isTouchLayoutActive()) return;
+    e.preventDefault();
+    _extInvPinnedForTouch = !_extInvPinnedForTouch;
+    if (!_extInvPinnedForTouch) hideHotbarTooltip();
+    updateExtInvVisibility();
+  });
+}
+
+applyTouchLayoutRuntime();
+window.addEventListener('resize', applyTouchLayoutRuntime);
 
 // Death screen overlay (shown when HP reaches 0)
 const deathOverlayEl = document.getElementById('death-menu-overlay');
@@ -3688,9 +4008,7 @@ function update(dt) {
   const effectiveMaxSpeed = shipSlowActive ? MAX_SPEED * SHIP_SLOW_FACTOR : MAX_SPEED;
   // Ship movement (right-click) - only if there's a direction to move
   if (input.rightMouseDown && player.fuel > 0 && !deathSequence.active) {
-    const dx = input.mouseX - WIDTH / 2;
-    const dy = input.mouseY - HEIGHT / 2;
-    const dir = normalize(dx, dy);
+    const dir = getThrustDirectionFromInput();
     // Only apply thrust and consume fuel if there's a direction
     if (dir.x !== 0 || dir.y !== 0) {
       ship.vx += dir.x * effectiveAccel * dt;
@@ -4758,9 +5076,8 @@ function render(dt = 1 / 60) {
     shipMesh.rotation.y = -aimAngle + Math.PI / 2;
     shipMesh.rotation.z = shipTilt;
     // Show thruster flames when thrusting
-    const thrustDx = input.mouseX - WIDTH / 2;
-    const thrustDy = input.mouseY - HEIGHT / 2;
-    const isThrusting = input.rightMouseDown && player.fuel > 0 && (thrustDx !== 0 || thrustDy !== 0);
+    const thrustDir = getThrustDirectionFromInput();
+    const isThrusting = input.rightMouseDown && player.fuel > 0 && (thrustDir.x !== 0 || thrustDir.y !== 0);
     for (const flame of shipFlames) {
       flame.visible = isThrusting;
       flame.rotation.z = shipTilt; // Tilt flames with ship
@@ -5464,12 +5781,19 @@ function _flushHUD() {
 // Extended inventory visibility (hover or menu open)
 let _extInvVisible = false;
 let _extInvHovered = false;
+let _extInvPinnedForTouch = false;
 function updateExtInvVisibility() {
   const anyMenuOpen = shopMenuOpen || craftingMenuOpen || refineryMenuOpen || shipyardMenuOpen;
-  _extInvVisible = _extInvHovered || anyMenuOpen;
+  const shouldPin = isTouchLayoutActive() && _extInvPinnedForTouch;
+  _extInvVisible = _extInvHovered || anyMenuOpen || shouldPin;
   if (_extInvEl) {
     const shouldShow = inventory.slots.length > 9 && _extInvVisible;
     _extInvEl.classList.toggle('visible', shouldShow);
+  }
+  if (hotbarInventoryToggleBtn) {
+    const hasExtendedSlots = inventory.slots.length > 9;
+    hotbarInventoryToggleBtn.style.display = (isTouchLayoutActive() && hasExtendedSlots) ? 'inline-flex' : 'none';
+    hotbarInventoryToggleBtn.classList.toggle('is-active', hasExtendedSlots && _extInvPinnedForTouch);
   }
 }
 
@@ -5574,6 +5898,48 @@ function returnSellAreaToHotbar() {
   markHUDDirty();
 }
 
+function triggerInteractionAction() {
+  if (startScreenOpen || deathScreenOpen || pauseMenuOpen || saveBrowserOpen || warpMenuOpen) return;
+  if (shopMenuOpen) { closeShopMenu(); return; }
+  if (craftingMenuOpen) { closeCraftingMenu(); return; }
+  if (refineryMenuOpen) { closeRefineryMenu(); return; }
+  if (shipyardMenuOpen) { closeShipyardMenu(); return; }
+  if (gamePaused) return;
+
+  const warpSt = isShipInWarpGate();
+  if (warpSt) {
+    openWarpMenuForStructure(warpSt);
+    return;
+  }
+
+  const shopSt = isShipInShop();
+  if (shopSt) {
+    clearLatchedGameplayInput();
+    openShopMenu(shopSt);
+    return;
+  }
+
+  const craftSt = isShipInCrafting();
+  if (craftSt) {
+    clearLatchedGameplayInput();
+    openCraftingMenu(craftSt);
+    return;
+  }
+
+  const refSt = isShipInRefinery();
+  if (refSt) {
+    clearLatchedGameplayInput();
+    openRefineryMenu(refSt);
+    return;
+  }
+
+  const shipSt = isShipInShipyard();
+  if (shipSt) {
+    clearLatchedGameplayInput();
+    openShipyardMenu(shipSt);
+  }
+}
+
 window.addEventListener('keydown', (e) => {
   sfx.resumeIfNeeded();
   if (e.code === 'Escape' && saveBrowserOpen) {
@@ -5627,47 +5993,8 @@ window.addEventListener('keydown', (e) => {
   }
   // Key in E position (KeyE): open warp gate/shop/crafting/refinery/shipyard menu when inside
   if (e.code === 'KeyE') {
-    const warpSt = isShipInWarpGate();
-    if (!gamePaused && warpSt) {
-      e.preventDefault();
-      openWarpMenuForStructure(warpSt);
-    } else if (!gamePaused) {
-      const shopSt = isShipInShop();
-      if (shopSt) {
-        e.preventDefault();
-        input.leftMouseDown = false;
-        input.rightMouseDown = false;
-        input.ctrlBrake = false;
-        openShopMenu(shopSt);
-      } else {
-        const craftSt = isShipInCrafting();
-        if (craftSt) {
-          e.preventDefault();
-          input.leftMouseDown = false;
-          input.rightMouseDown = false;
-          input.ctrlBrake = false;
-          openCraftingMenu(craftSt);
-        } else {
-          const refSt = isShipInRefinery();
-          if (refSt) {
-            e.preventDefault();
-            input.leftMouseDown = false;
-            input.rightMouseDown = false;
-            input.ctrlBrake = false;
-            openRefineryMenu(refSt);
-          } else {
-            const shipSt = isShipInShipyard();
-            if (shipSt) {
-              e.preventDefault();
-              input.leftMouseDown = false;
-              input.rightMouseDown = false;
-              input.ctrlBrake = false;
-              openShipyardMenu(shipSt);
-            }
-          }
-        }
-      }
-    }
+    e.preventDefault();
+    triggerInteractionAction();
   }
 });
 window.addEventListener('keyup', (e) => {
@@ -6032,13 +6359,7 @@ function updateWarpMenuContent(st) {
 }
 
 function openWarpMenuForStructure(st) {
-  input.leftMouseDown = false;
-  input.rightMouseDown = false;
-  input.ctrlBrake = false;
-  sfx.stopLaserLoop();
-  sfx.stopDroneLaserLoop();
-  laserWasFiring = false;
-  droneLaserWasActive = false;
+  clearLatchedGameplayInput();
   gamePaused = true;
   warpMenuOpen = true;
   activeWarpStructure = st;
@@ -7072,6 +7393,13 @@ if (hudOverlayEl) {
   hudOverlayEl.addEventListener('mouseenter', () => { _extInvHovered = true; updateExtInvVisibility(); });
   hudOverlayEl.addEventListener('mouseleave', () => { _extInvHovered = false; updateExtInvVisibility(); });
   hudOverlayEl.addEventListener('wheel', handleHotbarScroll, { passive: false });
+  hudOverlayEl.addEventListener('click', (e) => {
+    if (!isTouchLayoutActive()) return;
+    const target = e.target;
+    if (target instanceof Element && target.closest('.slot, #credits, #hotbar-item-tooltip, #hotbar-inventory-toggle')) return;
+    _extInvPinnedForTouch = !_extInvPinnedForTouch;
+    updateExtInvVisibility();
+  });
 }
 
 function showShopTooltip(itemKey, price, isBuy, slotEl) {
@@ -7108,6 +7436,16 @@ document.querySelectorAll('.shop-buy-slot').forEach(el => {
     }
   });
   el.addEventListener('mouseleave', hideShopTooltip);
+  el.addEventListener('click', () => {
+    if (!isTouchLayoutActive()) return;
+    const idx = parseInt(el.dataset.buySlot, 10);
+    const it = shopBuySlots[idx];
+    if (!it) {
+      hideShopTooltip();
+      return;
+    }
+    showShopTooltip(it.item, getItemBuyPrice(it.item), true, el);
+  });
 });
 
 document.querySelectorAll('.shop-sell-slot').forEach(el => {
@@ -7120,6 +7458,16 @@ document.querySelectorAll('.shop-sell-slot').forEach(el => {
     }
   });
   el.addEventListener('mouseleave', hideShopTooltip);
+  el.addEventListener('click', () => {
+    if (!isTouchLayoutActive()) return;
+    const idx = parseInt(el.dataset.sellSlot, 10);
+    const it = shopSellSlots[idx];
+    if (!it) {
+      hideShopTooltip();
+      return;
+    }
+    showShopTooltip(it.item, getItemSellPrice(it), false, el);
+  });
 });
 
 function showHotbarTooltip(it, slotEl) {
@@ -7153,6 +7501,33 @@ document.querySelectorAll('#hotbar .slot, #extended-inventory .slot').forEach(el
     if (it) showHotbarTooltip(it, el);
   });
   el.addEventListener('mouseleave', hideHotbarTooltip);
+  el.addEventListener('click', () => {
+    if (!isTouchLayoutActive()) return;
+    const slotIndex = parseInt(el.dataset.slot, 10);
+    // Select this hotbar slot on touch (like pressing 1-9)
+    if (slotIndex >= 0 && slotIndex < 9) {
+      selectedSlot = slotIndex;
+      sfx.playHotbarSelect();
+      markHUDDirty();
+    }
+    const it = hotbar[slotIndex];
+    if (!it) {
+      hideHotbarTooltip();
+      return;
+    }
+    showHotbarTooltip(it, el);
+  });
+});
+
+window.addEventListener('pointerdown', (e) => {
+  if (!isTouchLayoutActive()) return;
+  const target = e.target;
+  if (!(target instanceof Element)) return;
+  const inTooltipSource = target.closest('.shop-buy-slot, .shop-sell-slot, #hotbar .slot, #extended-inventory .slot');
+  if (!inTooltipSource) {
+    hideShopTooltip();
+    hideHotbarTooltip();
+  }
 });
 
 // Inventory drag state (unified for HUD and Shop)
@@ -7585,6 +7960,65 @@ function endDrag(clientX, clientY) {
   }
 }
 
+let mobileDragPointerId = null;
+const MOBILE_DRAG_SELECTORS = [
+  '#hotbar .slot',
+  '#extended-inventory .slot',
+  '.shop-buy-slot',
+  '.shop-sell-slot',
+  '.crafting-slot.input-slot:not(.refinery-input-slot)',
+  '#crafting-work-area .crafting-slot.output-slot',
+  '.refinery-input-slot',
+  '#refinery-output-area .refinery-output-slot'
+].join(', ');
+
+function dispatchSyntheticMouseEvent(target, type, pointerEvent) {
+  if (!(target instanceof Element)) return;
+  const evt = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: pointerEvent.clientX,
+    clientY: pointerEvent.clientY,
+    button: 0,
+    buttons: type === 'mouseup' ? 0 : 1,
+    shiftKey: false
+  });
+  target.dispatchEvent(evt);
+}
+
+window.addEventListener('pointerdown', (e) => {
+  if (!isTouchLayoutActive()) return;
+  if (e.pointerType === 'mouse') return;
+  const target = e.target;
+  if (!(target instanceof Element)) return;
+  if (!target.closest(MOBILE_DRAG_SELECTORS)) return;
+  if (mobileDragPointerId != null) return;
+  mobileDragPointerId = e.pointerId;
+  e.preventDefault();
+  dispatchSyntheticMouseEvent(target, 'mousedown', e);
+}, { passive: false });
+
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'mouse') return;
+  if (e.pointerId !== mobileDragPointerId) return;
+  e.preventDefault();
+  dispatchSyntheticMouseEvent(document.body, 'mousemove', e);
+}, { passive: false });
+
+window.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'mouse') return;
+  if (e.pointerId !== mobileDragPointerId) return;
+  dispatchSyntheticMouseEvent(document.body, 'mouseup', e);
+  mobileDragPointerId = null;
+});
+
+window.addEventListener('pointercancel', (e) => {
+  if (e.pointerType === 'mouse') return;
+  if (e.pointerId !== mobileDragPointerId) return;
+  dispatchSyntheticMouseEvent(document.body, 'mouseup', e);
+  mobileDragPointerId = null;
+});
+
 // UI Drag Start Listener
 window.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
@@ -7838,6 +8272,7 @@ function gameLoop(now) {
   }
   render(gamePaused ? 0 : dt);
   _flushHUD(); // Only re-renders DOM when hudDirty is true
+  syncMobileControlsMenuState();
 
   requestAnimationFrame(gameLoop);
 }
